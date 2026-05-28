@@ -1,0 +1,19 @@
+# .github/workflows/
+# Pipelines CI GitHub Actions — un par composant.
+#
+# FICHIERS :
+#
+# ci_server.yml
+#   Build et tests du serveur C++. Lance make -C server puis les tests unitaires.
+#
+# ci_gui.yml
+#   Build de la GUI C++. Installe SFML, lance make -C gui.
+#
+# ci_ai.yml
+#   Lint (flake8) et tests Python. Lance pip install -r ai/requirements.txt
+#   puis pytest ai/tests/.
+
+# création de tous les fichiers d'un coup
+touch .github/workflows/ci_server.yml \
+      .github/workflows/ci_gui.yml \
+      .github/workflows/ci_ai.yml
