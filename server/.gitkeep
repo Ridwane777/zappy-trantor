@@ -1,0 +1,82 @@
+# server/
+# Binaire serveur C++ : zappy_server
+# Processus unique, thread unique, utilise poll() pour le multiplexage réseau.
+#
+# FICHIERS :
+#
+# Makefile
+#   Compile zappy_server. Règles : all, clean, fclean, re.
+#
+# src/main.cpp
+#   Point d'entrée. Parse les arguments CLI (-p -x -y -n -c -f),
+#   instancie et lance le serveur.
+#
+# src/Server.cpp
+#   Contient la boucle poll(). Accepte les nouvelles connexions, dispatche
+#   les lectures/écritures, fait tourner l'horloge du jeu et déclenche
+#   le respawn des ressources toutes les 20 unités de temps.
+#
+# src/ClientHandler.cpp
+#   Gère un client connecté (IA ou GUI). Bufferise les données entrantes,
+#   extrait les commandes terminées par \n, file jusqu'à 10 commandes en attente.
+#
+# src/World.cpp
+#   Possède la carte (width x height, toroïdale). Spawne les ressources au
+#   démarrage et toutes les 20 unités de temps via la formule de densité.
+#   Fournit les accesseurs de tuiles.
+#
+# src/Player.cpp
+#   Représente un Trantorien : position, direction, niveau, inventaire,
+#   compteur de nourriture (126 unités de temps par unité de nourriture).
+#   Gère la mort par famine.
+#
+# src/Resource.cpp
+#   Gère les quantités de ressources par tuile. Traite les commandes Take/Set.
+#   Gère les 7 types : food, linemate, deraumere, sibur, mendiane, phiras, thystame.
+#
+# src/Elevation.cpp
+#   Implémente le rituel d'incantation. Valide les prérequis (nombre de joueurs
+#   + pierres sur la tuile) au début ET à la fin de la fenêtre de 300/f.
+#   Gèle les joueurs pendant le rituel. Retire les pierres en cas de succès.
+#   Notifie la GUI via les événements protocole.
+#
+# src/Command.cpp
+#   Parse et exécute les 12 commandes IA : Forward, Right, Left, Look,
+#   Inventory, Broadcast, Connect_nbr, Fork, Eject, Take, Set, Incantation.
+#   Répond "ko" pour toute commande inconnue.
+#
+# include/Server.hpp
+#   Déclaration de la classe Server + gestion des fd pour poll().
+#
+# include/World.hpp
+#   Déclaration de la classe World + struct Tile.
+#
+# include/Player.hpp
+#   Déclaration de la classe Player + enum Direction.
+#
+# include/Protocol.hpp
+#   Constantes string du protocole partagées entre le serveur et le handler GUI.
+#   Noms des commandes GUI, formats des réponses, formats des événements push.
+#
+# tests/test_world.cpp
+#   Tests unitaires : spawn des ressources, wrapping toroïdal, formule de densité.
+#
+# tests/test_elevation.cpp
+#   Tests unitaires : validation des prérequis d'incantation par niveau.
+
+# ── création de tous les fichiers d'un coup ───────────────────────────────────
+touch server/Makefile \
+      server/src/main.cpp \
+      server/src/Server.cpp \
+      server/src/ClientHandler.cpp \
+      server/src/World.cpp \
+      server/src/Player.cpp \
+      server/src/Resource.cpp \
+      server/src/Elevation.cpp \
+      server/src/Command.cpp \
+      server/include/Server.hpp \
+      server/include/World.hpp \
+      server/include/Player.hpp \
+      server/include/Protocol.hpp \
+      server/tests/test_world.cpp \
+      server/tests/test_elevation.cpp
