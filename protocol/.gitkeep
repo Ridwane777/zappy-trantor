@@ -1,0 +1,22 @@
+# protocol/
+# Documentation uniquement — aucun code compilé.
+# Référence partagée entre le serveur, la GUI et l'IA.
+#
+# FICHIERS :
+#
+# ai_protocol.md
+#   Toutes les commandes IA → serveur avec syntaxe, temps d'exécution (T/f)
+#   et réponses attendues. Handshake de connexion. Limite des 10 commandes.
+#
+# gui_protocol.md
+#   Tous les messages GUI (msz, bct, pnw, ppo, plv, pin, pex, pbc, pfk,
+#   pdr, pgt, pie, seg, smg, suc, sbp). Format exact de chaque message.
+#
+# commands.md
+#   Table de référence rapide : toutes les commandes des deux protocoles
+#   sur une seule page. Utilisée comme aide-mémoire pendant le développement.
+
+# ── création de tous les fichiers d'un coup ───────────────────────────────────
+touch protocol/ai_protocol.md \
+      protocol/gui_protocol.md \
+      protocol/commands.md
