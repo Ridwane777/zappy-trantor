@@ -43,5 +43,21 @@ ServerConfig parseArgs(int argc, char **argv)
         std::cerr << "Error: missing required argument\n";
         usage(argv[0]);
     }
+    if (config.port <= 0 || config.port > 65535) {
+        std::cerr << "Error: port must be between 1 and 65535\n";
+        usage(argv[0]);
+    }
+    if (config.width <= 0 || config.height <= 0) {
+        std::cerr << "Error: width and height must be > 0\n";
+        usage(argv[0]);
+    }
+    if (config.clients <= 0) {
+        std::cerr << "Error: clientsNb must be > 0\n";
+        usage(argv[0]);
+    }
+    if (config.freq <= 0) {
+        std::cerr << "Error: freq must be > 0\n";
+        usage(argv[0]);
+    }
     return config;
 }
