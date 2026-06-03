@@ -15,6 +15,7 @@ $(NAME): $(OBJS)
 
 clean:
 	rm -f $(OBJS)
+	rm -f zappy_server
 
 fclean: clean
 	rm -f $(NAME)
