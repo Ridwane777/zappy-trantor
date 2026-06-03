@@ -1,0 +1,42 @@
+#include "Args.hpp"
+#include <iostream>
+#include <cstdlib>
+#include <stdexcept>
+
+void usage(const char *bin)
+{
+    std::cerr << "USAGE: " << bin
+              << " -p port -x width -y height -n name1 name2 ... -c clientsNb -f freq\n";
+    exit(84);
+}
+
+ServerConfig parseArgs(int argc, char **argv)
+{
+    ServerConfig config;
+
+    if (argc < 2)
+        usage(argv[0]);
+
+    for (int i = 1; i < argc; i++) {
+        std::string arg = argv[i];
+
+        if (arg == "-p" && i + 1 < argc) {
+            config.port = std::atoi(argv[++i]);
+        } else if (arg == "-x" && i + 1 < argc) {
+            config.width = std::atoi(argv[++i]);
+        } else if (arg == "-y" && i + 1 < argc) {
+            config.height = std::atoi(argv[++i]);
+        } else if (arg == "-c" && i + 1 < argc) {
+            config.clients = std::atoi(argv[++i]);
+        } else if (arg == "-f" && i + 1 < argc) {
+            config.freq = std::atoi(argv[++i]);
+        } else if (arg == "-n") {
+            while (i + 1 < argc && argv[i + 1][0] != '-')
+                config.teams.push_back(argv[++i]);
+        } else {
+            std::cerr << "Unknown argument: " << arg << "\n";
+            usage(argv[0]);
+        }
+    }
+    return config;
+}
