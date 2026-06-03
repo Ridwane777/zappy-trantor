@@ -38,5 +38,10 @@ ServerConfig parseArgs(int argc, char **argv)
             usage(argv[0]);
         }
     }
+    if (config.port == -1 || config.width == -1 || config.height == -1 ||
+        config.clients == -1 || config.teams.empty()) {
+        std::cerr << "Error: missing required argument\n";
+        usage(argv[0]);
+    }
     return config;
 }
