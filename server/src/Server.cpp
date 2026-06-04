@@ -37,6 +37,29 @@ void Server::_createSocket()
     setsockopt(_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 }
 
+void Server::_acceptClient()
+{
+    int clientFd = accept(_fd, nullptr, nullptr);
+    if (clientFd == -1)
+        return;
+    _fds.push_back({clientFd, POLLIN, 0});
+    std::cout << "Client connected: fd=" << clientFd << "\n";
+}
+
+void Server::_handleClient(std::size_t index)
+{
+    char buf[4096];
+    int n = read(_fds[index].fd, buf, sizeof(buf));
+
+    if (n <= 0) {
+        std::cout << "Client disconnected: fd=" << _fds[index].fd << "\n";
+        close(_fds[index].fd);
+        _fds.erase(_fds.begin() + index);
+        return;
+    }
+    std::cout << "fd=" << _fds[index].fd << " received: " << std::string(buf, n);
+}
+
 void Server::run()
 {
     _fds.push_back({_fd, POLLIN, 0});
