@@ -24,7 +24,7 @@ void Server::_bindAndListen()
     if (listen(_fd, SOMAXCONN) == -1)
         throw std::runtime_error("listen() failed");
 
-    std::cout << "Server listening on port " << _config.port << "\n";
+    std::cout << "Server listening on port " << _config.port << std::endl;
 }
 
 void Server::_createSocket()
@@ -43,7 +43,7 @@ void Server::_acceptClient()
     if (clientFd == -1)
         return;
     _fds.push_back({clientFd, POLLIN, 0});
-    std::cout << "Client connected: fd=" << clientFd << "\n";
+    std::cout << "Client connected: fd=" << clientFd << std::endl;
 }
 
 void Server::_handleClient(std::size_t index)
@@ -52,7 +52,7 @@ void Server::_handleClient(std::size_t index)
     int n = read(_fds[index].fd, buf, sizeof(buf));
 
     if (n <= 0) {
-        std::cout << "Client disconnected: fd=" << _fds[index].fd << "\n";
+        std::cout << "Client disconnected: fd=" << _fds[index].fd << std::endl;
         close(_fds[index].fd);
         _fds.erase(_fds.begin() + index);
         return;
