@@ -12,6 +12,21 @@ Server::Server(const ServerConfig &config) : _fd(-1), _config(config)
     _bindAndListen();
 }
 
+void Server::_bindAndListen()
+{
+    struct sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons(_config.port);
+
+    if (bind(_fd, (struct sockaddr *)&addr, sizeof(addr)) == -1)
+        throw std::runtime_error("bind() failed");
+    if (listen(_fd, SOMAXCONN) == -1)
+        throw std::runtime_error("listen() failed");
+
+    std::cout << "Server listening on port " << _config.port << "\n";
+}
+
 void Server::_createSocket()
 {
     _fd = socket(AF_INET, SOCK_STREAM, 0);
