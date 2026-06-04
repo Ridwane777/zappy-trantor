@@ -1,8 +1,8 @@
-from src.client import Client
-from src.player import Player
-from src.states.survive import survive
-from src.states.collect import collect
-from src.states.elevate import elevate
+from network.client import Client
+from logic.player import Player
+from logic.states.survive import survive
+from logic.states.collect import collect
+from logic.states.elevate import elevate
 
 
 class Brain:
