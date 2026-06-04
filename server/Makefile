@@ -4,7 +4,8 @@ CXXFLAGS = -Wall -Wextra -Werror -std=c++17 -Iinclude
 NAME    = zappy_server
 
 SRCS    = src/main.cpp \
-          src/Args.cpp
+          src/Args.cpp \
+          src/Server.cpp
 
 OBJS    = $(SRCS:.cpp=.o)
 
