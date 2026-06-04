@@ -2,4 +2,4 @@
 *.o
 zappy_server
 zappy_gui
-zappy_ai
+/zappy_ai
