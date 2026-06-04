@@ -37,6 +37,24 @@ void Server::_createSocket()
     setsockopt(_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 }
 
+void Server::run()
+{
+    _fds.push_back({_fd, POLLIN, 0});
+
+    while (true) {
+        if (poll(_fds.data(), _fds.size(), -1) == -1)
+            throw std::runtime_error("poll() failed");
+
+        if (_fds[0].revents & POLLIN)
+            _acceptClient();
+
+        for (std::size_t i = 1; i < _fds.size(); i++) {
+            if (_fds[i].revents & POLLIN)
+                _handleClient(i);
+        }
+    }
+}
+
 Server::~Server()
 {
     for (auto &pfd : _fds)
