@@ -1,0 +1,87 @@
+#include "../include/Server.hpp"
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <unistd.h>
+#include <stdexcept>
+#include <iostream>
+#include <cstring>
+
+Server::Server(const ServerConfig &config) : _fd(-1), _config(config)
+{
+    _createSocket();
+    _bindAndListen();
+}
+
+void Server::_bindAndListen()
+{
+    struct sockaddr_in addr{};
+    addr.sin_family = AF_INET;
+    addr.sin_addr.s_addr = INADDR_ANY;
+    addr.sin_port = htons(_config.port);
+
+    if (bind(_fd, (struct sockaddr *)&addr, sizeof(addr)) == -1)
+        throw std::runtime_error("bind() failed");
+    if (listen(_fd, SOMAXCONN) == -1)
+        throw std::runtime_error("listen() failed");
+
+    std::cout << "Server listening on port " << _config.port << std::endl;
+}
+
+void Server::_createSocket()
+{
+    _fd = socket(AF_INET, SOCK_STREAM, 0);
+    if (_fd == -1)
+        throw std::runtime_error("socket() failed");
+
+    int opt = 1;
+    setsockopt(_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+}
+
+void Server::_acceptClient()
+{
+    int clientFd = accept(_fd, nullptr, nullptr);
+    if (clientFd == -1)
+        return;
+    _fds.push_back({clientFd, POLLIN, 0});
+    std::cout << "Client connected: fd=" << clientFd << std::endl;
+}
+
+void Server::_handleClient(std::size_t index)
+{
+    char buf[4096];
+    int n = read(_fds[index].fd, buf, sizeof(buf));
+
+    if (n <= 0) {
+        std::cout << "Client disconnected: fd=" << _fds[index].fd << std::endl;
+        close(_fds[index].fd);
+        _fds.erase(_fds.begin() + index);
+        return;
+    }
+    std::cout << "fd=" << _fds[index].fd << " received: " << std::string(buf, n);
+}
+
+void Server::run()
+{
+    _fds.push_back({_fd, POLLIN, 0});
+
+    while (true) {
+        if (poll(_fds.data(), _fds.size(), -1) == -1)
+            throw std::runtime_error("poll() failed");
+
+        if (_fds[0].revents & POLLIN)
+            _acceptClient();
+
+        for (std::size_t i = 1; i < _fds.size(); i++) {
+            if (_fds[i].revents & POLLIN)
+                _handleClient(i);
+        }
+    }
+}
+
+Server::~Server()
+{
+    for (auto &pfd : _fds)
+        close(pfd.fd);
+    if (_fd != -1)
+        close(_fd);
+}
