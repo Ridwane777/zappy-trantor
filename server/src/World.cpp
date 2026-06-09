@@ -273,23 +273,20 @@ std::string World::_cmdSet(Player &p, const std::string &res)
 
 static int broadcastDirection(int sx, int sy, int rx, int ry, int width, int height, Orientation receiverOrientation)
 {
-    // Distance toroïdale signée (chemin le plus court)
-    int dx = rx - sx;
-    if (dx >  width / 2)  dx -= width;
-    if (dx < -width / 2)  dx += width;
-
-    int dy = ry - sy;
-    if (dy >  height / 2) dy -= height;
-    if (dy < -height / 2) dy += height;
-
+    int dx = sx - rx;
+    int dy = sy - ry;
+    if (dx >  width / 2)
+        dx -= width;
+    if (dx < -width / 2)
+        dx += width;
+    if (dy >  height / 2)
+        dy -= height;
+    if (dy < -height / 2)
+        dy += height;
     if (dx == 0 && dy == 0)
         return 0;
 
-    // Angle absolu (repère écran : y positif vers le bas)
-    double angle = std::atan2(dy, dx); // en radians, -π..π
-
-    // On ramène dans le repère du récepteur selon son orientation
-    // NORTH = regarde vers y-, EAST = vers x+, etc.
+    double angle = std::atan2(dy, dx);
     double orientAngle = 0.0;
     switch (receiverOrientation) {
         case NORTH: orientAngle = -M_PI / 2; break;
@@ -300,11 +297,11 @@ static int broadcastDirection(int sx, int sy, int rx, int ry, int width, int hei
 
     double rel = angle - orientAngle;
     // Normalise dans [-π, π]
-    while (rel >  M_PI) rel -= 2 * M_PI;
-    while (rel < -M_PI) rel += 2 * M_PI;
+    while (rel >  M_PI)
+        rel -= 2 * M_PI;
+    while (rel < -M_PI)
+        rel += 2 * M_PI;
 
-    // Découpe en 8 secteurs de 45° chacun
-    // K=1 = devant, K=2 = devant-droite, ..., K=8 = devant-gauche
     int sector = static_cast<int>(std::round(rel / (M_PI / 4)));
     if (sector < 0) sector += 8;
     sector = sector % 8;
@@ -361,8 +358,10 @@ std::string World::_cmdEject(Player &p)
     bool ejected = false;
 
     for (auto &other : _players) {
-        if (other.fd == p.fd) continue;
-        if (other.x != p.x || other.y != p.y) continue;
+        if (other.fd == p.fd)
+            continue;
+        if (other.x != p.x || other.y != p.y)
+            continue;
 
         switch (p.orientation) {
             case NORTH: other.y = _map.wrapY(other.y - 1); break;
@@ -371,8 +370,7 @@ std::string World::_cmdEject(Player &p)
             case WEST:  other.x = _map.wrapX(other.x - 1); break;
         }
         int k = broadcastDirection(p.x, p.y, other.x, other.y,
-                                   _config.width, _config.height,
-                                   other.orientation);
+                                   _config.width, _config.height, other.orientation);
         if (onPlayerEvent)
             onPlayerEvent(other.fd, "eject: " + std::to_string(k) + "\n");
 
