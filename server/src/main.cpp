@@ -1,5 +1,5 @@
-#include "Args.hpp"
-#include "Server.hpp"
+#include "../include/Args.hpp"
+#include "../include/Server.hpp"
 #include <iostream>
 
 int main(int argc, char **argv)

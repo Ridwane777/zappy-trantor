@@ -1,4 +1,4 @@
-#include "Player.hpp"
+#include "../include/Player.hpp"
  
 Player::Player(int id, int fd, int x, int y, const std::string &team) : id(id), fd(fd), x(x), y(y),
     orientation(NORTH), level(1), isDead(false), isIncanting(false), team(team)
