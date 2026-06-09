@@ -5,7 +5,10 @@ NAME    = zappy_server
 
 SRCS    = src/main.cpp \
           src/Args.cpp \
-          src/Server.cpp
+          src/Server.cpp \
+          src/World.cpp \
+          src/Map.cpp \
+          src/Player.cpp
 
 OBJS    = $(SRCS:.cpp=.o)
 
