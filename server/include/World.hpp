@@ -5,24 +5,26 @@
 #include <vector>
 #include <string>
 #include <functional>
-
+#include <unordered_map>
 struct Egg {
     int id;
     int x;
     int y;
     std::string team;
 };
+using CommandHandler = std::function<std::string(Player &, const std::string &)>;
 
 class World {
 public:
     explicit World(const ServerConfig &config);
-    void update(int ticks);
-    std::string executeCommand(int playerFd, const std::string &cmd);
-    void addPlayer(int fd, const std::string &team);
-    void removePlayer(int fd);
 
-    // Callback que Server injecte pour envoyer aux GUIs
+    void        update(int ticks);
+    std::string executeCommand(int playerFd, const std::string &cmd);
+    void        addPlayer(int fd, const std::string &team);
+    void        removePlayer(int fd);
+
     std::function<void(const std::string &)> onGuiEvent;
+    std::function<void(int fd, const std::string &)> onPlayerEvent;
 
 private:
     Map _map;
@@ -32,7 +34,11 @@ private:
     int _spawnTimer = 0;
     int _nextEggId  = 0;
 
-    Player *_getPlayer(int fd);
+    std::unordered_map<std::string, CommandHandler> _handlers;
+    void _initHandlers();
+
+    Player     *_getPlayer(int fd);
+
     std::string _cmdForward(Player &p);
     std::string _cmdRight(Player &p);
     std::string _cmdLeft(Player &p);
