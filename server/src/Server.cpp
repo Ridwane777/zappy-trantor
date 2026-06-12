@@ -53,6 +53,7 @@ void Server::_acceptClient()
     }
     _fds.push_back({clientFd, POLLIN, 0});
     _clients.push_back(Client(clientFd));
+    _clients.back().queueWrite("WELCOME\n");
     std::cout << "Client connected: fd=" << clientFd << std::endl;
 }
 
