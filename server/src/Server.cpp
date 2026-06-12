@@ -2,6 +2,7 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <stdexcept>
 #include <iostream>
 #include <cstring>
@@ -35,6 +36,9 @@ void Server::_createSocket()
 
     int opt = 1;
     setsockopt(_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    if (fcntl(_fd, F_SETFL, O_NONBLOCK) == -1)
+        throw std::runtime_error("fcntl() failed");
 }
 
 void Server::_acceptClient()
