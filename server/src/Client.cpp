@@ -23,3 +23,23 @@ void Client::clearReadBuffer()
 {
     _readBuffer.clear();
 }
+
+const std::string &Client::getWriteBuffer() const
+{
+    return _writeBuffer;
+}
+
+void Client::queueWrite(const std::string &data)
+{
+    _writeBuffer.append(data);
+}
+
+void Client::consumeWriteBuffer(std::size_t len)
+{
+    _writeBuffer.erase(0, len);
+}
+
+bool Client::hasPendingWrite() const
+{
+    return !_writeBuffer.empty();
+}
