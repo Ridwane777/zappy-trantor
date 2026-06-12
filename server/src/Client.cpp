@@ -9,6 +9,26 @@ int Client::getFd() const
     return _fd;
 }
 
+ClientState Client::getState() const
+{
+    return _state;
+}
+
+void Client::setState(ClientState state)
+{
+    _state = state;
+}
+
+const std::string &Client::getTeam() const
+{
+    return _team;
+}
+
+void Client::setTeam(const std::string &team)
+{
+    _team = team;
+}
+
 const std::string &Client::getReadBuffer() const
 {
     return _readBuffer;

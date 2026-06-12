@@ -2,11 +2,23 @@
 
 #include <string>
 
+enum class ClientState {
+    WAITING_TEAM_NAME,
+    AI,
+    GUI
+};
+
 class Client {
 public:
     Client(int fd);
 
     int getFd() const;
+
+    ClientState getState() const;
+    void setState(ClientState state);
+
+    const std::string &getTeam() const;
+    void setTeam(const std::string &team);
 
     const std::string &getReadBuffer() const;
     void appendToReadBuffer(const char *data, std::size_t len);
@@ -21,4 +33,6 @@ private:
     int _fd;
     std::string _readBuffer;
     std::string _writeBuffer;
+    ClientState _state = ClientState::WAITING_TEAM_NAME;
+    std::string _team;
 };
