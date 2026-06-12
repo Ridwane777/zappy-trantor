@@ -22,4 +22,5 @@ private:
     void _bindAndListen();
     void _acceptClient();
     void _handleClient(std::size_t index);
+    void _flushClient(std::size_t index);
 };

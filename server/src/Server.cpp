@@ -74,6 +74,17 @@ void Server::_handleClient(std::size_t index)
               << _clients[clientIndex].getReadBuffer();
 }
 
+void Server::_flushClient(std::size_t index)
+{
+    std::size_t clientIndex = index - 1;
+    Client &client = _clients[clientIndex];
+    const std::string &buffer = client.getWriteBuffer();
+
+    int n = write(_fds[index].fd, buffer.data(), buffer.size());
+    if (n > 0)
+        client.consumeWriteBuffer(n);
+}
+
 void Server::run()
 {
     _fds.push_back({_fd, POLLIN, 0});
