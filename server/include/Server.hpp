@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Args.hpp"
+#include "Client.hpp"
 #include <vector>
 #include <poll.h>
 
@@ -15,6 +16,7 @@ private:
     int _fd;
     ServerConfig _config;
     std::vector<struct pollfd> _fds;
+    std::vector<Client> _clients;
 
     void _createSocket();
     void _bindAndListen();
