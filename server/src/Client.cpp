@@ -44,6 +44,17 @@ void Client::clearReadBuffer()
     _readBuffer.clear();
 }
 
+bool Client::extractLine(std::string &line)
+{
+    std::size_t pos = _readBuffer.find('\n');
+    if (pos == std::string::npos)
+        return false;
+
+    line = _readBuffer.substr(0, pos);
+    _readBuffer.erase(0, pos + 1);
+    return true;
+}
+
 const std::string &Client::getWriteBuffer() const
 {
     return _writeBuffer;

@@ -23,6 +23,7 @@ public:
     const std::string &getReadBuffer() const;
     void appendToReadBuffer(const char *data, std::size_t len);
     void clearReadBuffer();
+    bool extractLine(std::string &line);
 
     const std::string &getWriteBuffer() const;
     void queueWrite(const std::string &data);
