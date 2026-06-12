@@ -71,16 +71,19 @@ void Server::_processHandshake(std::size_t index, const std::string &line)
         return;
     }
 
-    int &slots = _slots[line];
-    if (slots > 0) {
-        slots--;
+    auto it = _slots.find(line);
+    if (it != _slots.end() && it->second > 0) {
+        it->second--;
         client.setState(ClientState::AI);
         client.setTeam(line);
-        client.queueWrite(std::to_string(slots) + "\n");
+        client.queueWrite(std::to_string(it->second) + "\n");
         client.queueWrite(std::to_string(_config.width) + " " +
                            std::to_string(_config.height) + "\n");
         return;
     }
+
+    client.queueWrite("ko\n");
+    client.setState(ClientState::CLOSING);
 }
 
 bool Server::_handleClient(std::size_t index)
@@ -102,7 +105,7 @@ bool Server::_handleClient(std::size_t index)
     return false;
 }
 
-void Server::_flushClient(std::size_t index)
+bool Server::_flushClient(std::size_t index)
 {
     std::size_t clientIndex = index - 1;
     Client &client = _clients[clientIndex];
@@ -111,6 +114,14 @@ void Server::_flushClient(std::size_t index)
     int n = write(_fds[index].fd, buffer.data(), buffer.size());
     if (n > 0)
         client.consumeWriteBuffer(n);
+
+    if (client.getState() == ClientState::CLOSING && !client.hasPendingWrite()) {
+        close(_fds[index].fd);
+        _fds.erase(_fds.begin() + index);
+        _clients.erase(_clients.begin() + clientIndex);
+        return true;
+    }
+    return false;
 }
 
 void Server::run()
@@ -136,7 +147,7 @@ void Server::run()
             if (_fds[i].revents & POLLIN)
                 disconnected = _handleClient(i);
             if (!disconnected && (_fds[i].revents & POLLOUT))
-                _flushClient(i);
+                disconnected = _flushClient(i);
             if (disconnected)
                 i--;
         }

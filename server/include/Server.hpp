@@ -25,5 +25,5 @@ private:
     void _acceptClient();
     bool _handleClient(std::size_t index);
     void _processHandshake(std::size_t index, const std::string &line);
-    void _flushClient(std::size_t index);
+    bool _flushClient(std::size_t index);
 };

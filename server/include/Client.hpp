@@ -5,7 +5,8 @@
 enum class ClientState {
     WAITING_TEAM_NAME,
     AI,
-    GUI
+    GUI,
+    CLOSING
 };
 
 class Client {
