@@ -60,6 +60,29 @@ void Server::_acceptClient()
     std::cout << "Client connected: fd=" << clientFd << std::endl;
 }
 
+void Server::_processHandshake(std::size_t index, const std::string &line)
+{
+    Client &client = _clients[index - 1];
+
+    if (line == "GRAPHIC") {
+        client.setState(ClientState::GUI);
+        client.queueWrite("msz " + std::to_string(_config.width) + " " +
+                           std::to_string(_config.height) + "\n");
+        return;
+    }
+
+    int &slots = _slots[line];
+    if (slots > 0) {
+        slots--;
+        client.setState(ClientState::AI);
+        client.setTeam(line);
+        client.queueWrite(std::to_string(slots) + "\n");
+        client.queueWrite(std::to_string(_config.width) + " " +
+                           std::to_string(_config.height) + "\n");
+        return;
+    }
+}
+
 bool Server::_handleClient(std::size_t index)
 {
     char buf[4096];
