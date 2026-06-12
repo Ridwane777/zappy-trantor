@@ -60,14 +60,18 @@ void Server::_handleClient(std::size_t index)
 {
     char buf[4096];
     int n = read(_fds[index].fd, buf, sizeof(buf));
+    std::size_t clientIndex = index - 1;
 
     if (n <= 0) {
         std::cout << "Client disconnected: fd=" << _fds[index].fd << std::endl;
         close(_fds[index].fd);
         _fds.erase(_fds.begin() + index);
+        _clients.erase(_clients.begin() + clientIndex);
         return;
     }
-    std::cout << "fd=" << _fds[index].fd << " received: " << std::string(buf, n);
+    _clients[clientIndex].appendToReadBuffer(buf, n);
+    std::cout << "fd=" << _fds[index].fd << " received: "
+              << _clients[clientIndex].getReadBuffer();
 }
 
 void Server::run()
