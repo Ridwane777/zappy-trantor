@@ -56,7 +56,7 @@ void Server::_acceptClient()
     std::cout << "Client connected: fd=" << clientFd << std::endl;
 }
 
-void Server::_handleClient(std::size_t index)
+bool Server::_handleClient(std::size_t index)
 {
     char buf[4096];
     int n = read(_fds[index].fd, buf, sizeof(buf));
@@ -67,11 +67,12 @@ void Server::_handleClient(std::size_t index)
         close(_fds[index].fd);
         _fds.erase(_fds.begin() + index);
         _clients.erase(_clients.begin() + clientIndex);
-        return;
+        return true;
     }
     _clients[clientIndex].appendToReadBuffer(buf, n);
     std::cout << "fd=" << _fds[index].fd << " received: "
               << _clients[clientIndex].getReadBuffer();
+    return false;
 }
 
 void Server::_flushClient(std::size_t index)
@@ -90,6 +91,12 @@ void Server::run()
     _fds.push_back({_fd, POLLIN, 0});
 
     while (true) {
+        for (std::size_t i = 1; i < _fds.size(); i++) {
+            _fds[i].events = POLLIN;
+            if (_clients[i - 1].hasPendingWrite())
+                _fds[i].events |= POLLOUT;
+        }
+
         if (poll(_fds.data(), _fds.size(), -1) == -1)
             throw std::runtime_error("poll() failed");
 
@@ -97,8 +104,14 @@ void Server::run()
             _acceptClient();
 
         for (std::size_t i = 1; i < _fds.size(); i++) {
+            bool disconnected = false;
+
             if (_fds[i].revents & POLLIN)
-                _handleClient(i);
+                disconnected = _handleClient(i);
+            if (!disconnected && (_fds[i].revents & POLLOUT))
+                _flushClient(i);
+            if (disconnected)
+                i--;
         }
     }
 }
