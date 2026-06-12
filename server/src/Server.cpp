@@ -52,6 +52,7 @@ void Server::_acceptClient()
         return;
     }
     _fds.push_back({clientFd, POLLIN, 0});
+    _clients.push_back(Client(clientFd));
     std::cout << "Client connected: fd=" << clientFd << std::endl;
 }
 
