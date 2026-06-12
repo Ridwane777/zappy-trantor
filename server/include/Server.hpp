@@ -3,6 +3,7 @@
 #include "Args.hpp"
 #include "Client.hpp"
 #include <vector>
+#include <unordered_map>
 #include <poll.h>
 
 class Server {
@@ -17,6 +18,7 @@ private:
     ServerConfig _config;
     std::vector<struct pollfd> _fds;
     std::vector<Client> _clients;
+    std::unordered_map<std::string, int> _slots;
 
     void _createSocket();
     void _bindAndListen();

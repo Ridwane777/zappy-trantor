@@ -11,6 +11,9 @@ Server::Server(const ServerConfig &config) : _fd(-1), _config(config)
 {
     _createSocket();
     _bindAndListen();
+
+    for (const auto &team : _config.teams)
+        _slots[team] = _config.clients;
 }
 
 void Server::_bindAndListen()
