@@ -7,13 +7,45 @@
 #include <iostream>
 #include <cstring>
 
-Server::Server(const ServerConfig &config) : _fd(-1), _config(config)
+Server::Server(const ServerConfig &config) : _fd(-1), _config(config), _world(_config)
 {
     _createSocket();
     _bindAndListen();
 
     for (const auto &team : _config.teams)
         _slots[team] = _config.clients;
+
+    _world.onGuiEvent = [this](const std::string &msg) {
+        _broadcastToGui(msg);
+    };
+    _world.onPlayerEvent = [this](int fd, const std::string &msg) {
+        _sendToPlayer(fd, msg);
+    };
+}
+
+void Server::_broadcastToGui(const std::string &msg)
+{
+    for (auto &client : _clients)
+        if (client.getState() == ClientState::GUI)
+            client.queueWrite(msg);
+}
+
+void Server::_sendToPlayer(int fd, const std::string &msg)
+{
+    for (auto &client : _clients)
+        if (client.getFd() == fd) {
+            client.queueWrite(msg);
+            return;
+        }
+}
+
+void Server::_sendGuiBootstrap(Client &client)
+{
+    client.queueWrite("msz " + std::to_string(_config.width) + " " +
+                       std::to_string(_config.height) + "\n");
+    for (const auto &msg : _world.getGuiSnapshot())
+        client.queueWrite(msg);
+    client.queueWrite("sgt " + std::to_string(_config.freq) + "\n");
 }
 
 void Server::_bindAndListen()
@@ -66,8 +98,7 @@ void Server::_processHandshake(std::size_t index, const std::string &line)
 
     if (line == "GRAPHIC") {
         client.setState(ClientState::GUI);
-        client.queueWrite("msz " + std::to_string(_config.width) + " " +
-                           std::to_string(_config.height) + "\n");
+        _sendGuiBootstrap(client);
         return;
     }
 
@@ -79,6 +110,7 @@ void Server::_processHandshake(std::size_t index, const std::string &line)
         client.queueWrite(std::to_string(it->second) + "\n");
         client.queueWrite(std::to_string(_config.width) + " " +
                            std::to_string(_config.height) + "\n");
+        _world.addPlayer(client.getFd(), line);
         return;
     }
 
@@ -94,6 +126,8 @@ bool Server::_handleClient(std::size_t index)
 
     if (n <= 0) {
         std::cout << "Client disconnected: fd=" << _fds[index].fd << std::endl;
+        if (_clients[clientIndex].getState() == ClientState::AI)
+            _world.removePlayer(_fds[index].fd);
         close(_fds[index].fd);
         _fds.erase(_fds.begin() + index);
         _clients.erase(_clients.begin() + clientIndex);
