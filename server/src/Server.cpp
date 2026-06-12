@@ -99,9 +99,13 @@ bool Server::_handleClient(std::size_t index)
         _clients.erase(_clients.begin() + clientIndex);
         return true;
     }
-    _clients[clientIndex].appendToReadBuffer(buf, n);
-    std::cout << "fd=" << _fds[index].fd << " received: "
-              << _clients[clientIndex].getReadBuffer();
+    Client &client = _clients[clientIndex];
+    client.appendToReadBuffer(buf, n);
+
+    std::string line;
+    if (client.getState() == ClientState::WAITING_TEAM_NAME && client.extractLine(line))
+        _processHandshake(index, line);
+
     return false;
 }
 
