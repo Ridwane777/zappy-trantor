@@ -124,6 +124,26 @@ static std::string bctMsg(int x, int y, const Tile &t)
     return oss.str();
 }
 
+std::vector<std::string> World::getGuiSnapshot() const
+{
+    std::vector<std::string> msgs;
+
+    for (const auto &team : _config.teams)
+        msgs.push_back("tna " + team + "\n");
+
+    for (int y = 0; y < _map.getHeight(); y++)
+        for (int x = 0; x < _map.getWidth(); x++)
+            msgs.push_back(bctMsg(x, y, _map.getTile(x, y)));
+
+    for (const auto &p : _players)
+        msgs.push_back("pnw #" + std::to_string(p.id) + " " +
+                        std::to_string(p.x) + " " + std::to_string(p.y) + " " +
+                        std::to_string(p.orientation) + " " +
+                        std::to_string(p.level) + " " + p.team + "\n");
+
+    return msgs;
+}
+
 std::string World::_cmdForward(Player &p)
 {
     switch (p.orientation) {

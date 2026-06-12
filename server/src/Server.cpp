@@ -2,14 +2,50 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <stdexcept>
 #include <iostream>
 #include <cstring>
 
-Server::Server(const ServerConfig &config) : _fd(-1), _config(config)
+Server::Server(const ServerConfig &config) : _fd(-1), _config(config), _world(_config)
 {
     _createSocket();
     _bindAndListen();
+
+    for (const auto &team : _config.teams)
+        _slots[team] = _config.clients;
+
+    _world.onGuiEvent = [this](const std::string &msg) {
+        _broadcastToGui(msg);
+    };
+    _world.onPlayerEvent = [this](int fd, const std::string &msg) {
+        _sendToPlayer(fd, msg);
+    };
+}
+
+void Server::_broadcastToGui(const std::string &msg)
+{
+    for (auto &client : _clients)
+        if (client.getState() == ClientState::GUI)
+            client.queueWrite(msg);
+}
+
+void Server::_sendToPlayer(int fd, const std::string &msg)
+{
+    for (auto &client : _clients)
+        if (client.getFd() == fd) {
+            client.queueWrite(msg);
+            return;
+        }
+}
+
+void Server::_sendGuiBootstrap(Client &client)
+{
+    client.queueWrite("msz " + std::to_string(_config.width) + " " +
+                       std::to_string(_config.height) + "\n");
+    for (const auto &msg : _world.getGuiSnapshot())
+        client.queueWrite(msg);
+    client.queueWrite("sgt " + std::to_string(_config.freq) + "\n");
 }
 
 void Server::_bindAndListen()
@@ -35,6 +71,9 @@ void Server::_createSocket()
 
     int opt = 1;
     setsockopt(_fd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    if (fcntl(_fd, F_SETFL, O_NONBLOCK) == -1)
+        throw std::runtime_error("fcntl() failed");
 }
 
 void Server::_acceptClient()
@@ -42,22 +81,85 @@ void Server::_acceptClient()
     int clientFd = accept(_fd, nullptr, nullptr);
     if (clientFd == -1)
         return;
+
+    if (fcntl(clientFd, F_SETFL, O_NONBLOCK) == -1) {
+        close(clientFd);
+        return;
+    }
     _fds.push_back({clientFd, POLLIN, 0});
+    _clients.push_back(Client(clientFd));
+    _clients.back().queueWrite("WELCOME\n");
     std::cout << "Client connected: fd=" << clientFd << std::endl;
 }
 
-void Server::_handleClient(std::size_t index)
+void Server::_processHandshake(std::size_t index, const std::string &line)
+{
+    Client &client = _clients[index - 1];
+
+    if (line == "GRAPHIC") {
+        client.setState(ClientState::GUI);
+        _sendGuiBootstrap(client);
+        return;
+    }
+
+    auto it = _slots.find(line);
+    if (it != _slots.end() && it->second > 0) {
+        it->second--;
+        client.setState(ClientState::AI);
+        client.setTeam(line);
+        client.queueWrite(std::to_string(it->second) + "\n");
+        client.queueWrite(std::to_string(_config.width) + " " +
+                           std::to_string(_config.height) + "\n");
+        _world.addPlayer(client.getFd(), line);
+        return;
+    }
+
+    client.queueWrite("ko\n");
+    client.setState(ClientState::CLOSING);
+}
+
+bool Server::_handleClient(std::size_t index)
 {
     char buf[4096];
     int n = read(_fds[index].fd, buf, sizeof(buf));
+    std::size_t clientIndex = index - 1;
 
     if (n <= 0) {
         std::cout << "Client disconnected: fd=" << _fds[index].fd << std::endl;
+        if (_clients[clientIndex].getState() == ClientState::AI)
+            _world.removePlayer(_fds[index].fd);
         close(_fds[index].fd);
         _fds.erase(_fds.begin() + index);
-        return;
+        _clients.erase(_clients.begin() + clientIndex);
+        return true;
     }
-    std::cout << "fd=" << _fds[index].fd << " received: " << std::string(buf, n);
+    Client &client = _clients[clientIndex];
+    client.appendToReadBuffer(buf, n);
+
+    std::string line;
+    if (client.getState() == ClientState::WAITING_TEAM_NAME && client.extractLine(line))
+        _processHandshake(index, line);
+
+    return false;
+}
+
+bool Server::_flushClient(std::size_t index)
+{
+    std::size_t clientIndex = index - 1;
+    Client &client = _clients[clientIndex];
+    const std::string &buffer = client.getWriteBuffer();
+
+    int n = write(_fds[index].fd, buffer.data(), buffer.size());
+    if (n > 0)
+        client.consumeWriteBuffer(n);
+
+    if (client.getState() == ClientState::CLOSING && !client.hasPendingWrite()) {
+        close(_fds[index].fd);
+        _fds.erase(_fds.begin() + index);
+        _clients.erase(_clients.begin() + clientIndex);
+        return true;
+    }
+    return false;
 }
 
 void Server::run()
@@ -65,6 +167,12 @@ void Server::run()
     _fds.push_back({_fd, POLLIN, 0});
 
     while (true) {
+        for (std::size_t i = 1; i < _fds.size(); i++) {
+            _fds[i].events = POLLIN;
+            if (_clients[i - 1].hasPendingWrite())
+                _fds[i].events |= POLLOUT;
+        }
+
         if (poll(_fds.data(), _fds.size(), -1) == -1)
             throw std::runtime_error("poll() failed");
 
@@ -72,8 +180,14 @@ void Server::run()
             _acceptClient();
 
         for (std::size_t i = 1; i < _fds.size(); i++) {
+            bool disconnected = false;
+
             if (_fds[i].revents & POLLIN)
-                _handleClient(i);
+                disconnected = _handleClient(i);
+            if (!disconnected && (_fds[i].revents & POLLOUT))
+                disconnected = _flushClient(i);
+            if (disconnected)
+                i--;
         }
     }
 }

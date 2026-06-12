@@ -22,6 +22,7 @@ public:
     std::string executeCommand(int playerFd, const std::string &cmd);
     void        addPlayer(int fd, const std::string &team);
     void        removePlayer(int fd);
+    std::vector<std::string> getGuiSnapshot() const;
 
     std::function<void(const std::string &)> onGuiEvent;
     std::function<void(int fd, const std::string &)> onPlayerEvent;

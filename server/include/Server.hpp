@@ -1,7 +1,10 @@
 #pragma once
 
 #include "Args.hpp"
+#include "Client.hpp"
+#include "World.hpp"
 #include <vector>
+#include <unordered_map>
 #include <poll.h>
 
 class Server {
@@ -15,9 +18,17 @@ private:
     int _fd;
     ServerConfig _config;
     std::vector<struct pollfd> _fds;
+    std::vector<Client> _clients;
+    std::unordered_map<std::string, int> _slots;
+    World _world;
 
     void _createSocket();
     void _bindAndListen();
     void _acceptClient();
-    void _handleClient(std::size_t index);
+    bool _handleClient(std::size_t index);
+    void _processHandshake(std::size_t index, const std::string &line);
+    bool _flushClient(std::size_t index);
+    void _sendGuiBootstrap(Client &client);
+    void _broadcastToGui(const std::string &msg);
+    void _sendToPlayer(int fd, const std::string &msg);
 };
