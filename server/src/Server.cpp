@@ -46,6 +46,11 @@ void Server::_acceptClient()
     int clientFd = accept(_fd, nullptr, nullptr);
     if (clientFd == -1)
         return;
+
+    if (fcntl(clientFd, F_SETFL, O_NONBLOCK) == -1) {
+        close(clientFd);
+        return;
+    }
     _fds.push_back({clientFd, POLLIN, 0});
     std::cout << "Client connected: fd=" << clientFd << std::endl;
 }
