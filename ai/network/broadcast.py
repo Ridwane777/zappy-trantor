@@ -3,4 +3,13 @@ def encode(msg_type: str, data: str) -> str:
 
 
 def decode(raw: str):
-    pass
+    if not raw.startswith("message "):
+        return None
+
+    try:
+        after = raw[len("message "):]
+        k_part, content = after.split(",", 1)
+        direction = int(k_part.strip())
+        return (direction, content.strip(), "")
+    except (ValueError, IndexError):
+        return None
