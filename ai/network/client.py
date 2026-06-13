@@ -25,6 +25,13 @@ class Client:
         self.map_x = int(dims[0])
         self.map_y = int(dims[1])
 
+    def send(self, command: str) -> str:
+        self._write(command)
+        return self._read_line()
+
+    def receive(self) -> str:
+        return self._read_line()
+
     def _write(self, message: str):
         self.sock.sendall((message + "\n").encode())
 
