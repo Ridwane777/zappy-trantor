@@ -10,6 +10,14 @@ def decode(raw: str):
         after = raw[len("message "):]
         k_part, content = after.split(",", 1)
         direction = int(k_part.strip())
-        return (direction, content.strip(), "")
+
+        content = content.strip()
+        if ":" in content:
+            msg_type, data = content.split(":", 1)
+        else:
+            msg_type, data = content, ""
+
+        return (direction, msg_type.strip(), data.strip())
+
     except (ValueError, IndexError):
         return None
