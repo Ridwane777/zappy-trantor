@@ -7,7 +7,7 @@ from logic.brain import Brain
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(prog="zappy_ai")
+    parser = argparse.ArgumentParser(prog="zappy_ai", add_help=False)
     # port du serveur — obligatoire
     parser.add_argument("-p", type=int, required=True, dest="port")
     # nom de l'équipe — obligatoire
