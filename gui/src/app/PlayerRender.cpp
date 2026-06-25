@@ -218,3 +218,113 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
         M = glm::rotate(M, ctx.mewYaw, glm::vec3(0, 1, 0));
         M = glm::scale(M, glm::vec3(ctx.mewScale));
         glm::mat3 N3 = glm::mat3(glm::transpose(glm::inverse(M)));
+        skinShader.setMat4("uModel",     glm::value_ptr(M));
+        skinShader.setMat3("uNormalMat", glm::value_ptr(N3));
+        ctx.mewMesh.draw();
+    }
+
+    // ── night moon: textured, self-lit, low over the sky, fades in at night ──
+    if (ctx.haveMoon && nightF > 0.01f) {
+        ctx.moonMesh.computeBones(0, 0.f, pBones, true, false);
+        skinShader.setMat4Array("uBones[0]", MAX_BONES, glm::value_ptr(pBones[0]));
+        // mesh radius ~50 in local space; sky moon ≈ radius 250 at 1600 units
+        glm::vec3 mp = camPos + ctx.moonDir * 1600.f;
+        glm::mat4 M  = glm::translate(glm::mat4(1.f), mp);
+        M = glm::scale(M, glm::vec3(5.0f));
+        glm::mat3 N3 = glm::mat3(glm::transpose(glm::inverse(M)));
+        skinShader.setMat4 ("uModel",           glm::value_ptr(M));
+        skinShader.setMat3 ("uNormalMat",       glm::value_ptr(N3));
+        skinShader.setBool ("uUseTexture",      true);
+        skinShader.setFloat("uAmbientStrength", 1.5f);     // self-lit, bright
+        skinShader.setVec3 ("uDirLightColor",   0.f, 0.f, 0.f);
+        skinShader.setFloat("uAlpha",           nightF);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glDisable(GL_CULL_FACE);
+        ctx.moonMesh.draw();
+        glEnable(GL_CULL_FACE);
+        glDisable(GL_BLEND);
+        skinShader.setFloat("uAlpha", 1.0f);               // restore
+    }
+
+    // ── team-selection glow: selected team's characters glow team color ──
+    const std::string& selTeam = ctx.hud.selectedTeam();
+    if (!selTeam.empty()) {
+        glDisable(GL_CULL_FACE);
+        glDepthMask(GL_FALSE);
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE);             // additive
+        auraShader.use();
+        auraShader.setMat4("uView", glm::value_ptr(view));
+        auraShader.setMat4("uProj", glm::value_ptr(proj));
+        int ti = 0;
+        { const GuiState& gs = ctx.netClient.state();
+          for (int k = 0; k < (int)gs.teams.size(); ++k)
+              if (gs.teams[k] == selTeam) ti = k; }
+        glm::vec3 tc = HudOverlay::teamColor3(ti);
+        float gp = 0.55f + 0.45f * std::sin(elapsed * 4.f);  // steady pulse
+        for (const GuiPlayer* pp : drawList) {
+            const GuiPlayer& p = *pp;
+            if (p.team != selTeam || p.level < 1) continue;
+            SkinnedMesh& m = ctx.tiers[tierOf(ctx.tiers, p.level)].mesh;
+            m.computeBones(ctx.playerAnims[p.id].anim, ctx.playerAnims[p.id].animTime,
+                           pBones, true, false);
+            auraShader.setMat4Array("uBones[0]", MAX_BONES, glm::value_ptr(pBones[0]));
+            auraShader.setVec3 ("uColor", tc.r, tc.g, tc.b);
+            auraShader.setFloat("uAlpha", 0.30f + 0.35f * gp);
+            glm::mat4 M = glm::scale(playerModel(ctx, p), glm::vec3(1.06f));
+            auraShader.setMat4("uModel", glm::value_ptr(M));
+            m.draw();
+        }
+        glDepthMask(GL_TRUE);
+        glEnable(GL_CULL_FACE);
+        glDisable(GL_BLEND);
+    }
+
+    // eggs: level-0 players are unhatched eggs (textured)
+    if (ctx.eggMeshTex) {
+        float r  = ctx.eggMeshTex->boundingRadius();
+        float es = (r > 1e-4f) ? 0.15f / r : 0.15f;   // small, fits lvl-1 char
+        glm::vec3 ec = ctx.eggMeshTex->centroid();
+        eggShader.use();
+        eggShader.setMat4 ("uView", glm::value_ptr(view));
+        eggShader.setMat4 ("uProj", glm::value_ptr(proj));
+        eggShader.setInt  ("uTex", 0);
+        eggShader.setVec3 ("uDirLightDir",   sunDir.x, sunDir.y, sunDir.z);
+        eggShader.setVec3 ("uDirLightColor", lightCol.x, lightCol.y, lightCol.z);
+        eggShader.setVec3 ("uPointPos",   0.f, 10.f, 0.f);
+        eggShader.setVec3 ("uPointColor", 0.f, 0.f, 0.f);
+        eggShader.setFloat("uAmbient", 0.45f * ambScale);
+        eggShader.setFloat("uAlpha",   1.f);
+        eggShader.setFloat("uBright",  1.f);
+        glDisable(GL_CULL_FACE);
+        for (const GuiPlayer* pp : drawList) {
+            const GuiPlayer& p = *pp;
+            if (p.level != 0) continue;
+            glm::vec2 ew = ctx.playerAnims[p.id].curWorld;
+            float wx  = ew.x;
+            float wz  = ew.y;
+            float wob = std::sin(elapsed * 3.f + p.id) * 0.06f;   // gentle wobble
+            glm::mat4 M = glm::translate(glm::mat4(1.f), {wx, es * r, wz});
+            M = glm::rotate(M, wob, {0.f, 0.f, 1.f});
+            M = glm::scale(M, glm::vec3(es));
+            M = glm::translate(M, -ec);
+            glm::mat3 N3 = glm::mat3(glm::transpose(glm::inverse(M)));
+            eggShader.setMat4("uModel",     glm::value_ptr(M));
+            eggShader.setMat3("uNormalMat", glm::value_ptr(N3));
+            ctx.eggMeshTex->draw();
+        }
+        glEnable(GL_CULL_FACE);
+    }
+
+    // level ring on the ground: purple for odd levels, white for even
+    static Mesh levelRing = buildRingMesh();      // flat annulus, radius 1
+    glDisable(GL_CULL_FACE);
+    glDepthMask(GL_FALSE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE);            // additive glow
+    toon.use();
+    toon.setBool ("uEmissive", true);
+    toon.setBool ("uCircleClip", false);
+    toon.setBool ("uShoreBlend", false);
+    float ringPulse = 0.70f + 0.30f * std::sin(elapsed * 3.f);
