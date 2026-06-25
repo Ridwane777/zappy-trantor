@@ -23,3 +23,29 @@ uniform bool  uCrystal;
 uniform bool  uWave;
 uniform float uAlpha;
 uniform bool  uCircleClip;
+uniform bool  uShoreBlend;
+uniform vec2  uClipCenter;
+uniform float uClipRadius;
+uniform float uShoreInnerR;
+uniform float uShoreWidth;
+
+uniform vec3 uDirLightDir;
+uniform vec3 uDirLightColor;
+
+uniform vec3 uPointLight0Pos;
+uniform vec3 uPointLight0Color;
+uniform vec3 uPointLight1Pos;
+uniform vec3 uPointLight1Color;
+
+out vec4 FragColor;
+
+void main() {
+    if (uEmissive) {
+        FragColor = vec4(uColor * 1.4, 1.0);
+        return;
+    }
+
+    // pick base color: texture > vertex-baked > zone > uniform
+    vec3 baseColor = uColor;
+    if      (uUseTexture)     baseColor = texture(uTexture, vTexCoord).rgb;
+    else if (uUseVertexColor) baseColor = vVertColor;
