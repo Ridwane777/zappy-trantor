@@ -13,3 +13,9 @@ struct IncantationEffect {
 };
 constexpr float INCANT_DUR = 6.f;
 
+// Draws every active ritual (dashed Fresnel ring + Gaussian-beam pillars).
+// Self-contained GL state; uses the `incant` shader and the shared ring/quad
+// meshes. No-op when fx is empty.
+void drawIncantations(const std::vector<IncantationEffect>& fx, Shader& incant,
+                      const glm::mat4& view, const glm::mat4& proj,
+                      const glm::vec3& camPos, float elapsed);
