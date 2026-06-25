@@ -29,3 +29,35 @@ Mesh::Mesh(const std::vector<float>& verts, const std::vector<unsigned int>& ind
             float r2 = dx*dx + dy*dy + dz*dz;
             if (r2 > maxR2) maxR2 = r2;
         }
+        _radius = std::sqrt(maxR2);
+        if (_radius < 1e-5f) _radius = 1.f;
+
+        _yMin = verts[1];
+        for (int i = 1; i < n; ++i) {
+            float y = verts[i*stride + 1];
+            if (y < _yMin) _yMin = y;
+        }
+    }
+
+    glGenVertexArrays(1, &vao);
+    glGenBuffers(1, &vbo);
+    glGenBuffers(1, &ebo);
+
+    glBindVertexArray(vao);
+
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER,
+                 (GLsizeiptr)(verts.size() * sizeof(float)),
+                 verts.data(), GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
+                 (GLsizeiptr)(indices.size() * sizeof(unsigned int)),
+                 indices.data(), GL_STATIC_DRAW);
+
+    GLsizei byteStride = stride * sizeof(float);
+
+    // Position: layout 0, vec3
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, byteStride, (void*)0);
+    glEnableVertexAttribArray(0);
+
