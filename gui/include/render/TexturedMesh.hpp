@@ -7,3 +7,12 @@
 #include <glm/glm.hpp>
 
 class TexturedMesh {
+public:
+    TexturedMesh() = default;
+    ~TexturedMesh();
+
+    TexturedMesh(const TexturedMesh &) = delete;
+    TexturedMesh &operator=(const TexturedMesh &) = delete;
+    TexturedMesh(TexturedMesh &&other) noexcept;
+    TexturedMesh &operator=(TexturedMesh &&other) noexcept;
+
