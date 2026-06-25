@@ -6,3 +6,7 @@ uniform mat4  uView;
 uniform mat4  uProj;
 uniform float uSize;
 
+out vec2 vUV;
+out vec2 vXZ;
+
+void main() {
