@@ -13,3 +13,9 @@ uniform mat4 uBones[96];
 
 void main() {
     mat4 skin = aWeights.x * uBones[int(aJoints.x)]
+              + aWeights.y * uBones[int(aJoints.y)]
+              + aWeights.z * uBones[int(aJoints.z)]
+              + aWeights.w * uBones[int(aJoints.w)];
+
+    gl_Position = uProj * uView * uModel * skin * vec4(aPos, 1.0);
+}
