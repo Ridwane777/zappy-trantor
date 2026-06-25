@@ -40,3 +40,24 @@ struct PlayerAnim {
 
 // Shared state for the live/demo player pass, pulled out of GuiApp's run()
 // loop. Everything here is owned by GuiApp and persists across frames; this
+// struct just bundles references so the render passes below can share them
+// without a 25-parameter function signature.
+struct PlayerRenderCtx {
+    PlayerTier (&tiers)[4];
+    std::unordered_map<int, PlayerAnim>& playerAnims;
+    std::vector<Spark>& sparks;
+
+    bool testMode;
+    bool netConnected;
+    const std::vector<GuiPlayer>& testPlayers;
+    GuiClient& netClient;
+    const MapData& map;
+    float evoDur;
+    AudioManager& gameAudio;
+
+    bool adminMode, haveMew;
+    SkinnedMesh& mewMesh;
+    float mewAnimTime; bool mewMoving;
+    glm::vec3 mewPos; float mewYaw; float mewScale;
+
+    bool haveMoon;
