@@ -25,3 +25,12 @@ public:
     glm::vec3 centroid()       const { return _centroid; }
     float     boundingRadius() const { return _radius; }
     bool      hasTexture()     const { return _texId != 0; }
+
+private:
+    unsigned int _vao = 0, _vbo = 0, _ebo = 0, _texId = 0;
+    int          _indexCount = 0;
+    glm::vec3    _centroid{0.f};
+    float        _radius = 1.f;
+
+    void cleanup();
+};
