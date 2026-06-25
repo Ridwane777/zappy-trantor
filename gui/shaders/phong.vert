@@ -40,3 +40,17 @@ void main() {
     if (uSway) {
         // Sway top vertices more than base (use local Y as weight)
         float weight = max(0.0, pos.y) * 0.6;
+        float swayX  = sin(uTime * 1.3 + pos.z * 0.5) * weight * 0.12;
+        float swayZ  = cos(uTime * 0.9 + pos.x * 0.5) * weight * 0.08;
+        pos.x += swayX;
+        pos.z += swayZ;
+    }
+
+    if (!uWave) vWaveH = 0.0;
+    vec4 wp     = uModel * vec4(pos, 1.0);
+    vPos        = wp.xyz;
+    vNormal     = normalize(uNormalMat * norm);
+    vVertColor  = aVertColor;
+    vTexCoord   = vec2(0.0);
+    gl_Position = uProj * uView * wp;
+}
