@@ -13,3 +13,8 @@ class Shader;
 //   chargeT      : 0..1 charge progress (colour + spawn rate)
 //   justReleased : true on the single frame the pulse fires (spawns the ring)
 //
+// Updates + renders the additive billboards in one call.
+void drawTreeMotes(std::vector<Spark>& motes, bool charging, float chargeT,
+                   bool justReleased, const glm::vec3& treePos,
+                   Shader& star, unsigned vao, const glm::mat4& view,
+                   const glm::mat4& proj, float elapsed, float dt);
