@@ -46,3 +46,19 @@ public:
 private:
     // kind: 0=team header, 1=player row, 2=toggle tab, 3=panel background
     struct Hit { sf::FloatRect rect; int kind; std::string team; int pid; };
+
+    static sf::Color teamColorU(int i);
+
+    const sf::Font   *_font      = nullptr;
+    bool              _open      = true;
+    float             _anim      = 1.f;   // 0=hidden, 1=shown (slide)
+    std::string       _selTeam;           // "" = none → no team glow
+    int               _selPlayer = -1;    // -1 = none → no inventory popup
+    float             _invPollT  = 0.f;
+    std::vector<Hit>  _hits;
+    float             _scroll    = 0.f;   // team/player list scroll offset (px)
+    float             _maxScroll = 0.f;   // set during draw, clamps _scroll
+    float             _panelX    = 0.f;   // set during draw, for scroll hit-test
+
+    static constexpr float WIDTH = 250.f;
+};
