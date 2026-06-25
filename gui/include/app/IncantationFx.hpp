@@ -8,3 +8,8 @@ class Shader;
 // pillars, fading in/out over INCANT_DUR seconds.
 struct IncantationEffect {
     glm::vec3 pos;
+    float     timer    = 0.f;
+    bool      success  = false;
+};
+constexpr float INCANT_DUR = 6.f;
+
