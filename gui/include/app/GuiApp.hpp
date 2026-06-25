@@ -3,3 +3,5 @@
 // game loop (3D scene + 2D HudOverlay). Constructed and run from main().
 
 struct GuiApp {
+    int run(int argc, char **argv);
+};
