@@ -3,3 +3,13 @@
 zappy_server
 zappy_gui
 zappy_ai
+
+# Python caches
+__pycache__/
+*.pyc
+
+# Artefacts du script de push progressif (jamais commités)
+.push_state
+.push_files
+.push_backup/
+progressive_push.sh
