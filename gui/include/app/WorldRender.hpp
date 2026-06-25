@@ -25,3 +25,13 @@ void drawProps(Shader& toon, Shader& outline, const MapData& map,
 void drawResources(Shader& egg, const std::unique_ptr<TexturedMesh>* gemTex,
                    const MapData& map, const glm::vec3& sunDir,
                    const glm::vec3& lightCol, float ambScale,
+                   const glm::mat4& view, const glm::mat4& proj, float elapsed);
+
+// Floating textured food (apple/grapes/mushroom), varied per tile (foodMesh[0..2]).
+void drawFood(Shader& egg, const std::unique_ptr<TexturedMesh>* foodMesh,
+              const MapData& map, const glm::vec3& sunDir,
+              const glm::vec3& lightCol, float ambScale,
+              const glm::mat4& view, const glm::mat4& proj, float elapsed);
+
+// Drifting clouds (toon-shaded, no outline).
+void drawClouds(Shader& toon, const MapData& map, float elapsed);
