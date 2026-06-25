@@ -190,3 +190,67 @@ void drawResources(Shader& egg, const std::unique_ptr<TexturedMesh>* gemTex,
 
 void drawFood(Shader& egg, const std::unique_ptr<TexturedMesh>* foodMesh,
               const MapData& map, const glm::vec3& sunDir,
+              const glm::vec3& lightCol, float ambScale,
+              const glm::mat4& view, const glm::mat4& proj, float elapsed)
+{
+    if (!(foodMesh[0] || foodMesh[1] || foodMesh[2])) return;
+    egg.use();
+    egg.setMat4 ("uView", glm::value_ptr(view));
+    egg.setMat4 ("uProj", glm::value_ptr(proj));
+    egg.setInt  ("uTex", 0);
+    egg.setVec3 ("uDirLightDir",   sunDir.x, sunDir.y, sunDir.z);
+    egg.setVec3 ("uDirLightColor", lightCol.x, lightCol.y, lightCol.z);
+    egg.setVec3 ("uPointPos",   0.f, 10.f, 0.f);
+    egg.setVec3 ("uPointColor", 0.f, 0.f, 0.f);
+    egg.setFloat("uAmbient", 0.55f * ambScale);
+    egg.setFloat("uAlpha",   1.f);
+    egg.setFloat("uBright",  1.f);
+    glDisable(GL_CULL_FACE);
+    for (auto& tile : map.tiles) {
+        if (tile.res[0] <= 0) continue;
+        int v = ((tile.x * 7 + tile.y * 13) % 3 + 3) % 3;
+        TexturedMesh* fm = foodMesh[v] ? foodMesh[v].get()
+                         : foodMesh[0] ? foodMesh[0].get()
+                         : foodMesh[1] ? foodMesh[1].get() : foodMesh[2].get();
+        if (!fm) continue;
+        float r  = fm->boundingRadius();
+        float s  = (r > 1e-4f) ? 0.175f / r : 0.175f;   // x2.5
+        float wx = tile.x * TILE + TILE * 0.5f;
+        float wz = tile.y * TILE + TILE * 0.5f;
+        float bob = 0.30f + 0.05f * std::sin(elapsed * 1.5f + (tile.x * 17 + tile.y * 31) * 0.1f);
+        glm::mat4 M = glm::translate(glm::mat4(1.f), {wx, bob, wz});
+        M = glm::rotate(M, elapsed * 0.5f, {0.f, 1.f, 0.f});
+        M = glm::scale(M, glm::vec3(s));
+        M = glm::translate(M, -fm->centroid());
+        glm::mat3 N3 = glm::mat3(glm::transpose(glm::inverse(M)));
+        egg.setMat4("uModel",     glm::value_ptr(M));
+        egg.setMat3("uNormalMat", glm::value_ptr(N3));
+        fm->draw();
+    }
+    glEnable(GL_CULL_FACE);
+}
+
+void drawClouds(Shader& toon, const MapData& map, float elapsed)
+{
+    Mesh& cloudMesh = getMesh("cloud");
+    for (auto& c : map.clouds) {
+        float x = c.x * TILE + elapsed * c.drift_x * TILE;
+        float y = c.y;
+        float z = c.z * TILE + elapsed * c.drift_z * TILE;
+
+        float r = cloudMesh.boundingRadius();
+        float s = (r > 1e-4f) ? c.scale / r : c.scale;
+
+        glm::mat4 M = glm::translate(glm::mat4(1.f), {x, y, z});
+        M = glm::scale(M, glm::vec3(s));
+        M = glm::translate(M, -cloudMesh.centroid());
+        glm::mat3 N = glm::mat3(glm::transpose(glm::inverse(M)));
+        // No outline on clouds — they're white, outline makes them black blobs
+        toon.use();
+        toon.setMat4("uModel",     glm::value_ptr(M));
+        toon.setMat3("uNormalMat", glm::value_ptr(N));
+        toon.setVec3("uColor",     0.96f, 0.97f, 1.0f);
+        toon.setBool("uEmissive",  false);
+        cloudMesh.draw();
+    }
+}
