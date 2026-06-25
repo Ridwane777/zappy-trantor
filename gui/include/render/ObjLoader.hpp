@@ -4,3 +4,5 @@
 
 class ObjLoader {
 public:
+    static Mesh load(const std::string& path);
+};
