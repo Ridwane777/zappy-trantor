@@ -3,3 +3,8 @@
 #include <vector>
 
 class Shader;
+
+// One active incantation ritual: a glowing dashed domain ring + rising light
+// pillars, fading in/out over INCANT_DUR seconds.
+struct IncantationEffect {
+    glm::vec3 pos;
