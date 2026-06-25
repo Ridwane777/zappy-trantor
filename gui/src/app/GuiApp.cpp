@@ -787,3 +787,267 @@ int GuiApp::run(int argc, char** argv)
 
             if (ev.type == sf::Event::MouseWheelScrolled) {
                 sf::Vector2i mp = sf::Mouse::getPosition(window);
+                if (!hud.handleScroll(mp, ev.mouseWheelScroll.delta))   // sidebar scroll first
+                    camDist = glm::clamp(camDist - ev.mouseWheelScroll.delta * 1.5f,
+                                         4.f, 120.f);
+            }
+        }
+
+        // ── hot reload map.json ───────────────────────────────────────────────
+        time_t mt = fileMtime(MAP_FILE);
+        if (mt != lastMtime) {
+            try {
+                map       = loadMap(MAP_FILE);
+                landMesh  = buildGroundMesh(map.tiles, "tile",  false);
+                cliffMesh = buildGroundMesh(map.tiles, "tile",  true);
+                waterMesh = buildGroundMesh(map.tiles, "water", false);
+                for (auto& t : map.tiles)
+                    for (auto& p : t.props) getMesh(p.model);
+                cx = map.w * TILE * 0.5f;
+                cz = map.h * TILE * 0.5f;
+                lastMtime = mt;
+                std::cout << "Map reloaded\n";
+            } catch (std::exception& e) {
+                std::cerr << "Reload failed: " << e.what() << "\n";
+            }
+        }
+
+        // ── admin: fly Mew (forward/turn + Z up / S down), 3rd-person mouse look ──
+        if (adminMode) {
+            const float spd = 16.f, turn = 1.9f, vspd = 12.f;
+            glm::vec3 fwd(std::sin(mewYaw), 0.f, std::cos(mewYaw));
+            mewMoving = false;
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Up) ||
+                sf::Keyboard::isKeyPressed(sf::Keyboard::W)) { mewPos += fwd * spd * dt; mewMoving = true; }
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down)) { mewPos -= fwd * spd * dt; mewMoving = true; }
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left))  mewYaw += turn * dt;
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) mewYaw -= turn * dt;
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Z)) { mewPos.y += vspd * dt; mewMoving = true; }  // up
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) { mewPos.y -= vspd * dt; mewMoving = true; }  // down
+            if (mewPos.y < MEW_FLOOR) mewPos.y = MEW_FLOOR;   // can't go under the map
+            // anim seulement en déplacement ; à l'arrêt, pose neutre (droit) + le bob flotte
+            // en mouvement : l'animation tourne ; à l'arrêt : on laisse l'animation
+            // se terminer en douceur jusqu'à retomber sur la pose idle, puis on fige
+            if (mewMoving) {
+                mewAnimTime += dt;
+            } else {
+                float dur   = mewAnimDur > 0.01f ? mewAnimDur : 11.f;
+                float phase = std::fmod(mewAnimTime, dur); if (phase < 0) phase += dur;
+                float toTarget = std::fmod(mewIdlePose - phase + dur, dur);
+                float step = dt * 3.f;                            // retour ~3x plus rapide
+                if (toTarget <= step) mewAnimTime = mewIdlePose;  // arrivé : on fige
+                else                  mewAnimTime += step;        // continue l'anim, vite
+            }
+
+            // audio: soft whoosh while gliding, louder hover hum when floating still
+            if (mewMoving) {
+                mewFlyTimer -= dt;
+                if (mewFlyTimer <= 0.f) { gameAudio.play("mew_fly", 80.f); mewFlyTimer = 0.7f; }
+                gameAudio.setLoopVolume(80.f);
+            } else {
+                mewFlyTimer = 0.f;
+                gameAudio.setLoopVolume(80.f);
+            }
+
+            // every ~10 s, Mew lets out one of its random little meows (a/b/c)
+            mewMeowTimer -= dt;
+            if (mewMeowTimer <= 0.f) {
+                const char* meows[3] = { "mew_meow_a", "mew_meow_b", "mew_meow_c" };
+                gameAudio.play(meows[std::rand() % 3], 80.f);
+                mewMeowTimer = 9.f + (std::rand() % 40) / 10.f;   // ~9-13 s
+            }
+
+            // hold SPACE to charge the constellation — driven by constellation.tick()
+        }
+        constellation.tick(sf::Keyboard::isKeyPressed(sf::Keyboard::Space) && !adminPrompt,
+                            adminMode, dt);
+
+        // ── camera matrices ───────────────────────────────────────────────────
+        glm::vec3 target(cx, camTargetY, cz);
+        glm::vec3 camPos = target + glm::vec3(
+            camDist * std::cos(camPitch) * std::sin(camYaw),
+            camDist * std::sin(camPitch),
+            camDist * std::cos(camPitch) * std::cos(camYaw));
+
+        sf::Vector2u ws = window.getSize();
+        float aspect = (float)ws.x / ws.y;
+        glm::mat4 proj = glm::perspective(glm::radians(38.f), aspect, 0.1f, 8000.f);
+
+        glm::mat4 view = glm::lookAt(camPos, target, glm::vec3(0,1,0));
+
+        // admin: 3rd-person camera locked behind Mew (overrides the orbit cam)
+        if (adminMode) {
+            // camera tracks Mew's steady height (NOT the float bob) so the bob is
+            // actually visible on screen instead of cancelling out with the camera
+            float by = mewPos.y;
+            target = glm::vec3(mewPos.x, by + 1.0f, mewPos.z);
+            // orbit the camera around Mew: yaw follows Mew's facing + mouse offset
+            float ay = mewYaw + admCamYaw;
+            float ap = glm::clamp(admCamPitch, -1.20f, 1.40f);
+            float dist = 9.f, horiz = dist * std::cos(ap);
+            camPos = glm::vec3(mewPos.x - std::sin(ay) * horiz,
+                               by + 1.0f + dist * std::sin(ap),
+                               mewPos.z - std::cos(ay) * horiz);
+            view = glm::lookAt(camPos, target, glm::vec3(0, 1, 0));
+        }
+
+        // ── day/night cycle (client-side timed loop) ──────────────────────────
+        DayNight dn = computeDayNight(elapsed, nightOverride);
+        float     nightF   = dn.nightF,   ambScale = dn.ambScale;
+        glm::vec3 skySunDir = dn.skySunDir, moonDir = dn.moonDir, sunDir = dn.sunDir;
+        glm::vec3 lightCol  = dn.lightCol,  skyTop  = dn.skyTop,  skyHor = dn.skyHor;
+
+        // ── sky gradient pass (fullscreen quad, no depth test) ────────────────
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
+        glm::mat4 invVP  = glm::inverse(proj * view);
+        skyShader.use();
+        skyShader.setVec3("uSkyTop",      skyTop.x, skyTop.y, skyTop.z);
+        skyShader.setVec3("uSkyHorizon",  skyHor.x, skyHor.y, skyHor.z);
+        skyShader.setMat4("uInvViewProj", glm::value_ptr(invVP));
+        skyShader.setVec3("uCamPos",      camPos.x, camPos.y, camPos.z);
+        skyShader.setVec3("uSunDir",      skySunDir.x, skySunDir.y, skySunDir.z);
+        skyShader.setVec3("uMoonDir",     moonDir.x, moonDir.y, moonDir.z);
+        skyShader.setFloat("uSunStrength",  1.f - nightF);
+        skyShader.setFloat("uMoonStrength", nightF);
+        glBindVertexArray(skyVAO);
+        glDrawElements(GL_TRIANGLES, 6, GL_UNSIGNED_INT, nullptr);
+        glBindVertexArray(0);
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+
+        // ── set shared uniforms ───────────────────────────────────────────────
+        toon.use();
+        toon.setMat4("uView",              glm::value_ptr(view));
+        toon.setMat4("uProj",              glm::value_ptr(proj));
+        toon.setVec3("uCamPos",            camPos.x, camPos.y, camPos.z);
+        toon.setVec3("uDirLightDir",       sunDir.x, sunDir.y, sunDir.z);
+        toon.setVec3("uDirLightColor",     lightCol.x, lightCol.y, lightCol.z);
+        toon.setVec3("uPointLight0Pos",    0.f, 10.f, 0.f);
+        toon.setVec3("uPointLight0Color",  0.f, 0.f, 0.f);
+        toon.setVec3("uPointLight1Pos",    0.f, 10.f, 0.f);
+        toon.setVec3("uPointLight1Color",  0.f, 0.f, 0.f);
+        toon.setFloat("uShininess",        32.f);
+        toon.setFloat("uAmbientStrength",  0.22f * ambScale);
+        toon.setFloat("uAlpha",       1.0f);
+        toon.setFloat("uTime",        elapsed);
+        toon.setBool ("uWave",           false);
+        toon.setBool ("uSway",           false);
+        toon.setBool ("uUseVertexColor", false);
+        toon.setBool ("uUseTexture",    false);
+        toon.setBool ("uMultiColor",    false);
+        toon.setBool ("uCrystal",     false);
+        toon.setBool ("uMultiColor",  false);
+        toon.setBool ("uCircleClip",  false);
+        toon.setBool ("uShoreBlend",  false);
+        toon.setFloat("uShoreInnerR", 0.f);
+        toon.setFloat("uShoreWidth",  1.f);
+
+        // ── draw seamless ground (single draw call each, zero seams) ─────────
+        drawGround(toon, landMesh, oceanMesh, waterMesh, map, cx, cz);
+
+        // ── draw props ────────────────────────────────────────────────────────
+        drawProps(toon, outline, map, view, proj, elapsed, ambScale, treeGlow);
+
+        // ── draw resources (floating textured gemstones, one per type per tile) ──
+        drawResources(eggShader, gemTex, map, sunDir, lightCol, ambScale, view, proj, elapsed);
+
+        // ── draw food (textured apple/grapes/mushroom, varied per tile) ───────
+        drawFood(eggShader, foodMesh, map, sunDir, lightCol, ambScale, view, proj, elapsed);
+
+        // ── draw players (live server, or local demo) as skinned characters ───
+        {
+            PlayerRenderCtx prCtx{
+                tiers, playerAnims, sparks,
+                testMode, netConnected, testPlayers, netClient, map, EVO_DUR, gameAudio,
+                adminMode, haveMew, mewMesh, mewAnimTime, mewMoving, mewPos, mewYaw, MEW_SCALE,
+                haveMoon, moonMesh, moonDir,
+                eggMeshTex.get(),
+                hud, constellation
+            };
+            updateAndDrawPlayers(prCtx, skinShader, auraShader, toon, starShader, eggShader,
+                                 sparkVAO, view, proj, camPos, sunDir, lightCol, ambScale,
+                                 nightF, elapsed, dt);
+        }
+
+        // ── draw skinned characters ───────────────────────────────────────────
+        drawCharacters(characters, skinShader, auraShader, view, proj,
+                       camPos, sunDir, lightCol, ambScale, elapsed, dt);
+
+        // ── draw Tree of Life pulse effects ───────────────────────────────────
+        {
+            bool charging     = (pulseState == PulseState::CHARGING);
+            bool justReleased = (pulseState == PulseState::RELEASING &&
+                                 prevPulse  != PulseState::RELEASING);
+            prevPulse = pulseState;
+            drawTreeMotes(treeMotes, charging, chargeT, justReleased, TREE_POS,
+                          starShader, sparkVAO, view, proj, elapsed, dt);
+        }
+
+        // ── Mew constellation channel: light-purple energy (tree-of-life style) ──
+        constellation.updateMewEnergy(adminMode, dt, mewPos, elapsed);
+        constellation.renderMewEnergy(starShader, sparkVAO, view, proj, elapsed);
+
+        // ── draw incantation ritual — dashed circle + ground flash pillars ────
+        drawIncantations(incantations, incantShader, view, proj, camPos, elapsed);
+
+        // ── draw clouds (animated drift) ──────────────────────────────────────
+        drawClouds(toon, map, elapsed);
+
+        // ── 2D overlay: HUD line, sidebar, inventory popup, action feed ──
+        window.resetGLStates();
+        hud.draw(window, netConnected ? &netClient.state() : nullptr,
+                 menuCfg.host, menuCfg.port, map.w, map.h);
+
+        // ── admin password box (centered) ──
+        if (adminPrompt) {
+            sf::RectangleShape dim(sf::Vector2f((float)ws.x, (float)ws.y));
+            dim.setFillColor(sf::Color(0, 0, 0, 130)); window.draw(dim);
+            float bw = 380.f, bh = 124.f;
+            float bx = ws.x / 2.f - bw / 2.f, byp = ws.y / 2.f - bh / 2.f;
+            sf::RectangleShape box(sf::Vector2f(bw, bh));
+            box.setPosition(bx, byp);
+            box.setFillColor(sf::Color(16, 20, 30, 245));
+            box.setOutlineColor(sf::Color(120, 170, 255, 220)); box.setOutlineThickness(2.f);
+            window.draw(box);
+            sf::Text title; title.setFont(hudFont); title.setString("MODE ADMIN");
+            title.setCharacterSize(20); title.setFillColor(sf::Color(150, 200, 255));
+            title.setPosition(bx + 18.f, byp + 14.f); window.draw(title);
+            sf::RectangleShape field(sf::Vector2f(bw - 36.f, 34.f));
+            field.setPosition(bx + 18.f, byp + 48.f);
+            field.setFillColor(sf::Color(8, 10, 16, 255));
+            field.setOutlineColor(sf::Color(90, 120, 170, 200)); field.setOutlineThickness(1.f);
+            window.draw(field);
+            std::string mask(adminInput.size(), '*');
+            bool blink = ((int)(elapsed * 2.f)) % 2 == 0;
+            sf::Text inp; inp.setFont(hudFont); inp.setString(mask + (blink ? "_" : ""));
+            inp.setCharacterSize(20); inp.setFillColor(sf::Color(235, 235, 245));
+            inp.setPosition(bx + 26.f, byp + 52.f); window.draw(inp);
+            sf::Text hint; hint.setFont(hudFont);
+            hint.setString("mot de passe  -  Entree: valider   Echap: annuler");
+            hint.setCharacterSize(12); hint.setFillColor(sf::Color(170, 180, 200));
+            hint.setPosition(bx + 18.f, byp + 92.f); window.draw(hint);
+        }
+        // ── admin mode hint ──
+        if (adminMode) {
+            sf::Text h; h.setFont(hudFont);
+            char hb[160];
+            std::snprintf(hb, sizeof(hb),
+                "MODE ADMIN  -  Z/fleches: voler   Espace: constellation   O/P: pose=%.1f   Q: quitter",
+                mewIdlePose);
+            h.setString(hb);
+            h.setCharacterSize(16); h.setFillColor(sf::Color(150, 220, 255, 220));
+            sf::FloatRect b = h.getLocalBounds();
+            h.setPosition(ws.x / 2.f - b.width / 2.f, 42.f);
+            window.draw(h);
+        }
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+
+        window.display();
+    }
+    return 0;
+}
