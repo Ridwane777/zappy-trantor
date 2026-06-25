@@ -26,3 +26,13 @@ glm::mat4 Camera::getProjection(float aspect) const {
 }
 
 void Camera::onMouseDrag(float dx, float dy) {
+    float sensitivity = 0.005f;
+    yaw   += dx * sensitivity;
+    pitch += dy * sensitivity;
+    pitch = std::clamp(pitch, -PI/2.f + 0.01f, PI/2.f - 0.01f);
+}
+
+void Camera::onScroll(float dy) {
+    distance -= dy * 0.5f;
+    distance = std::clamp(distance, 0.5f, 500.f);
+}
