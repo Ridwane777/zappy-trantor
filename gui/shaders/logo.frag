@@ -23,3 +23,12 @@ void main() {
 
     vec3 col = base * uAmbient + base * uDirLightColor * diff;
 
+    // point-light flash from the explosion
+    vec3  PL    = uPointPos - vPos;
+    float pdiff = max(dot(N, normalize(PL)), 0.0);
+    float atten = 1.0 / (1.0 + 0.08 * dot(PL, PL));
+    col += base * uPointColor * pdiff * atten;
+
+    col *= uBright;
+    FragColor = vec4(col, uAlpha);
+}
