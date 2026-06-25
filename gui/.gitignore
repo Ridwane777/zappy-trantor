@@ -19,3 +19,11 @@ tools/
 assets/models/
 assets/characters/
 assets/models
+assets/characters
+
+# Large source art (decimated logo + raw background plates) — fetched separately
+assets/screen/zappy_logo.*
+assets/screen/Gemini_*
+
+# Small UI essentials (fonts, gear icon, etc.) ARE tracked — everything under
+# assets/ not matched above is committed so the menu renders on a fresh clone.
