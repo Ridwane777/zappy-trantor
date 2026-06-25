@@ -12,3 +12,17 @@
 // WELCOME/GRAPHIC handshake, then switches the socket to non-blocking so poll()
 // never stalls the render loop. Partial lines are buffered between polls.
 
+#include "net/GuiState.hpp"
+#include <string>
+#include <deque>
+
+class GuiClient {
+public:
+    GuiClient() = default;
+    ~GuiClient();
+
+    GuiClient(const GuiClient &) = delete;
+    GuiClient &operator=(const GuiClient &) = delete;
+
+    // Establish the connection and send "GRAPHIC". On failure returns false and
+    // fills `err`. On success the socket is left non-blocking.
