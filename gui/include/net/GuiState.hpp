@@ -39,3 +39,23 @@ struct GuiPlayer {
 struct GuiEgg {
     int id = 0;
     int x  = 0;
+    int y  = 0;
+};
+
+// A transient incantation flash, consumed by the renderer for FX.
+struct GuiIncantation {
+    int  x       = 0;
+    int  y       = 0;
+    bool resolved = false;   // false=ongoing, true=finished (set by pie)
+    bool success  = false;
+};
+
+struct GuiState {
+    int width    = 0;
+    int height   = 0;
+    int timeUnit = 100;        // server tick frequency (sgt)
+    bool sizeKnown = false;
+    float secondsToReset = -1.f;   // countdown to next resource reset (sst); <0 = unknown
+
+    std::vector<std::string>          teams;
+    std::vector<GuiTile>              tiles;     // size width*height, index y*width + x
