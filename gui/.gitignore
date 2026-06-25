@@ -5,3 +5,10 @@ zappy_gui
 
 # Secrets — local env (R2 credentials, etc.). Never commit.
 .env.local
+*.env.local
+
+# Local docs / dev tooling — not part of the deliverable
+TECHNOLOGIES.md
+tools/
+
+# Third-party header-only libs (json, tinygltf) are installed like any other
