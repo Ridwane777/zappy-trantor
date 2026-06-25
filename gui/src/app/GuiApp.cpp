@@ -524,3 +524,266 @@ int GuiApp::run(int argc, char** argv)
     float      treeGlow    = 0.f;   // foliage emissive: tracks charge, fades out after release
     float      waveRadius  = 0.f;
 
+    // ── 2D overlay (HUD line, team/player sidebar, inventory popup, feed) ──────
+    HudOverlay hud;
+    hud.init(hudFont);
+
+    while (window.isOpen()) {
+        float dt = clock.restart().asSeconds();
+        elapsed  += dt;
+
+        hud.update(dt);                         // smooth sidebar slide
+
+        // tick down the resource-reset countdown (server resyncs it via "sst")
+        if (netConnected && netClient.state().secondsToReset > 0.f)
+            netClient.state().secondsToReset =
+                std::max(0.f, netClient.state().secondsToReset - dt);
+
+        // while a player popup is open, poll its inventory (~3×/s) so counts stay live
+        int pollId = hud.inventoryPollTarget(dt);
+        if (pollId >= 0 && netConnected)
+            netClient.send("pin #" + std::to_string(pollId));
+
+        // ── drain new action events into game SFX (levelup/hatch handled at draw) ─
+        if (netConnected) {
+            const GuiState& gs = netClient.state();
+            pickupCooldown = std::max(0.f, pickupCooldown - dt);
+            unsigned long total = gs.logTotal;
+            unsigned long newCount = total - lastLogTotal;
+            if (newCount > gs.log.size()) newCount = (unsigned long)gs.log.size();
+            for (std::size_t i = gs.log.size() - newCount; i < gs.log.size(); ++i) {
+                int k = gs.log[i].kind;
+                if (k == 2)      gameAudio.play("death",  85.f);   // pdi
+                else if (k == 3) gameAudio.play("incant", 80.f);   // pic
+                else if (k == 0 && pickupCooldown <= 0.f) {        // pgt — subtle, throttled
+                    gameAudio.play("pickup", 32.f);
+                    pickupCooldown = 0.18f;
+                }
+            }
+            lastLogTotal = total;
+        }
+
+        // ── live server state: drain socket, mirror tile resources onto the map ─
+        if (netConnected) {
+            netClient.poll();
+            netConnected = netClient.connected();
+            const GuiState& gs = netClient.state();
+            if (gs.sizeKnown) {
+                // Spread the server grid across the island's central LAND area
+                // (the raw 0..W corner is mostly water), accumulating collisions.
+                for (auto& t : map.tiles)
+                    for (int i = 0; i < 7; ++i) t.res[i] = 0;
+                const int insetT = 7;
+                int landX = std::max(1, map.w - 2 * insetT);
+                int landY = std::max(1, map.h - 2 * insetT);
+                for (int y = 0; y < gs.height; ++y)
+                    for (int x = 0; x < gs.width; ++x) {
+                        int itx = insetT + x * landX / std::max(1, gs.width);
+                        int ity = insetT + y * landY / std::max(1, gs.height);
+                        auto it = tileIndex.find((long long)ity * 100000 + itx);
+                        if (it == tileIndex.end()) continue;
+                        const GuiTile& st = gs.tileAt(x, y);
+                        for (int i = 0; i < 7; ++i)
+                            map.tiles[it->second].res[i] += st.res[i];
+                    }
+            }
+            static bool dbg = (std::getenv("ZAPPY_DEBUG") != nullptr);
+            static int dbgFrame = 0;
+            if (dbg && (++dbgFrame % 120 == 0)) {
+                long totalRes = 0;
+                for (auto& t : map.tiles) for (int i = 0; i < 7; ++i) totalRes += t.res[i];
+                std::cerr << "[dbg] grid " << gs.width << "x" << gs.height
+                          << "  teams " << gs.teams.size()
+                          << "  players " << gs.players.size()
+                          << "  eggs " << gs.eggs.size()
+                          << "  mapRes " << totalRes << "\n";
+            }
+        }
+
+        // ── demo mode: hatch from egg (lvl 0) then grow to 8 (loops) ──────────
+        // seconds per phase configurable via ZAPPY_TESTSEC (default 20)
+        if (testMode) {
+            static float phaseSec = std::getenv("ZAPPY_TESTSEC")
+                                  ? (float)std::atof(std::getenv("ZAPPY_TESTSEC")) : 1.f;
+            testTimer += dt;
+            int lvl = ((int)(testTimer / phaseSec)) % 9;   // 0(egg),1,...,8, loop
+            for (auto& p : testPlayers) p.level = lvl;
+        }
+
+        // ── pulse state machine ───────────────────────────────────────────────
+        pulseTimer += dt;
+        switch (pulseState) {
+        case PulseState::IDLE: {
+            chargeT = 0.f;
+            // When connected, charge during the final CHARGE_DURATION seconds before
+            // the resource reset so the tree "pulses" right as it fires. Offline,
+            // fall back to the ambient self-timed cycle.
+            float sr = netConnected ? netClient.state().secondsToReset : -1.f;
+            bool trigger = (sr >= 0.f) ? (sr <= CHARGE_DURATION)
+                                       : (pulseTimer >= IDLE_DURATION);
+            if (trigger) {
+                pulseState = PulseState::CHARGING;
+                pulseTimer = 0.f;
+            }
+            break;
+        }
+        case PulseState::CHARGING:
+            chargeT = glm::clamp(pulseTimer / CHARGE_DURATION, 0.f, 1.f);
+            if (pulseTimer >= CHARGE_DURATION) {
+                pulseState = PulseState::RELEASING;
+                pulseTimer = 0.f;
+                waveRadius = 0.f;
+                for (auto& ch : characters) ch.auraTriggered = false;
+            }
+            break;
+        case PulseState::RELEASING:
+            chargeT    = 0.f;
+            waveRadius += WAVE_SPEED * dt;
+            for (auto& ch : characters) {
+                if (!ch.auraTriggered) {
+                    float dist = glm::length(glm::vec2(ch.worldPos.x - TREE_POS.x,
+                                                       ch.worldPos.z - TREE_POS.z));
+                    if (waveRadius >= dist) {
+                        ch.auraTimer     = 30.f;
+                        ch.auraTriggered = true;
+                    }
+                }
+            }
+            if (waveRadius >= WAVE_MAXR) {
+                pulseState = PulseState::IDLE;
+                pulseTimer = 0.f;
+            }
+            break;
+        }
+        // foliage glow follows the charge, then fades out gently after release
+        // (instead of snapping off the instant the energy is released)
+        if (pulseState == PulseState::CHARGING)
+            treeGlow = chargeT;
+        else
+            treeGlow = std::max(0.f, treeGlow - dt * 0.5f);   // ~2s fade-out
+
+        for (auto& ch : characters)
+            if (ch.auraTimer > 0.f) ch.auraTimer -= dt;
+
+        // ── demo incantation trigger ──────────────────────────────────────────
+        incantCooldown -= dt;
+        if (incantCooldown <= 0.f && !characters.empty() &&
+            pulseState == PulseState::IDLE) {
+            IncantationEffect fx;
+            fx.pos = characters[0].worldPos; fx.pos.y = 0.f;
+            incantations.push_back(fx);
+            incantCooldown = 55.f;
+        }
+        bool anyIncant = false;
+        for (auto& ix : incantations) {
+            ix.timer += dt;
+            if (ix.timer >= INCANT_DUR - 0.5f) ix.success = true;
+            anyIncant = true;
+        }
+        incantations.erase(
+            std::remove_if(incantations.begin(), incantations.end(),
+                [](const IncantationEffect& ix){ return ix.timer >= INCANT_DUR; }),
+            incantations.end());
+        for (auto& ch : characters) ch.incanting = anyIncant;
+
+        // ── events ────────────────────────────────────────────────────────────
+        sf::Event ev;
+        while (window.pollEvent(ev)) {
+            if (ev.type == sf::Event::Closed)
+                window.close();
+
+            // ── admin password box: A opens it, type, Enter validates, Esc cancels ──
+            if (adminPrompt) {
+                if (ev.type == sf::Event::TextEntered) {
+                    if (adminEatNext) {                                  // le 'a' d'ouverture
+                        adminEatNext = false;
+                    } else if (ev.text.unicode == 8) {                   // backspace
+                        if (!adminInput.empty()) adminInput.pop_back();
+                    } else if (ev.text.unicode >= 32 && ev.text.unicode < 127 &&
+                               adminInput.size() < 32) {
+                        adminInput += (char)ev.text.unicode;
+                    }
+                }
+                if (ev.type == sf::Event::KeyPressed) {
+                    if (ev.key.code == sf::Keyboard::Enter) {
+                        if (adminInput == "admin1234") {                 // déverrouillage
+                            adminMode = true;
+                            mewPos = glm::vec3(cx, camTargetY + 4.f, cz);
+                            mewYaw = camYaw;
+                            gameAudio.play("reveal", 90.f);
+                            gameAudio.play("mew_cry", 80.f);               // little chirp on reveal
+                            gameAudio.playLoop("mew_float", 80.f);         // ethereal hover hum
+                        }
+                        adminPrompt = false; adminInput.clear();
+                    } else if (ev.key.code == sf::Keyboard::Escape) {
+                        adminPrompt = false; adminInput.clear();
+                    }
+                }
+                continue;                                                // on avale la saisie
+            }
+
+            if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::Escape)
+                window.close();
+            if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::A && !adminMode) {
+                adminPrompt = true; adminInput.clear(); adminEatNext = true;  // ouvrir le prompt
+                continue;
+            }
+            if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::Q && adminMode) {
+                adminMode = false;                                       // quitter le mode admin
+                gameAudio.stopLoop();                                    // couper le bourdon de vol
+            }
+            // scrub de la pose idle (O / P) pour choisir la frame de repos
+            if (adminMode && ev.type == sf::Event::KeyPressed &&
+                (ev.key.code == sf::Keyboard::O || ev.key.code == sf::Keyboard::P)) {
+                mewIdlePose += (ev.key.code == sf::Keyboard::P ? 0.5f : -0.5f);
+                if (mewIdlePose < 0.f)         mewIdlePose = 0.f;
+                if (mewIdlePose > mewAnimDur)  mewIdlePose = mewAnimDur;
+                mewAnimTime = mewIdlePose;                               // applique tout de suite
+                std::cerr << "[mew] pose=" << mewIdlePose << "\n";
+            }
+
+            if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::R) {
+                if (adminMode) {                       // reset the 3rd-person view
+                    admCamYaw = 0.f; admCamPitch = 0.32f;
+                } else {
+                    camYaw = 45.f * 3.14159f / 180.f;
+                    camPitch = 35.f * 3.14159f / 180.f;
+                    camDist = std::max(map.w, map.h) * TILE * 1.1f;
+                }
+            }
+            if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::Tab)
+                hud.toggle();
+            // N: cycle day/night override (auto -> force night -> force day -> auto)
+            if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::N)
+                nightOverride = (nightOverride + 1) % 3;
+
+            if (ev.type == sf::Event::MouseButtonPressed)
+                gameAudio.play("click", 65.f);                       // son à chaque clic
+
+            if (ev.type == sf::Event::MouseButtonPressed &&
+                ev.mouseButton.button == sf::Mouse::Left) {
+                sf::Vector2i mp = sf::Mouse::getPosition(window);
+                if (!hud.handleClick(mp)) {                          // empty space → orbit
+                    dragging = true;
+                    lastMouse = mp;
+                }
+            }
+            if (ev.type == sf::Event::MouseButtonReleased)
+                dragging = false;
+
+            if (ev.type == sf::Event::MouseMoved && dragging) {
+                sf::Vector2i cur = sf::Mouse::getPosition(window);
+                if (adminMode) {                              // look around Mew
+                    admCamYaw   -= (cur.x - lastMouse.x) * 0.008f;
+                    admCamPitch += (cur.y - lastMouse.y) * 0.006f;
+                    admCamPitch  = glm::clamp(admCamPitch, -1.20f, 1.40f);
+                } else {
+                    camYaw   += (cur.x - lastMouse.x) * 0.008f;
+                    camPitch += (cur.y - lastMouse.y) * 0.006f;
+                    camPitch  = glm::clamp(camPitch, 0.15f, 1.48f);
+                }
+                lastMouse = cur;
+            }
+
+            if (ev.type == sf::Event::MouseWheelScrolled) {
+                sf::Vector2i mp = sf::Mouse::getPosition(window);
