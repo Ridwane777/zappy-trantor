@@ -1,0 +1,7 @@
+# Build artifacts
+*.o
+*.d
+zappy_gui
+
+# Secrets — local env (R2 credentials, etc.). Never commit.
+.env.local
