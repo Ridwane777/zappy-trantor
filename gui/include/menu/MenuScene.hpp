@@ -8,3 +8,14 @@
 // opens an editable host/port panel.
 //
 // Runs its own GL resources + event loop, so it fully owns the window until it
+// returns. The caller then proceeds to connect + run the game renderer.
+
+#include <SFML/Graphics.hpp>
+#include <string>
+
+struct MenuConfig {
+    std::string host = "127.0.0.1";
+    int         port = 4242;
+};
+
+// Runs the startup screen until the user starts or quits.
