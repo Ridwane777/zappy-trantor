@@ -283,3 +283,289 @@ bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,
     }
     for (int i = 0; i < 5 && plantMesh; ++i) {   // a few leafy plants
         float px = frand(-8.f, 8.f), pz = frand(-11.f, -4.f);
+        veg.push_back({plantMesh.get(), {px, 0.f, pz}, vegScale(plantMesh.get(), frand(0.8f, 1.3f)),
+                       frand(0.f, 6.28f), {0.34f, 0.56f, 0.26f}});
+    }
+
+    auto envf = [](const char *n, float d) { const char *v = std::getenv(n); return v ? (float)std::atof(v) : d; };
+    const float phxYaw = envf("ZAPPY_PHX_YAW", 0.f);    // phoenix facing (deg), 0 = along travel
+
+    Mesh sphere = buildSphere(1.f, 20, 16);
+
+    // Camera-facing quad used to billboard the glowing star (corners -1..1).
+    unsigned int glowVAO = 0, glowVBO = 0;
+    {
+        const float quad[] = { -1.f,-1.f,  1.f,-1.f,  1.f,1.f,  -1.f,1.f };
+        glGenVertexArrays(1, &glowVAO);
+        glGenBuffers(1, &glowVBO);
+        glBindVertexArray(glowVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, glowVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void *)0);
+        glEnableVertexAttribArray(0);
+        glBindVertexArray(0);
+    }
+
+    // Water plane for the logo's reflection (rippling, semi-transparent).
+    Shader waterShader("shaders/water.vert", "shaders/water.frag");
+    GLuint waterTex = 0;
+    {
+        sf::Image wi;
+        std::string wb = zappy::assetBytes("assets/screen/water.png");
+        if (!wb.empty() && wi.loadFromMemory(wb.data(), wb.size())) {
+            glGenTextures(1, &waterTex);
+            glBindTexture(GL_TEXTURE_2D, waterTex);
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, wi.getSize().x, wi.getSize().y,
+                         0, GL_RGBA, GL_UNSIGNED_BYTE, wi.getPixelsPtr());
+            glGenerateMipmap(GL_TEXTURE_2D);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            glBindTexture(GL_TEXTURE_2D, 0);
+        }
+    }
+
+    // Logo: prefer the textured export; fall back to a plain mesh, then to a
+    // procedural block, so the menu always renders something.
+    std::unique_ptr<TexturedMesh> texLogo;
+    std::unique_ptr<Mesh>         plainLogo;
+    bool useTexLogo = false;
+    try {
+        texLogo = std::make_unique<TexturedMesh>(TexturedMesh::load(LOGO_PATH, LOGO_TEX));
+        useTexLogo = texLogo->hasTexture();
+        std::cout << "[menu] loaded textured logo: " << LOGO_PATH
+                  << (useTexLogo ? " (+texture)\n" : " (no texture)\n");
+    } catch (const std::exception &e) {
+        std::cout << "[menu] textured logo failed (" << e.what()
+                  << ") - using placeholder block\n";
+        plainLogo = std::make_unique<Mesh>(buildPlaceholderLogo());
+    }
+
+    // Normalise logo to a consistent on-screen size regardless of source scale.
+    float     logoScale  = 1.f;
+    glm::vec3 logoCenter(0.f);
+    {
+        float r = useTexLogo ? texLogo->boundingRadius() : plainLogo->boundingRadius();
+        logoScale  = (r > 1e-4f) ? 2.6f / r : 1.f;
+        logoCenter = useTexLogo ? texLogo->centroid() : plainLogo->centroid();
+    }
+
+    // ── scene constants ──────────────────────────────────────────────────────
+    const glm::vec3 LOGO_POS(0.f, 1.6f, 0.f);   // sits above the reflection plane y=0
+    const float     LIGHT_START_Y = 4.6f;   // just inside the top of frame
+    const float     IMPACT_Y      = LOGO_POS.y;
+
+    // ── intro state machine ──────────────────────────────────────────────────
+    enum class Phase { FALLING, FLOATING, REVEALING, READY };
+    Phase phase = Phase::FALLING;
+    float phaseT = 0.f;
+    const float FALL_DUR   = 9.0f;   // blue light descends, brightening (slow)
+    const float FLOAT_DUR  = 2.5f;   // bounces / floats at the centre
+    const float REVEAL_DUR = 5.0f;   // flash + particles fade as the logo appears
+
+    std::vector<Particle> particles;
+
+    // drifting fireflies for the tropical-island ambience
+    std::vector<Particle> fireflies;
+    for (int i = 0; i < 16; ++i) {
+        Particle p;
+        p.pos    = glm::vec3(frand(-5.f, 5.f), frand(0.2f, 2.2f), frand(-3.f, 2.5f));
+        p.vel    = glm::vec3(frand(-0.25f, 0.25f), frand(-0.12f, 0.18f), frand(-0.25f, 0.25f));
+        p.size   = frand(0.006f, 0.013f);
+        p.phase  = frand(0.f, 6.2832f);
+        p.twFreq = frand(1.5f, 4.0f);
+        p.color  = glm::mix(glm::vec3(1.0f, 0.85f, 0.4f),   // warm amber
+                            glm::vec3(0.7f, 1.0f, 0.5f),    // green-gold
+                            frand(0.f, 1.f));
+        p.life = p.maxLife = 1.f;
+        fireflies.push_back(p);
+    }
+    float lightY      = LIGHT_START_Y;
+    float lightScale  = 0.05f;   // starts small
+    float lightBright = 0.25f;   // starts dim
+    float flashStr    = 0.f;     // point-light flash intensity (decays)
+    float flash2D     = 0.f;     // full-screen flash overlay (decays)
+    float logoReveal  = 0.f;     // 0..1
+    float animT       = 0.f;     // accumulating time for pulse/flicker effects
+
+    // ── UI ───────────────────────────────────────────────────────────────────
+    Button startBtn;
+    startBtn.setup(font, "START", 240.f, 60.f);
+
+    // Settings gear icon in the top-left corner.
+    sf::Texture gearTex;
+    IconButton settingsBtn;
+    std::string gb = zappy::assetBytes("assets/screen/settings_gear.png");
+    if (!gb.empty() && gearTex.loadFromMemory(gb.data(), gb.size())) {
+        gearTex.setSmooth(true);
+        settingsBtn.setup(gearTex, 24.f, 24.f, 48.f);
+    }
+
+    bool showParams = false;
+    int  focusField = -1;          // 0 = host, 1 = port
+    // orbit camera around the fixed logo (3rd-person style)
+    float camYaw   = 0.f;
+    float camPitch = 0.18f;
+    // the scene (sky, sand, vegetation, water) stays FIXED; dragging spins only the
+    // logo on the spot, so the backdrop feels like a living diorama you look into.
+    float logoYaw   = 0.f;
+    float logoPitch = 0.f;
+    float camDist  = 9.0f;
+    bool  orbiting = false;
+    sf::Vector2i lastDrag;
+    std::string hostStr = out.host;
+    std::string portStr = std::to_string(out.port);
+
+    sf::Clock clock;
+
+    auto spawnExplosion = [&](const glm::vec3 &c) {
+        particles.clear();
+        int n = 280;
+        for (int i = 0; i < n; ++i) {
+            glm::vec3 dir(frand(-1, 1), frand(-1, 1), frand(-1, 1));
+            float len = glm::length(dir);
+            if (len < 1e-3f) dir = glm::vec3(0, 1, 0); else dir /= len;
+            float speed = frand(1.5f, 6.0f);
+            Particle p;
+            p.pos = c;
+            p.vel = dir * speed;
+            p.maxLife = frand(0.8f, 1.8f);
+            p.life = p.maxLife;
+            p.size = frand(0.015f, 0.06f);             // small motes of light
+            p.color = glm::mix(glm::vec3(0.45f, 0.70f, 1.0f),   // blue
+                               glm::vec3(0.90f, 0.95f, 1.0f),   // near-white
+                               frand(0.f, 1.f));
+            p.phase  = frand(0.f, 6.2832f);            // random twinkle phase
+            p.twFreq = frand(10.f, 26.f);              // irregular flicker rates
+            particles.push_back(p);
+        }
+    };
+
+    // ── intro audio: music bed + per-phase cues (missing files are silent) ──────
+    AudioManager audio;
+    audio.init("assets/audio");
+    audio.playMusic("intro", false, 32.f);     // quiet bed so the star effects carry
+    audio.playLoop("sparkle", 0.f);            // starts silent on window open, swells with the fall
+    int lastBounce = -1;                        // tracks floor contacts during FLOATING
+
+    while (window.isOpen()) {
+        float dt = clock.restart().asSeconds();
+        if (dt > 0.05f) dt = 0.05f;            // clamp big hitches (asset load)
+        phaseT += dt;
+        animT  += dt;
+
+        // ── events ────────────────────────────────────────────────────────────
+        sf::Event ev;
+        while (window.pollEvent(ev)) {
+            if (ev.type == sf::Event::Closed)
+                return false;
+            if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::Escape) {
+                if (showParams) showParams = false;
+                else return false;
+            }
+            // Enter starts the game once the intro has finished (same as START).
+            if (ev.type == sf::Event::KeyPressed && phase == Phase::READY && !showParams &&
+                (ev.key.code == sf::Keyboard::Return || ev.key.code == sf::Keyboard::Enter)) {
+                out.host = hostStr.empty() ? "127.0.0.1" : hostStr;
+                out.port = portStr.empty() ? 4242 : std::atoi(portStr.c_str());
+                return true;
+            }
+            if (ev.type == sf::Event::Resized)
+                glViewport(0, 0, ev.size.width, ev.size.height);
+
+            sf::Vector2u ws = window.getSize();
+
+            if (ev.type == sf::Event::MouseButtonPressed)
+                audio.play("click", 70.f);                 // son à chaque clic
+
+            if (ev.type == sf::Event::MouseButtonPressed &&
+                ev.mouseButton.button == sf::Mouse::Left) {
+                float mx = float(ev.mouseButton.x), my = float(ev.mouseButton.y);
+                if (showParams) {
+                    // field hit-tests (positions mirror the draw code below)
+                    float fx = ws.x / 2.f - 150.f, fw = 300.f, fh = 40.f;
+                    sf::FloatRect hostR(fx, ws.y / 2.f - 40.f, fw, fh);
+                    sf::FloatRect portR(fx, ws.y / 2.f + 30.f, fw, fh);
+                    if (hostR.contains(mx, my))      focusField = 0;
+                    else if (portR.contains(mx, my)) focusField = 1;
+                    else                             focusField = -1;
+                    // "Back / Done" button
+                    sf::FloatRect backR(ws.x / 2.f - 90.f, ws.y / 2.f + 100.f, 180.f, 48.f);
+                    if (backR.contains(mx, my)) {
+                        showParams = false;
+                        focusField = -1;
+                    }
+                } else if (phase == Phase::READY && startBtn.contains(mx, my)) {
+                    out.host = hostStr.empty() ? "127.0.0.1" : hostStr;
+                    out.port = portStr.empty() ? 4242 : std::atoi(portStr.c_str());
+                    return true;
+                } else if (phase == Phase::READY && settingsBtn.valid &&
+                           settingsBtn.contains(mx, my)) {
+                    showParams = true;
+                    focusField = 0;
+                } else {
+                    // click anywhere else starts orbiting the camera around the logo
+                    orbiting = true;
+                    lastDrag = {ev.mouseButton.x, ev.mouseButton.y};
+                }
+            }
+            if (ev.type == sf::Event::MouseButtonReleased &&
+                ev.mouseButton.button == sf::Mouse::Left)
+                orbiting = false;
+
+            if (ev.type == sf::Event::MouseMoved && orbiting) {
+                // spin the logo in place; the camera/scene never moves
+                logoYaw   += (ev.mouseMove.x - lastDrag.x) * 0.012f;
+                logoPitch += (ev.mouseMove.y - lastDrag.y) * 0.008f;
+                logoPitch  = glm::clamp(logoPitch, -0.5f, 0.5f);
+                lastDrag = {ev.mouseMove.x, ev.mouseMove.y};
+            }
+            if (ev.type == sf::Event::MouseWheelScrolled && !showParams)
+                camDist = glm::clamp(camDist - ev.mouseWheelScroll.delta * 0.8f, 4.f, 20.f);
+
+            if (ev.type == sf::Event::TextEntered && showParams && focusField >= 0) {
+                std::string &f = (focusField == 0) ? hostStr : portStr;
+                char c = static_cast<char>(ev.text.unicode);
+                if (ev.text.unicode == 8) {                 // backspace
+                    if (!f.empty()) f.pop_back();
+                } else if (ev.text.unicode >= 32 && ev.text.unicode < 127) {
+                    if (focusField == 1) {                  // port: digits only
+                        if (c >= '0' && c <= '9' && f.size() < 5) f += c;
+                    } else if (f.size() < 64) {
+                        f += c;
+                    }
+                }
+            }
+        }
+
+        // ── update intro ──────────────────────────────────────────────────────
+        if (phase == Phase::FALLING) {
+            float t = std::min(phaseT / FALL_DUR, 1.f);
+            audio.setLoopVolume(glm::mix(0.f, 100.f, t));    // 0 at window open → full at centre
+            float e = t * t;                                 // ease-in (accelerate)
+            lightY = glm::mix(LIGHT_START_Y, IMPACT_Y, e);
+            lightScale = glm::mix(0.05f, 0.20f, t);          // grows as it falls
+            // brightens (accelerating) with an uncanny flicker
+            float flicker = 0.86f + 0.14f * std::sin(animT * 34.f);
+            lightBright = glm::mix(0.25f, 1.6f, t * t) * flicker;
+            if (t >= 1.f) {
+                phase = Phase::FLOATING; phaseT = 0.f;
+                audio.stopLoop();                            // star reached centre → sparkle ends
+                audio.play("shimmer_hold", 55.f);            // soft glow bed under the bounces
+            }
+        } else if (phase == Phase::FLOATING) {
+            // damped bounce on an invisible floor at the impact point
+            float decay  = 1.f - std::min(phaseT / FLOAT_DUR, 1.f);
+            float bounce = std::fabs(std::sin(phaseT * 5.5f)) * 0.6f * decay;
+            lightY = IMPACT_Y + bounce;
+            // each time the light returns to the floor (|sin| hits 0) -> a bounce sfx
+            int bIdx = (int)(phaseT * 5.5f / 3.14159265f);
+            if (bIdx != lastBounce) {
+                lastBounce = bIdx;
+                audio.play("bounce", 55.f + 45.f * decay);   // softens as it settles
+            }
+            lightScale  = 0.20f + 0.02f * std::sin(animT * 9.f);
+            lightBright = 1.6f + 0.35f * std::sin(animT * 13.f);   // bright, uneasy pulse
+            if (phaseT >= FLOAT_DUR) {
+                phase = Phase::REVEALING; phaseT = 0.f;
