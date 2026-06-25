@@ -30,3 +30,14 @@ bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,
 // Renders one loading-screen frame: a title, a progress bar at `progress`
 // (0..1) and a status line. Call repeatedly between asset-load steps. Pumps
 // window events so the window stays responsive during the load.
+void drawLoadingScreen(sf::RenderWindow &window, sf::Font &font,
+                       float progress, const std::string &status);
+
+// Smoothly animates the loading bar from its current displayed value up to
+// `target` (0..1) over `duration` seconds, rendering many eased frames, then
+// returns. Use this at each load checkpoint so the bar glides instead of
+// jumping. Keeps internal state; a target lower than the current value resets
+// the sequence (e.g. when the menu is run again).
+void advanceLoadingTo(sf::RenderWindow &window, sf::Font &font,
+                      float target, const std::string &status,
+                      float duration = 0.4f);
