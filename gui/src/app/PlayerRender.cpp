@@ -108,3 +108,113 @@ static void updatePlayerStates(PlayerRenderCtx& ctx,
             float sm = pa.moveLerp * pa.moveLerp * (3.f - 2.f * pa.moveLerp);  // smoothstep
             pa.curWorld = glm::mix(pa.prevWorld, target, sm);
         }
+        pa.moveT = std::max(0.f, pa.moveT - dt);
+        pa.turnT = std::max(0.f, pa.turnT - dt);
+        int a = 0;                                    // idle
+        if (frozen)                 a = 0;            // stand still for the level-up
+        else if (pa.moveLerp < 1.f) a = 1;            // walk while gliding
+        else if (pa.turnT > 0.f)    a = pa.turnAnim;  // turn
+        if (a >= ctx.tiers[tierOf(ctx.tiers, p.level)].mesh.animCount()) a = 0;
+        pa.anim = a;
+        // Advance the animation clock. While walking, sync the stride to the
+        // actual ground distance moved this frame so the feet don't slide
+        // (one walk cycle == WALK_CYCLE_DIST world units). Idle/turn: real time.
+        if (a == 1) {
+            float frameDist = glm::length(pa.curWorld - beforeC);
+            float cyc = ctx.tiers[tierOf(ctx.tiers, p.level)].mesh.animDuration(1);
+            pa.animTime += (frameDist / WALK_CYCLE_DIST) * cyc;
+        } else {
+            pa.animTime += dt;
+        }
+        // evolution on level-up (hatch 0->1 or any +level)
+        if (p.level != pa.prevLevel) {
+            if (pa.prevLevel >= 0 && p.level >= 1) {
+                pa.evoT = ctx.evoDur;
+                pa.freezeT = ctx.evoDur;                // hold still for the level-up moment
+                ctx.gameAudio.play(pa.prevLevel == 0 ? "hatch" : "levelup", 90.f);
+                float wx = pa.curWorld.x, wz = pa.curWorld.y;
+                for (int i = 0; i < 30; ++i) {
+                    Spark s;
+                    glm::vec3 d(frand(-1, 1), frand(0.2f, 1.6f), frand(-1, 1));
+                    s.pos = {wx, frand(0.3f, 2.2f), wz};
+                    s.vel = d * frand(1.2f, 3.2f);
+                    s.maxLife = frand(0.6f, 1.3f); s.life = s.maxLife;
+                    s.size = frand(0.07f, 0.17f);
+                    s.phase = frand(0.f, 6.28f); s.twFreq = frand(12.f, 28.f);
+                    s.color = glm::mix(glm::vec3(0.6f, 0.8f, 1.0f),
+                                       glm::vec3(1.0f, 1.0f, 0.85f), frand(0.f, 1.f));
+                    ctx.sparks.push_back(s);
+                }
+            }
+            pa.prevLevel = p.level;
+        }
+        pa.evoT = std::max(0.f, pa.evoT - dt);
+    }
+}
+
+// Runs every draw pass that depends on the player list: solid skinned
+// characters, Mew (admin mount), the night moon, team-selection aura glow,
+// eggs, ground level rings, evolution glow + sparkles, and the night-sky
+// overlay.
+static void drawPlayerPasses(PlayerRenderCtx& ctx,
+                             const std::vector<const GuiPlayer*>& drawList,
+                             Shader& skinShader, Shader& auraShader,
+                             Shader& toon, Shader& starShader, Shader& eggShader,
+                             unsigned sparkVAO,
+                             const glm::mat4& view, const glm::mat4& proj,
+                             const glm::vec3& camPos, const glm::vec3& sunDir,
+                             const glm::vec3& lightCol, float ambScale,
+                             float nightF, float elapsed, float dt) {
+    glm::mat4 pBones[MAX_BONES];
+
+    // solid character pass
+    skinShader.use();
+    skinShader.setMat4("uView", glm::value_ptr(view));
+    skinShader.setMat4("uProj", glm::value_ptr(proj));
+    skinShader.setVec3("uCamPos",          camPos.x, camPos.y, camPos.z);
+    skinShader.setVec3("uDirLightDir",     sunDir.x, sunDir.y, sunDir.z);
+    skinShader.setVec3("uDirLightColor",   lightCol.x, lightCol.y, lightCol.z);
+    skinShader.setVec3("uPointLight0Color",0.f,0.f,0.f);
+    skinShader.setVec3("uPointLight1Color",0.f,0.f,0.f);
+    skinShader.setFloat("uShininess",      28.f);
+    skinShader.setFloat("uAmbientStrength",0.30f * ambScale);
+    skinShader.setFloat("uAlpha",          1.0f);
+    skinShader.setFloat("uTime",           elapsed);
+    skinShader.setBool ("uEmissive",       false);
+    skinShader.setBool ("uCrystal",        false);
+    skinShader.setBool ("uWave",           false);
+    skinShader.setBool ("uSway",           false);
+    skinShader.setBool ("uCircleClip",     false);
+    skinShader.setBool ("uShoreBlend",     false);
+    skinShader.setFloat("uShoreInnerR",    0.f);
+    skinShader.setFloat("uShoreWidth",     1.f);
+    skinShader.setBool ("uUseTexture",     true);
+    skinShader.setInt  ("uTexture",        0);
+    skinShader.setBool ("uUseVertexColor", false);
+    skinShader.setBool ("uMultiColor",     false);
+    for (const GuiPlayer* pp : drawList) {
+        const GuiPlayer& p = *pp;
+        if (p.level == 0) continue;              // unhatched egg — drawn below
+        SkinnedMesh& m = ctx.tiers[tierOf(ctx.tiers, p.level)].mesh;
+        int a = ctx.playerAnims[p.id].anim;
+        m.computeBones(a, ctx.playerAnims[p.id].animTime, pBones, true, false);
+        skinShader.setMat4Array("uBones[0]", MAX_BONES, glm::value_ptr(pBones[0]));
+        glm::mat4 M = playerModel(ctx, p);
+        glm::mat3 N3 = glm::mat3(glm::transpose(glm::inverse(M)));
+        skinShader.setMat4("uModel",     glm::value_ptr(M));
+        skinShader.setMat3("uNormalMat", glm::value_ptr(N3));
+        m.draw();
+    }
+
+    // ── admin: draw Mew (the 3rd-person mount) ──
+    if (ctx.adminMode && ctx.haveMew) {
+        ctx.mewMesh.computeBones(0, ctx.mewAnimTime, pBones, true, false);
+        skinShader.setMat4Array("uBones[0]", MAX_BONES, glm::value_ptr(pBones[0]));
+        // gentle float: bigger bounce when idle (hovering in place), softened
+        // while moving so it doesn't fight the travel motion
+        float bobAmp = ctx.mewMoving ? 0.12f : 0.32f;
+        float by = ctx.mewPos.y + std::sin(elapsed * 2.2f) * bobAmp;   // float / bounce in the air
+        glm::mat4 M = glm::translate(glm::mat4(1.f), glm::vec3(ctx.mewPos.x, by, ctx.mewPos.z));
+        M = glm::rotate(M, ctx.mewYaw, glm::vec3(0, 1, 0));
+        M = glm::scale(M, glm::vec3(ctx.mewScale));
+        glm::mat3 N3 = glm::mat3(glm::transpose(glm::inverse(M)));
