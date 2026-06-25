@@ -5,3 +5,7 @@ in vec2 vUV;
 uniform vec3  uColor;
 uniform float uIntensity;
 
+out vec4 FragColor;
+
+void main() {
+    float r = length(vUV);
