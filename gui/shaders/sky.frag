@@ -32,3 +32,15 @@ void main() {
     float corona = smoothstep(0.975,  0.9985, cosA) * 0.55;
     float glow   = smoothstep(0.90,   0.975,  cosA) * 0.35;
     vec3  sunColor  = vec3(1.0, 0.75, 0.20);
+    vec3  glowColor = vec3(1.0, 0.45, 0.05);
+    sky += glowColor * glow   * uSunStrength;
+    sky += glowColor * corona * uSunStrength;
+    sky  = mix(sky, sunColor, disc * uSunStrength);
+
+    // ── moon halo (the disc itself is a 3D mesh; this is just the glow) ──
+    float cosM  = dot(rayDir, uMoonDir);
+    float mglow = smoothstep(0.93, 0.9985, cosM) * 0.28;
+    sky += vec3(0.55, 0.62, 0.85) * mglow * uMoonStrength;
+
+    FragColor = vec4(clamp(sky, 0.0, 1.0), 1.0);
+}
