@@ -21,3 +21,27 @@ void drawTreeMotes(std::vector<Spark>& motes, bool charging, float chargeT,
         for (int i = 0; i < n; ++i) {
             Spark m;
             float ang = frnd(0.f, 6.2832f);
+            float rad = baseR * frnd(0.35f, 1.0f);
+            m.pos = treePos + glm::vec3(std::cos(ang) * rad, frnd(0.f, 2.f),
+                                        std::sin(ang) * rad);
+            glm::vec3 inward = glm::normalize(glm::vec3(
+                treePos.x - m.pos.x, 0.f, treePos.z - m.pos.z) + glm::vec3(1e-4f));
+            m.vel = glm::vec3(inward.x * frnd(0.4f, 1.3f), frnd(2.5f, 5.5f),
+                              inward.z * frnd(0.4f, 1.3f));
+            m.maxLife = frnd(1.0f, 2.0f); m.life = m.maxLife;
+            m.size  = frnd(0.12f, 0.30f);
+            m.phase = frnd(0.f, 6.28f); m.twFreq = frnd(16.f, 36.f);  // fast uncanny flicker
+            m.color = glm::mix(glm::vec3(0.85f, 0.95f, 0.30f),        // sickly yellow-green
+                               glm::vec3(0.25f, 1.0f, 0.40f), chargeT) // -> eerie green
+                      * frnd(0.8f, 1.2f);
+            motes.push_back(m);
+        }
+    }
+    // ── RELEASING: a ring of motes bursts outward across the island ──────
+    if (justReleased) {
+        const int n = 150;
+        for (int i = 0; i < n; ++i) {
+            Spark m;
+            float ang = (i / (float)n) * 6.2832f + frnd(-0.04f, 0.04f);
+            float rad = baseR * frnd(0.2f, 0.6f);
+            m.pos = treePos + glm::vec3(std::cos(ang) * rad, frnd(0.3f, 1.6f),
