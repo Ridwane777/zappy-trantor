@@ -61,3 +61,34 @@ Mesh::Mesh(const std::vector<float>& verts, const std::vector<unsigned int>& ind
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, byteStride, (void*)0);
     glEnableVertexAttribArray(0);
 
+    // Normal: layout 1, vec3
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, byteStride, (void*)(3*sizeof(float)));
+    glEnableVertexAttribArray(1);
+
+    // Vertex color: layout 2, vec3 (only present when stride==9)
+    if (stride == 9) {
+        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, byteStride, (void*)(6*sizeof(float)));
+        glEnableVertexAttribArray(2);
+    }
+
+    glBindVertexArray(0);
+}
+
+Mesh::Mesh(Mesh&& other) noexcept
+    : vao(other.vao), vbo(other.vbo), ebo(other.ebo),
+      indexCount(other.indexCount), _stride(other._stride),
+      _centroid(other._centroid), _radius(other._radius), _yMin(other._yMin)
+{
+    other.vao = 0; other.vbo = 0; other.ebo = 0;
+}
+
+Mesh& Mesh::operator=(Mesh&& other) noexcept {
+    if (this != &other) {
+        cleanup();
+        vao        = other.vao;
+        vbo        = other.vbo;
+        ebo        = other.ebo;
+        indexCount = other.indexCount;
+        _stride    = other._stride;
+        _centroid  = other._centroid;
+        _radius    = other._radius;
