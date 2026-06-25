@@ -3368,3 +3368,3374 @@
           "rot_y": 119.7,
           "scale": 0.763
         },
+        {
+          "model": "rock_1",
+          "dx": 0.276,
+          "dz": -0.286,
+          "rot_y": 280.5,
+          "scale": 0.889
+        },
+        {
+          "model": "rock_2",
+          "dx": 0.116,
+          "dz": 0.274,
+          "rot_y": 22.7,
+          "scale": 0.983
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 7,
+      "y": 7,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": -0.383,
+          "dz": -0.252,
+          "rot_y": 15.1,
+          "scale": 0.854
+        },
+        {
+          "model": "mapletree_1",
+          "dx": 0.411,
+          "dz": 0.036,
+          "rot_y": 91.2,
+          "scale": 0.811
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.12,
+          "dz": 0.236,
+          "rot_y": 311.7,
+          "scale": 0.71
+        }
+      ],
+      "resources": {
+        "food": 3,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 8,
+      "y": 7,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": 0.327,
+          "dz": 0.204,
+          "rot_y": 322.1,
+          "scale": 0.723
+        },
+        {
+          "model": "plant_1",
+          "dx": -0.003,
+          "dz": -0.002,
+          "rot_y": 332.8,
+          "scale": 0.755
+        }
+      ],
+      "resources": {
+        "food": 2,
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 9,
+      "y": 7,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 1,
+        "deraumere": 1,
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 10,
+      "y": 7,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "linemate": 1
+      }
+    },
+    {
+      "x": 11,
+      "y": 7,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "plant_1",
+          "dx": 0.219,
+          "dz": 0.031,
+          "rot_y": 115.6,
+          "scale": 0.516
+        }
+      ],
+      "resources": {
+        "linemate": 1,
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 12,
+      "y": 7,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "palmtree_1",
+          "dx": 0.07,
+          "dz": -0.05,
+          "rot_y": 248.3,
+          "scale": 0.57
+        }
+      ],
+      "resources": {
+        "linemate": 1
+      }
+    },
+    {
+      "x": 13,
+      "y": 7,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "flower_2",
+          "dx": -0.1,
+          "dz": 0.339,
+          "rot_y": 98.8,
+          "scale": 0.696
+        }
+      ],
+      "resources": {
+        "linemate": 1,
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 14,
+      "y": 7,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 15,
+      "y": 7,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "plant_1",
+          "dx": -0.093,
+          "dz": 0.205,
+          "rot_y": 244.6,
+          "scale": 0.691
+        }
+      ],
+      "resources": {
+        "food": 2,
+        "deraumere": 1,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 16,
+      "y": 7,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "flower_1",
+          "dx": 0.236,
+          "dz": -0.391,
+          "rot_y": 24.2,
+          "scale": 0.656
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 1
+      }
+    },
+    {
+      "x": 17,
+      "y": 7,
+      "ground": "tile",
+      "props": []
+    },
+    {
+      "x": 18,
+      "y": 7,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "plant_1",
+          "dx": 0.071,
+          "dz": 0.122,
+          "rot_y": 341.6,
+          "scale": 0.574
+        }
+      ],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 19,
+      "y": 7,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": 0.025,
+          "dz": -0.086,
+          "rot_y": 233.8,
+          "scale": 0.69
+        },
+        {
+          "model": "normaltree_1",
+          "dx": 0.198,
+          "dz": -0.001,
+          "rot_y": 139.3,
+          "scale": 0.765
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.201,
+          "dz": -0.045,
+          "rot_y": 358.7,
+          "scale": 0.699
+        }
+      ],
+      "resources": {
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 20,
+      "y": 7,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": -0.317,
+          "dz": 0.296,
+          "rot_y": 162.7,
+          "scale": 0.846
+        },
+        {
+          "model": "mapletree_1",
+          "dx": -0.346,
+          "dz": 0.153,
+          "rot_y": 304.4,
+          "scale": 0.707
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.365,
+          "dz": 0.035,
+          "rot_y": 320.9,
+          "scale": 0.834
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "sibur": 1
+      }
+    },
+    {
+      "x": 21,
+      "y": 7,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "plant_1",
+          "dx": 0.116,
+          "dz": 0.247,
+          "rot_y": 183.2,
+          "scale": 0.659
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.303,
+          "dz": 0.244,
+          "rot_y": 9.5,
+          "scale": 0.763
+        },
+        {
+          "model": "normaltree_1",
+          "dx": 0.255,
+          "dz": 0.043,
+          "rot_y": 220.3,
+          "scale": 0.651
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 22,
+      "y": 7,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_3",
+          "dx": 0.193,
+          "dz": 0.023,
+          "rot_y": 276.9,
+          "scale": 0.997
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.416,
+          "dz": 0.125,
+          "rot_y": 162.0,
+          "scale": 0.954
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.333,
+          "dz": 0.247,
+          "rot_y": 230.3,
+          "scale": 0.805
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 23,
+      "y": 7,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": 0.361,
+          "dz": -0.391,
+          "rot_y": 44.7,
+          "scale": 0.796
+        },
+        {
+          "model": "cliff_rock",
+          "dx": -0.156,
+          "dz": 0.184,
+          "rot_y": 124.6,
+          "scale": 1.032
+        },
+        {
+          "model": "rock_3",
+          "dx": 0.304,
+          "dz": -0.219,
+          "rot_y": 228.6,
+          "scale": 0.915
+        },
+        {
+          "model": "cliff_rock",
+          "dx": -0.174,
+          "dz": 0.029,
+          "rot_y": 180.9,
+          "scale": 0.801
+        }
+      ],
+      "resources": {
+        "linemate": 1
+      }
+    },
+    {
+      "x": 24,
+      "y": 7,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 25,
+      "y": 7,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 26,
+      "y": 7,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 27,
+      "y": 7,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 0,
+      "y": 8,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 1,
+      "y": 8,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 2,
+      "y": 8,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_2",
+          "dx": -0.415,
+          "dz": -0.4,
+          "rot_y": 230.9,
+          "scale": 0.923
+        },
+        {
+          "model": "rock_1",
+          "dx": 0.235,
+          "dz": -0.073,
+          "rot_y": 230.0,
+          "scale": 0.899
+        },
+        {
+          "model": "rock_1",
+          "dx": -0.185,
+          "dz": 0.402,
+          "rot_y": 173.9,
+          "scale": 0.991
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 3,
+      "y": 8,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": -0.376,
+          "dz": -0.387,
+          "rot_y": 158.3,
+          "scale": 0.895
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.094,
+          "dz": -0.165,
+          "rot_y": 258.6,
+          "scale": 0.97
+        },
+        {
+          "model": "rock_3",
+          "dx": 0.418,
+          "dz": -0.325,
+          "rot_y": 133.4,
+          "scale": 0.918
+        }
+      ],
+      "resources": {
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 4,
+      "y": 8,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": -0.205,
+          "dz": -0.222,
+          "rot_y": 34.9,
+          "scale": 0.837
+        },
+        {
+          "model": "rock_1",
+          "dx": 0.102,
+          "dz": -0.222,
+          "rot_y": 311.5,
+          "scale": 0.798
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.068,
+          "dz": -0.165,
+          "rot_y": 274.7,
+          "scale": 0.899
+        }
+      ],
+      "resources": {
+        "deraumere": 2
+      }
+    },
+    {
+      "x": 5,
+      "y": 8,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": -0.161,
+          "dz": -0.401,
+          "rot_y": 340.3,
+          "scale": 0.751
+        },
+        {
+          "model": "plant_1",
+          "dx": -0.239,
+          "dz": -0.124,
+          "rot_y": 18.2,
+          "scale": 0.749
+        },
+        {
+          "model": "flower_1",
+          "dx": 0.13,
+          "dz": -0.025,
+          "rot_y": 193.2,
+          "scale": 0.833
+        }
+      ]
+    },
+    {
+      "x": 6,
+      "y": 8,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "flower_1",
+          "dx": 0.191,
+          "dz": 0.222,
+          "rot_y": 131.7,
+          "scale": 0.726
+        },
+        {
+          "model": "mapletree_1",
+          "dx": -0.256,
+          "dz": 0.045,
+          "rot_y": 26.5,
+          "scale": 0.751
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 7,
+      "y": 8,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": 0.411,
+          "dz": 0.152,
+          "rot_y": 42.8,
+          "scale": 0.864
+        },
+        {
+          "model": "normaltree_1",
+          "dx": 0.248,
+          "dz": -0.135,
+          "rot_y": 338.0,
+          "scale": 0.811
+        },
+        {
+          "model": "normaltree_1",
+          "dx": 0.008,
+          "dz": 0.0,
+          "rot_y": 16.3,
+          "scale": 0.663
+        }
+      ],
+      "resources": {
+        "food": 4
+      }
+    },
+    {
+      "x": 8,
+      "y": 8,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": -0.036,
+          "dz": 0.089,
+          "rot_y": 185.6,
+          "scale": 0.709
+        },
+        {
+          "model": "mapletree_1",
+          "dx": -0.283,
+          "dz": 0.412,
+          "rot_y": 266.2,
+          "scale": 0.702
+        }
+      ],
+      "resources": {
+        "linemate": 2,
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 9,
+      "y": 8,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "flower_1",
+          "dx": 0.022,
+          "dz": 0.142,
+          "rot_y": 107.9,
+          "scale": 0.663
+        }
+      ]
+    },
+    {
+      "x": 10,
+      "y": 8,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 1,
+        "deraumere": 1,
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 11,
+      "y": 8,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 12,
+      "y": 8,
+      "ground": "tile",
+      "props": []
+    },
+    {
+      "x": 13,
+      "y": 8,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "linemate": 1
+      }
+    },
+    {
+      "x": 14,
+      "y": 8,
+      "ground": "tile",
+      "props": []
+    },
+    {
+      "x": 15,
+      "y": 8,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 1,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 16,
+      "y": 8,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 1,
+        "linemate": 1,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 17,
+      "y": 8,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "palmtree_1",
+          "dx": 0.318,
+          "dz": 0.192,
+          "rot_y": 279.4,
+          "scale": 0.616
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 18,
+      "y": 8,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 19,
+      "y": 8,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": 0.088,
+          "dz": 0.081,
+          "rot_y": 302.8,
+          "scale": 0.53
+        }
+      ]
+    },
+    {
+      "x": 20,
+      "y": 8,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": 0.376,
+          "dz": -0.328,
+          "rot_y": 6.8,
+          "scale": 0.705
+        },
+        {
+          "model": "normaltree_1",
+          "dx": 0.16,
+          "dz": -0.075,
+          "rot_y": 279.0,
+          "scale": 0.851
+        },
+        {
+          "model": "flower_1",
+          "dx": 0.198,
+          "dz": -0.368,
+          "rot_y": 49.7,
+          "scale": 0.68
+        }
+      ],
+      "resources": {
+        "linemate": 1,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 21,
+      "y": 8,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": 0.021,
+          "dz": -0.156,
+          "rot_y": 62.3,
+          "scale": 0.849
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.122,
+          "dz": 0.228,
+          "rot_y": 259.5,
+          "scale": 0.784
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "sibur": 1
+      }
+    },
+    {
+      "x": 22,
+      "y": 8,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": -0.258,
+          "dz": -0.213,
+          "rot_y": 200.9,
+          "scale": 0.684
+        },
+        {
+          "model": "plant_1",
+          "dx": -0.17,
+          "dz": -0.177,
+          "rot_y": 74.6,
+          "scale": 0.799
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.127,
+          "dz": 0.364,
+          "rot_y": 286.3,
+          "scale": 0.696
+        }
+      ]
+    },
+    {
+      "x": 23,
+      "y": 8,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_2",
+          "dx": -0.106,
+          "dz": 0.423,
+          "rot_y": 294.6,
+          "scale": 1.036
+        },
+        {
+          "model": "rock_2",
+          "dx": -0.184,
+          "dz": -0.187,
+          "rot_y": 257.1,
+          "scale": 0.854
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "sibur": 1,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 24,
+      "y": 8,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": -0.018,
+          "dz": -0.262,
+          "rot_y": 193.9,
+          "scale": 1.03
+        },
+        {
+          "model": "rock_2",
+          "dx": -0.319,
+          "dz": 0.102,
+          "rot_y": 211.3,
+          "scale": 0.823
+        },
+        {
+          "model": "rock_2",
+          "dx": 0.027,
+          "dz": 0.121,
+          "rot_y": 18.9,
+          "scale": 0.874
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "deraumere": 1,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 25,
+      "y": 8,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 26,
+      "y": 8,
+      "ground": "water",
+      "props": [
+        {
+          "model": "boat",
+          "dx": -0.277,
+          "dz": 0.028,
+          "rot_y": 334.5,
+          "scale": 0.481
+        }
+      ]
+    },
+    {
+      "x": 27,
+      "y": 8,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 0,
+      "y": 9,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 1,
+      "y": 9,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 2,
+      "y": 9,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_3",
+          "dx": -0.157,
+          "dz": 0.128,
+          "rot_y": 326.9,
+          "scale": 0.777
+        },
+        {
+          "model": "rock_1",
+          "dx": 0.031,
+          "dz": 0.196,
+          "rot_y": 337.2,
+          "scale": 1.024
+        }
+      ],
+      "resources": {
+        "thystame": 1
+      }
+    },
+    {
+      "x": 3,
+      "y": 9,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_3",
+          "dx": -0.285,
+          "dz": 0.369,
+          "rot_y": 359.0,
+          "scale": 0.869
+        },
+        {
+          "model": "rock_1",
+          "dx": 0.384,
+          "dz": 0.407,
+          "rot_y": 333.4,
+          "scale": 1.013
+        }
+      ],
+      "resources": {
+        "phiras": 1
+      }
+    },
+    {
+      "x": 4,
+      "y": 9,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": -0.33,
+          "dz": 0.406,
+          "rot_y": 102.4,
+          "scale": 0.867
+        },
+        {
+          "model": "mapletree_1",
+          "dx": -0.005,
+          "dz": 0.368,
+          "rot_y": 306.4,
+          "scale": 0.742
+        }
+      ],
+      "resources": {
+        "linemate": 1,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 5,
+      "y": 9,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": -0.284,
+          "dz": -0.035,
+          "rot_y": 92.6,
+          "scale": 0.675
+        },
+        {
+          "model": "rock_1",
+          "dx": 0.244,
+          "dz": 0.057,
+          "rot_y": 272.6,
+          "scale": 0.672
+        }
+      ],
+      "resources": {
+        "linemate": 1,
+        "sibur": 1
+      }
+    },
+    {
+      "x": 6,
+      "y": 9,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "flower_1",
+          "dx": 0.275,
+          "dz": 0.013,
+          "rot_y": 31.2,
+          "scale": 0.791
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.302,
+          "dz": -0.148,
+          "rot_y": 89.3,
+          "scale": 0.693
+        },
+        {
+          "model": "normaltree_1",
+          "dx": 0.213,
+          "dz": 0.381,
+          "rot_y": 108.7,
+          "scale": 0.803
+        }
+      ],
+      "resources": {
+        "linemate": 1
+      }
+    },
+    {
+      "x": 7,
+      "y": 9,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "plant_1",
+          "dx": 0.131,
+          "dz": -0.298,
+          "rot_y": 42.6,
+          "scale": 0.561
+        }
+      ],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 8,
+      "y": 9,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "plant_1",
+          "dx": 0.269,
+          "dz": 0.138,
+          "rot_y": 112.0,
+          "scale": 0.523
+        }
+      ],
+      "resources": {
+        "food": 2,
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 9,
+      "y": 9,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 10,
+      "y": 9,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "flower_1",
+          "dx": -0.236,
+          "dz": -0.308,
+          "rot_y": 55.1,
+          "scale": 0.65
+        }
+      ]
+    },
+    {
+      "x": 11,
+      "y": 9,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "linemate": 1,
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 12,
+      "y": 9,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 13,
+      "y": 9,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 3,
+        "linemate": 2
+      }
+    },
+    {
+      "x": 14,
+      "y": 9,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 1,
+        "deraumere": 1,
+        "sibur": 1
+      }
+    },
+    {
+      "x": 15,
+      "y": 9,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 16,
+      "y": 9,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 1,
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 17,
+      "y": 9,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_3",
+          "dx": 0.214,
+          "dz": 0.313,
+          "rot_y": 29.5,
+          "scale": 0.589
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 2
+      }
+    },
+    {
+      "x": 18,
+      "y": 9,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 19,
+      "y": 9,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "plant_1",
+          "dx": -0.298,
+          "dz": 0.032,
+          "rot_y": 182.0,
+          "scale": 0.615
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 3
+      }
+    },
+    {
+      "x": 20,
+      "y": 9,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": 0.017,
+          "dz": -0.322,
+          "rot_y": 73.9,
+          "scale": 0.77
+        },
+        {
+          "model": "normaltree_1",
+          "dx": 0.009,
+          "dz": 0.259,
+          "rot_y": 163.2,
+          "scale": 0.753
+        }
+      ],
+      "resources": {
+        "linemate": 1,
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 21,
+      "y": 9,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": -0.032,
+          "dz": 0.258,
+          "rot_y": 260.4,
+          "scale": 0.725
+        },
+        {
+          "model": "flower_1",
+          "dx": 0.206,
+          "dz": 0.066,
+          "rot_y": 16.3,
+          "scale": 0.713
+        },
+        {
+          "model": "normaltree_1",
+          "dx": 0.415,
+          "dz": 0.365,
+          "rot_y": 24.8,
+          "scale": 0.854
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 1
+      }
+    },
+    {
+      "x": 22,
+      "y": 9,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": 0.226,
+          "dz": 0.223,
+          "rot_y": 352.2,
+          "scale": 0.785
+        },
+        {
+          "model": "mapletree_1",
+          "dx": 0.414,
+          "dz": -0.099,
+          "rot_y": 313.1,
+          "scale": 0.848
+        }
+      ],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 23,
+      "y": 9,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_2",
+          "dx": 0.142,
+          "dz": 0.035,
+          "rot_y": 235.3,
+          "scale": 0.854
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.033,
+          "dz": 0.025,
+          "rot_y": 262.0,
+          "scale": 0.817
+        },
+        {
+          "model": "cliff_rock",
+          "dx": -0.42,
+          "dz": -0.177,
+          "rot_y": 242.5,
+          "scale": 0.913
+        }
+      ]
+    },
+    {
+      "x": 24,
+      "y": 9,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_2",
+          "dx": -0.222,
+          "dz": -0.135,
+          "rot_y": 99.2,
+          "scale": 1.031
+        },
+        {
+          "model": "rock_2",
+          "dx": -0.341,
+          "dz": 0.272,
+          "rot_y": 150.9,
+          "scale": 0.98
+        },
+        {
+          "model": "rock_3",
+          "dx": -0.426,
+          "dz": -0.259,
+          "rot_y": 36.3,
+          "scale": 0.76
+        }
+      ]
+    },
+    {
+      "x": 25,
+      "y": 9,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_2",
+          "dx": -0.397,
+          "dz": 0.212,
+          "rot_y": 144.8,
+          "scale": 0.82
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.32,
+          "dz": -0.39,
+          "rot_y": 181.4,
+          "scale": 0.837
+        },
+        {
+          "model": "rock_2",
+          "dx": 0.204,
+          "dz": -0.159,
+          "rot_y": 215.3,
+          "scale": 0.952
+        }
+      ],
+      "resources": {
+        "linemate": 2,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 26,
+      "y": 9,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 27,
+      "y": 9,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 0,
+      "y": 10,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 1,
+      "y": 10,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": -0.176,
+          "dz": -0.386,
+          "rot_y": 341.5,
+          "scale": 1.014
+        },
+        {
+          "model": "rock_3",
+          "dx": 0.111,
+          "dz": -0.064,
+          "rot_y": 178.4,
+          "scale": 1.042
+        },
+        {
+          "model": "rock_3",
+          "dx": 0.151,
+          "dz": 0.252,
+          "rot_y": 114.7,
+          "scale": 0.875
+        }
+      ],
+      "resources": {
+        "sibur": 1,
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 2,
+      "y": 10,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": 0.224,
+          "dz": -0.023,
+          "rot_y": 305.8,
+          "scale": 0.84
+        },
+        {
+          "model": "rock_2",
+          "dx": 0.269,
+          "dz": 0.365,
+          "rot_y": 202.5,
+          "scale": 1.04
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 2,
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 3,
+      "y": 10,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": -0.216,
+          "dz": -0.249,
+          "rot_y": 232.8,
+          "scale": 0.851
+        },
+        {
+          "model": "flower_1",
+          "dx": -0.342,
+          "dz": 0.189,
+          "rot_y": 68.6,
+          "scale": 0.694
+        },
+        {
+          "model": "mapletree_1",
+          "dx": 0.086,
+          "dz": 0.314,
+          "rot_y": 67.7,
+          "scale": 0.813
+        }
+      ],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 4,
+      "y": 10,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": -0.017,
+          "dz": 0.31,
+          "rot_y": 119.9,
+          "scale": 0.86
+        },
+        {
+          "model": "normaltree_1",
+          "dx": 0.367,
+          "dz": 0.388,
+          "rot_y": 42.2,
+          "scale": 0.87
+        },
+        {
+          "model": "mapletree_1",
+          "dx": -0.216,
+          "dz": 0.088,
+          "rot_y": 73.6,
+          "scale": 0.85
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 1,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 5,
+      "y": 10,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": -0.1,
+          "dz": 0.028,
+          "rot_y": 129.3,
+          "scale": 0.693
+        },
+        {
+          "model": "mapletree_1",
+          "dx": -0.002,
+          "dz": -0.337,
+          "rot_y": 353.3,
+          "scale": 0.743
+        },
+        {
+          "model": "flower_1",
+          "dx": 0.348,
+          "dz": -0.109,
+          "rot_y": 149.0,
+          "scale": 0.765
+        }
+      ],
+      "resources": {
+        "linemate": 1
+      }
+    },
+    {
+      "x": 6,
+      "y": 10,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": -0.163,
+          "dz": 0.296,
+          "rot_y": 208.5,
+          "scale": 0.584
+        }
+      ],
+      "resources": {
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 7,
+      "y": 10,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "palmtree_1",
+          "dx": -0.082,
+          "dz": 0.227,
+          "rot_y": 179.7,
+          "scale": 0.631
+        }
+      ],
+      "resources": {
+        "sibur": 1
+      }
+    },
+    {
+      "x": 8,
+      "y": 10,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": 0.219,
+          "dz": 0.317,
+          "rot_y": 231.0,
+          "scale": 0.598
+        }
+      ],
+      "resources": {
+        "linemate": 2,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 9,
+      "y": 10,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "grass_large",
+          "dx": -0.278,
+          "dz": 0.185,
+          "rot_y": 175.8,
+          "scale": 0.683
+        }
+      ],
+      "resources": {
+        "linemate": 1,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 10,
+      "y": 10,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "linemate": 2,
+        "sibur": 1
+      }
+    },
+    {
+      "x": 11,
+      "y": 10,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 12,
+      "y": 10,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_3",
+          "dx": 0.291,
+          "dz": 0.374,
+          "rot_y": 240.6,
+          "scale": 0.653
+        }
+      ],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 13,
+      "y": 10,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 4,
+        "linemate": 1,
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 14,
+      "y": 10,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "deraumere": 1,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 15,
+      "y": 10,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "flower_1",
+          "dx": -0.412,
+          "dz": 0.005,
+          "rot_y": 134.4,
+          "scale": 0.624
+        }
+      ],
+      "resources": {
+        "linemate": 1
+      }
+    },
+    {
+      "x": 16,
+      "y": 10,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 2
+      }
+    },
+    {
+      "x": 17,
+      "y": 10,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 18,
+      "y": 10,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 1,
+        "mendiane": 2
+      }
+    },
+    {
+      "x": 19,
+      "y": 10,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": 0.035,
+          "dz": -0.332,
+          "rot_y": 190.6,
+          "scale": 0.555
+        }
+      ],
+      "resources": {
+        "deraumere": 1,
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 20,
+      "y": 10,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "linemate": 1,
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 21,
+      "y": 10,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "flower_1",
+          "dx": 0.146,
+          "dz": 0.257,
+          "rot_y": 327.5,
+          "scale": 0.656
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.295,
+          "dz": -0.259,
+          "rot_y": 189.5,
+          "scale": 0.826
+        }
+      ],
+      "resources": {
+        "linemate": 2,
+        "sibur": 1
+      }
+    },
+    {
+      "x": 22,
+      "y": 10,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": -0.107,
+          "dz": -0.079,
+          "rot_y": 203.4,
+          "scale": 0.868
+        },
+        {
+          "model": "normaltree_1",
+          "dx": 0.155,
+          "dz": 0.292,
+          "rot_y": 235.3,
+          "scale": 0.836
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 1,
+        "sibur": 2
+      }
+    },
+    {
+      "x": 23,
+      "y": 10,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": -0.101,
+          "dz": 0.044,
+          "rot_y": 20.2,
+          "scale": 0.632
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.0,
+          "dz": -0.056,
+          "rot_y": 282.4,
+          "scale": 0.766
+        },
+        {
+          "model": "flower_1",
+          "dx": -0.34,
+          "dz": 0.024,
+          "rot_y": 15.3,
+          "scale": 0.681
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 1
+      }
+    },
+    {
+      "x": 24,
+      "y": 10,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "flower_1",
+          "dx": -0.021,
+          "dz": -0.381,
+          "rot_y": 26.8,
+          "scale": 0.852
+        },
+        {
+          "model": "flower_1",
+          "dx": 0.053,
+          "dz": -0.392,
+          "rot_y": 334.4,
+          "scale": 0.705
+        },
+        {
+          "model": "plant_1",
+          "dx": 0.073,
+          "dz": 0.212,
+          "rot_y": 256.6,
+          "scale": 0.726
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "deraumere": 1,
+        "sibur": 1
+      }
+    },
+    {
+      "x": 25,
+      "y": 10,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": -0.228,
+          "dz": 0.294,
+          "rot_y": 140.1,
+          "scale": 1.019
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.225,
+          "dz": -0.317,
+          "rot_y": 355.9,
+          "scale": 0.967
+        }
+      ]
+    },
+    {
+      "x": 26,
+      "y": 10,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_3",
+          "dx": -0.393,
+          "dz": -0.055,
+          "rot_y": 301.9,
+          "scale": 0.852
+        },
+        {
+          "model": "rock_2",
+          "dx": 0.4,
+          "dz": -0.091,
+          "rot_y": 278.5,
+          "scale": 0.759
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.433,
+          "dz": -0.008,
+          "rot_y": 128.1,
+          "scale": 1.032
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 1,
+        "deraumere": 1,
+        "sibur": 2
+      }
+    },
+    {
+      "x": 27,
+      "y": 10,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 0,
+      "y": 11,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 1,
+      "y": 11,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": 0.104,
+          "dz": 0.262,
+          "rot_y": 256.7,
+          "scale": 0.775
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.186,
+          "dz": 0.118,
+          "rot_y": 266.3,
+          "scale": 0.845
+        },
+        {
+          "model": "cliff_rock",
+          "dx": -0.435,
+          "dz": -0.169,
+          "rot_y": 129.6,
+          "scale": 0.831
+        }
+      ],
+      "resources": {
+        "linemate": 1,
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 2,
+      "y": 11,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": -0.045,
+          "dz": 0.048,
+          "rot_y": 146.9,
+          "scale": 0.758
+        },
+        {
+          "model": "cliff_rock",
+          "dx": -0.358,
+          "dz": 0.086,
+          "rot_y": 116.8,
+          "scale": 0.866
+        }
+      ],
+      "resources": {
+        "linemate": 1
+      }
+    },
+    {
+      "x": 3,
+      "y": 11,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": -0.349,
+          "dz": 0.337,
+          "rot_y": 325.9,
+          "scale": 0.865
+        },
+        {
+          "model": "mapletree_1",
+          "dx": -0.278,
+          "dz": -0.1,
+          "rot_y": 50.0,
+          "scale": 0.702
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "sibur": 1
+      }
+    },
+    {
+      "x": 4,
+      "y": 11,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": -0.055,
+          "dz": -0.066,
+          "rot_y": 174.3,
+          "scale": 0.648
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.213,
+          "dz": 0.105,
+          "rot_y": 213.8,
+          "scale": 0.677
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.164,
+          "dz": 0.377,
+          "rot_y": 119.6,
+          "scale": 0.779
+        }
+      ],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 5,
+      "y": 11,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": -0.139,
+          "dz": 0.265,
+          "rot_y": 309.4,
+          "scale": 0.864
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.151,
+          "dz": 0.376,
+          "rot_y": 72.3,
+          "scale": 0.705
+        },
+        {
+          "model": "plant_1",
+          "dx": 0.394,
+          "dz": -0.175,
+          "rot_y": 250.2,
+          "scale": 0.748
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 2,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 6,
+      "y": 11,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": -0.084,
+          "dz": 0.215,
+          "rot_y": 141.5,
+          "scale": 0.523
+        }
+      ],
+      "resources": {
+        "mendiane": 2,
+        "phiras": 1,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 7,
+      "y": 11,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "plant_1",
+          "dx": 0.031,
+          "dz": 0.124,
+          "rot_y": 198.0,
+          "scale": 0.691
+        }
+      ],
+      "resources": {
+        "food": 2,
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 8,
+      "y": 11,
+      "ground": "tile",
+      "props": []
+    },
+    {
+      "x": 9,
+      "y": 11,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 1,
+        "linemate": 1
+      }
+    },
+    {
+      "x": 10,
+      "y": 11,
+      "ground": "tile",
+      "props": []
+    },
+    {
+      "x": 11,
+      "y": 11,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "flower_1",
+          "dx": 0.268,
+          "dz": 0.248,
+          "rot_y": 147.3,
+          "scale": 0.6
+        }
+      ],
+      "resources": {
+        "linemate": 3,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 12,
+      "y": 11,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 1,
+        "sibur": 1
+      }
+    },
+    {
+      "x": 13,
+      "y": 11,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "flower_1",
+          "dx": 0.181,
+          "dz": 0.243,
+          "rot_y": 26.6,
+          "scale": 0.698
+        }
+      ],
+      "resources": {
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 14,
+      "y": 11,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 15,
+      "y": 11,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "linemate": 1,
+        "sibur": 1
+      }
+    },
+    {
+      "x": 16,
+      "y": 11,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 2,
+        "sibur": 1
+      }
+    },
+    {
+      "x": 17,
+      "y": 11,
+      "ground": "tile",
+      "props": []
+    },
+    {
+      "x": 18,
+      "y": 11,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 1,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 19,
+      "y": 11,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "mendiane": 1,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 20,
+      "y": 11,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "sibur": 1
+      }
+    },
+    {
+      "x": 21,
+      "y": 11,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "flower_2",
+          "dx": 0.025,
+          "dz": 0.094,
+          "rot_y": 30.6,
+          "scale": 0.654
+        }
+      ],
+      "resources": {
+        "thystame": 1
+      }
+    },
+    {
+      "x": 22,
+      "y": 11,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "palmtree_1",
+          "dx": 0.1,
+          "dz": -0.31,
+          "rot_y": 354.1,
+          "scale": 0.635
+        }
+      ]
+    },
+    {
+      "x": 23,
+      "y": 11,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": 0.391,
+          "dz": -0.058,
+          "rot_y": 3.8,
+          "scale": 0.692
+        },
+        {
+          "model": "mapletree_1",
+          "dx": 0.016,
+          "dz": 0.068,
+          "rot_y": 207.1,
+          "scale": 0.737
+        }
+      ]
+    },
+    {
+      "x": 24,
+      "y": 11,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": 0.074,
+          "dz": 0.0,
+          "rot_y": 124.2,
+          "scale": 0.636
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.071,
+          "dz": 0.388,
+          "rot_y": 41.8,
+          "scale": 0.856
+        }
+      ],
+      "resources": {
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 25,
+      "y": 11,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": -0.038,
+          "dz": -0.246,
+          "rot_y": 173.9,
+          "scale": 0.744
+        },
+        {
+          "model": "mapletree_1",
+          "dx": 0.165,
+          "dz": -0.152,
+          "rot_y": 108.1,
+          "scale": 0.824
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 1,
+        "deraumere": 1,
+        "mendiane": 2
+      }
+    },
+    {
+      "x": 26,
+      "y": 11,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_2",
+          "dx": 0.13,
+          "dz": 0.156,
+          "rot_y": 59.2,
+          "scale": 1.045
+        },
+        {
+          "model": "cliff_rock",
+          "dx": -0.286,
+          "dz": -0.299,
+          "rot_y": 201.5,
+          "scale": 1.038
+        }
+      ]
+    },
+    {
+      "x": 27,
+      "y": 11,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": -0.278,
+          "dz": 0.124,
+          "rot_y": 155.6,
+          "scale": 0.759
+        },
+        {
+          "model": "rock_1",
+          "dx": -0.266,
+          "dz": 0.081,
+          "rot_y": 140.0,
+          "scale": 0.961
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 1,
+        "sibur": 1,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 0,
+      "y": 12,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 1,
+      "y": 12,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_2",
+          "dx": -0.385,
+          "dz": -0.35,
+          "rot_y": 313.9,
+          "scale": 0.806
+        },
+        {
+          "model": "cliff_rock",
+          "dx": -0.037,
+          "dz": -0.209,
+          "rot_y": 310.5,
+          "scale": 0.908
+        },
+        {
+          "model": "rock_1",
+          "dx": 0.085,
+          "dz": 0.098,
+          "rot_y": 211.3,
+          "scale": 0.854
+        },
+        {
+          "model": "rock_2",
+          "dx": 0.103,
+          "dz": 0.276,
+          "rot_y": 254.2,
+          "scale": 0.839
+        }
+      ],
+      "resources": {
+        "phiras": 1
+      }
+    },
+    {
+      "x": 2,
+      "y": 12,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": -0.322,
+          "dz": -0.336,
+          "rot_y": 109.9,
+          "scale": 0.805
+        },
+        {
+          "model": "rock_2",
+          "dx": 0.01,
+          "dz": -0.072,
+          "rot_y": 49.6,
+          "scale": 0.865
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.119,
+          "dz": 0.17,
+          "rot_y": 232.3,
+          "scale": 1.05
+        }
+      ],
+      "resources": {
+        "linemate": 1
+      }
+    },
+    {
+      "x": 3,
+      "y": 12,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": -0.302,
+          "dz": -0.156,
+          "rot_y": 162.4,
+          "scale": 0.643
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.412,
+          "dz": -0.305,
+          "rot_y": 293.5,
+          "scale": 0.861
+        },
+        {
+          "model": "mapletree_1",
+          "dx": -0.004,
+          "dz": 0.155,
+          "rot_y": 149.6,
+          "scale": 0.832
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 1
+      }
+    },
+    {
+      "x": 4,
+      "y": 12,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": -0.394,
+          "dz": 0.219,
+          "rot_y": 105.2,
+          "scale": 0.696
+        },
+        {
+          "model": "mapletree_1",
+          "dx": -0.279,
+          "dz": -0.036,
+          "rot_y": 267.3,
+          "scale": 0.814
+        },
+        {
+          "model": "mapletree_1",
+          "dx": -0.325,
+          "dz": -0.324,
+          "rot_y": 279.0,
+          "scale": 0.828
+        }
+      ],
+      "resources": {
+        "phiras": 1
+      }
+    },
+    {
+      "x": 5,
+      "y": 12,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "flower_1",
+          "dx": -0.312,
+          "dz": 0.149,
+          "rot_y": 196.7,
+          "scale": 0.698
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 1
+      }
+    },
+    {
+      "x": 6,
+      "y": 12,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "flower_1",
+          "dx": 0.171,
+          "dz": -0.138,
+          "rot_y": 359.8,
+          "scale": 0.59
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 1
+      }
+    },
+    {
+      "x": 7,
+      "y": 12,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "linemate": 1
+      }
+    },
+    {
+      "x": 8,
+      "y": 12,
+      "ground": "tile",
+      "props": []
+    },
+    {
+      "x": 9,
+      "y": 12,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "linemate": 1,
+        "phiras": 1,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 10,
+      "y": 12,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 11,
+      "y": 12,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 2
+      }
+    },
+    {
+      "x": 12,
+      "y": 12,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "grass_large",
+          "dx": 0.074,
+          "dz": -0.125,
+          "rot_y": 255.9,
+          "scale": 0.627
+        }
+      ]
+    },
+    {
+      "x": 13,
+      "y": 12,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_3",
+          "dx": -0.246,
+          "dz": -0.246,
+          "rot_y": 21.4,
+          "scale": 0.57
+        }
+      ],
+      "resources": {
+        "sibur": 1
+      }
+    },
+    {
+      "x": 14,
+      "y": 12,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "flower_1",
+          "dx": -0.148,
+          "dz": 0.171,
+          "rot_y": 104.2,
+          "scale": 0.553
+        }
+      ],
+      "resources": {
+        "mendiane": 2
+      }
+    },
+    {
+      "x": 15,
+      "y": 12,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 1,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 16,
+      "y": 12,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 1,
+        "mendiane": 1,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 17,
+      "y": 12,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 1,
+        "deraumere": 2,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 18,
+      "y": 12,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "grass_large",
+          "dx": 0.24,
+          "dz": 0.352,
+          "rot_y": 357.3,
+          "scale": 0.673
+        }
+      ],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 19,
+      "y": 12,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "grass_large",
+          "dx": -0.21,
+          "dz": 0.178,
+          "rot_y": 298.3,
+          "scale": 0.652
+        }
+      ],
+      "resources": {
+        "linemate": 1
+      }
+    },
+    {
+      "x": 20,
+      "y": 12,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "linemate": 4,
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 21,
+      "y": 12,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 2,
+        "linemate": 1
+      }
+    },
+    {
+      "x": 22,
+      "y": 12,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": -0.058,
+          "dz": -0.033,
+          "rot_y": 228.1,
+          "scale": 0.676
+        }
+      ],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 23,
+      "y": 12,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "plant_1",
+          "dx": -0.151,
+          "dz": 0.297,
+          "rot_y": 132.9,
+          "scale": 0.69
+        }
+      ]
+    },
+    {
+      "x": 24,
+      "y": 12,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": 0.23,
+          "dz": 0.195,
+          "rot_y": 263.1,
+          "scale": 0.74
+        },
+        {
+          "model": "mapletree_1",
+          "dx": -0.119,
+          "dz": -0.367,
+          "rot_y": 192.4,
+          "scale": 0.682
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 25,
+      "y": 12,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": -0.194,
+          "dz": 0.276,
+          "rot_y": 121.6,
+          "scale": 0.769
+        },
+        {
+          "model": "mapletree_1",
+          "dx": -0.012,
+          "dz": -0.131,
+          "rot_y": 245.7,
+          "scale": 0.642
+        }
+      ],
+      "resources": {
+        "food": 2
+      }
+    },
+    {
+      "x": 26,
+      "y": 12,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_2",
+          "dx": -0.036,
+          "dz": -0.331,
+          "rot_y": 308.8,
+          "scale": 0.882
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.403,
+          "dz": -0.262,
+          "rot_y": 247.9,
+          "scale": 0.79
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 1
+      }
+    },
+    {
+      "x": 27,
+      "y": 12,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 0,
+      "y": 13,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_3",
+          "dx": -0.199,
+          "dz": 0.136,
+          "rot_y": 90.1,
+          "scale": 0.862
+        },
+        {
+          "model": "rock_3",
+          "dx": -0.294,
+          "dz": -0.091,
+          "rot_y": 110.0,
+          "scale": 0.96
+        }
+      ],
+      "resources": {
+        "food": 3,
+        "linemate": 1
+      }
+    },
+    {
+      "x": 1,
+      "y": 13,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": 0.179,
+          "dz": -0.439,
+          "rot_y": 171.7,
+          "scale": 0.79
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.158,
+          "dz": -0.432,
+          "rot_y": 250.4,
+          "scale": 0.995
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 1,
+        "sibur": 1,
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 2,
+      "y": 13,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": -0.309,
+          "dz": -0.361,
+          "rot_y": 137.9,
+          "scale": 0.805
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.157,
+          "dz": 0.32,
+          "rot_y": 49.4,
+          "scale": 0.816
+        },
+        {
+          "model": "rock_1",
+          "dx": -0.308,
+          "dz": 0.414,
+          "rot_y": 51.4,
+          "scale": 0.757
+        }
+      ],
+      "resources": {
+        "linemate": 1
+      }
+    },
+    {
+      "x": 3,
+      "y": 13,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": -0.05,
+          "dz": 0.187,
+          "rot_y": 226.1,
+          "scale": 0.666
+        },
+        {
+          "model": "normaltree_1",
+          "dx": 0.157,
+          "dz": 0.302,
+          "rot_y": 31.2,
+          "scale": 0.654
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 4,
+      "y": 13,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": -0.097,
+          "dz": 0.389,
+          "rot_y": 113.2,
+          "scale": 0.664
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.349,
+          "dz": 0.045,
+          "rot_y": 216.0,
+          "scale": 0.776
+        },
+        {
+          "model": "rock_1",
+          "dx": 0.16,
+          "dz": 0.292,
+          "rot_y": 237.0,
+          "scale": 0.702
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 5,
+      "y": 13,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "plant_1",
+          "dx": 0.169,
+          "dz": -0.139,
+          "rot_y": 19.6,
+          "scale": 0.68
+        }
+      ]
+    },
+    {
+      "x": 6,
+      "y": 13,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 3
+      }
+    },
+    {
+      "x": 7,
+      "y": 13,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "linemate": 1
+      }
+    },
+    {
+      "x": 8,
+      "y": 13,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "flower_1",
+          "dx": 0.079,
+          "dz": 0.024,
+          "rot_y": 352.0,
+          "scale": 0.697
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 2,
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 9,
+      "y": 13,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "linemate": 1,
+        "deraumere": 2,
+        "sibur": 1
+      }
+    },
+    {
+      "x": 10,
+      "y": 13,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "grass_large",
+          "dx": 0.057,
+          "dz": -0.113,
+          "rot_y": 245.9,
+          "scale": 0.653
+        }
+      ],
+      "resources": {
+        "food": 2
+      }
+    },
+    {
+      "x": 11,
+      "y": 13,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 1,
+        "linemate": 1
+      }
+    },
+    {
+      "x": 12,
+      "y": 13,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 13,
+      "y": 13,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_3",
+          "dx": -0.2,
+          "dz": -0.387,
+          "rot_y": 21.8,
+          "scale": 0.658
+        }
+      ],
+      "resources": {
+        "food": 2,
+        "linemate": 2,
+        "sibur": 1
+      }
+    },
+    {
+      "x": 14,
+      "y": 13,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 2,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 15,
+      "y": 13,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "sibur": 1
+      }
+    },
+    {
+      "x": 16,
+      "y": 13,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 3,
+        "sibur": 1,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 17,
+      "y": 13,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 2,
+        "linemate": 1,
+        "deraumere": 1,
+        "sibur": 1
+      }
+    },
+    {
+      "x": 18,
+      "y": 13,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "sibur": 1
+      }
+    },
+    {
+      "x": 19,
+      "y": 13,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "flower_1",
+          "dx": 0.097,
+          "dz": -0.187,
+          "rot_y": 111.6,
+          "scale": 0.602
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 20,
+      "y": 13,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "grass_large",
+          "dx": 0.031,
+          "dz": -0.092,
+          "rot_y": 228.3,
+          "scale": 0.667
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "sibur": 1
+      }
+    },
+    {
+      "x": 21,
+      "y": 13,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": 0.135,
+          "dz": 0.156,
+          "rot_y": 304.7,
+          "scale": 0.512
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 1,
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 22,
+      "y": 13,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": -0.039,
+          "dz": 0.091,
+          "rot_y": 111.3,
+          "scale": 0.808
+        },
+        {
+          "model": "rock_1",
+          "dx": -0.32,
+          "dz": 0.175,
+          "rot_y": 252.5,
+          "scale": 0.669
+        }
+      ],
+      "resources": {
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 23,
+      "y": 13,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": 0.238,
+          "dz": 0.185,
+          "rot_y": 60.1,
+          "scale": 0.66
+        },
+        {
+          "model": "flower_1",
+          "dx": -0.194,
+          "dz": 0.325,
+          "rot_y": 277.7,
+          "scale": 0.637
+        },
+        {
+          "model": "flower_1",
+          "dx": -0.192,
+          "dz": -0.366,
+          "rot_y": 256.4,
+          "scale": 0.768
+        }
+      ],
+      "resources": {
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 24,
+      "y": 13,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": -0.117,
+          "dz": -0.0,
+          "rot_y": 204.1,
+          "scale": 0.718
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.334,
+          "dz": 0.062,
+          "rot_y": 260.2,
+          "scale": 0.685
+        }
+      ],
+      "resources": {
+        "sibur": 1
+      }
+    },
+    {
+      "x": 25,
+      "y": 13,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": 0.319,
+          "dz": -0.225,
+          "rot_y": 169.8,
+          "scale": 0.865
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.379,
+          "dz": 0.315,
+          "rot_y": 199.0,
+          "scale": 1.024
+        },
+        {
+          "model": "rock_2",
+          "dx": -0.071,
+          "dz": -0.157,
+          "rot_y": 149.9,
+          "scale": 0.966
+        }
+      ]
+    },
+    {
+      "x": 26,
+      "y": 13,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 27,
+      "y": 13,
+      "ground": "water",
+      "props": [
+        {
+          "model": "lily_pad",
+          "dx": 0.001,
+          "dz": 0.225,
+          "rot_y": 64.6,
+          "scale": 0.561
+        }
+      ]
+    },
+    {
+      "x": 0,
+      "y": 14,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 1,
+      "y": 14,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": -0.031,
+          "dz": -0.192,
+          "rot_y": 304.1,
+          "scale": 0.848
+        },
