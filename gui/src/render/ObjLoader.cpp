@@ -75,3 +75,41 @@ Mesh ObjLoader::load(const std::string& path) {
                             fc.ni = std::stoi(nStr) - 1;
                         }
                     }
+                }
+                polygon.push_back(fc);
+            }
+            // Fan triangulate
+            for (size_t i = 1; i + 1 < polygon.size(); ++i) {
+                faces.push_back({polygon[0], polygon[i], polygon[i+1]});
+            }
+        }
+    }
+
+    // If no normals were supplied, compute face normals
+    bool computeNormals = normals.empty();
+    if (computeNormals) {
+        // Compute per-face normals and assign to each corner
+        normals.resize(faces.size());
+        for (size_t fi = 0; fi < faces.size(); ++fi) {
+            auto& f = faces[fi];
+            auto& p0 = positions[f[0].pi];
+            auto& p1 = positions[f[1].pi];
+            auto& p2 = positions[f[2].pi];
+            float ax = p1[0]-p0[0], ay = p1[1]-p0[1], az = p1[2]-p0[2];
+            float bx = p2[0]-p0[0], by = p2[1]-p0[1], bz = p2[2]-p0[2];
+            float nx = ay*bz - az*by;
+            float ny = az*bx - ax*bz;
+            float nz = ax*by - ay*bx;
+            float len = std::sqrt(nx*nx + ny*ny + nz*nz);
+            if (len > 1e-8f) { nx/=len; ny/=len; nz/=len; }
+            normals[fi] = {nx, ny, nz};
+            for (int k = 0; k < 3; ++k) f[k].ni = (int)fi;
+        }
+    }
+
+    // Detect whether vertex colors were baked in (all non-white = real colors)
+    bool hasVCol = false;
+    for (auto& c : vertColors)
+        if (c[0] < 0.999f || c[1] < 0.999f || c[2] < 0.999f) { hasVCol = true; break; }
+
+    // Build interleaved vertex buffer (stride 9 with colors, 6 without)
