@@ -34,3 +34,15 @@ void main() {
         // Fresnel makes beam brighter when viewed from the side
         intensity = (diff + spec) * hFade * (0.50 + 0.50 * fresnel);
     } else {
+        // ── Ring: radial soft glow + Fresnel (ground-lit look)
+        float r    = length(vWorldPos.xz - uRingCenter.xz);
+        float span = max(uRingOuterR - uRingInnerR, 0.001);
+        float frac = clamp((r - uRingInnerR) / span, 0.0, 1.0);
+        float cx   = (frac - 0.5) * 2.0;
+        float radial = exp(-cx * cx * 5.0);             // soft ring profile
+        // Floor-angle fresnel: ring glows brighter from our 35° camera
+        intensity = radial * (0.45 + 0.35 * fresnel + 0.20);
+    }
+
+    FragColor = vec4(uColor, uAlpha * clamp(intensity, 0.0, 1.0));
+}
