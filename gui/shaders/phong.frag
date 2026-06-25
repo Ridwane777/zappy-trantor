@@ -74,3 +74,29 @@ void main() {
         // Fresnel rim
         float fresnel = pow(1.0 - max(dot(N, V), 0.0), 2.5);
         col += baseColor * fresnel * 0.9;
+
+        // Inner glow
+        col += baseColor * 0.15;
+
+        FragColor = vec4(clamp(col, 0.0, 1.0), uAlpha);
+        return;
+    }
+
+    if (uWave) {
+        float t = clamp((vWaveH + 0.21) / 0.42, 0.0, 1.0);
+        col = mix(col * 0.6, col * 1.2 + vec3(0.04, 0.08, 0.14), t);
+    }
+
+    float alpha = uAlpha;
+    if (uCircleClip) {
+        float d    = length(vPos.xz - uClipCenter);
+        float fade = clamp((uClipRadius - d) / (uClipRadius * 0.06), 0.0, 1.0);
+        if (fade <= 0.0) discard;
+        alpha *= fade;
+    }
+    if (uShoreBlend) {
+        float d = length(vPos.xz - uClipCenter);
+        alpha *= smoothstep(uShoreInnerR, uShoreInnerR + uShoreWidth, d);
+    }
+    FragColor = vec4(clamp(col, 0.0, 1.0), alpha);
+}
