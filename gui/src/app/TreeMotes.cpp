@@ -45,3 +45,26 @@ void drawTreeMotes(std::vector<Spark>& motes, bool charging, float chargeT,
             float ang = (i / (float)n) * 6.2832f + frnd(-0.04f, 0.04f);
             float rad = baseR * frnd(0.2f, 0.6f);
             m.pos = treePos + glm::vec3(std::cos(ang) * rad, frnd(0.3f, 1.6f),
+                                        std::sin(ang) * rad);
+            float spd = frnd(10.f, 17.f);
+            m.vel = glm::vec3(std::cos(ang) * spd, frnd(-0.4f, 1.2f), std::sin(ang) * spd);
+            m.maxLife = frnd(1.6f, 2.8f); m.life = m.maxLife;
+            m.size  = frnd(0.16f, 0.36f);
+            m.phase = frnd(0.f, 6.28f); m.twFreq = frnd(14.f, 32.f);
+            m.color = glm::vec3(0.28f, 1.0f, 0.45f) * frnd(0.85f, 1.25f);
+            motes.push_back(m);
+        }
+    }
+
+    // update: integrate + a slow uncanny swirl around the tree axis
+    for (auto& m : motes) {
+        glm::vec2 rel(m.pos.x - treePos.x, m.pos.z - treePos.z);
+        float a = 0.9f * dt, c = std::cos(a), s = std::sin(a);
+        m.pos.x = treePos.x + (rel.x * c - rel.y * s);
+        m.pos.z = treePos.z + (rel.x * s + rel.y * c);
+        m.pos += m.vel * dt;
+        m.life -= dt;
+    }
+    motes.erase(std::remove_if(motes.begin(), motes.end(),
+        [](const Spark& s) { return s.life <= 0.f; }), motes.end());
+
