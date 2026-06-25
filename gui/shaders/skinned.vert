@@ -28,3 +28,13 @@ void main() {
 
     vec4 skinnedPos    = skin * vec4(aPos, 1.0);
     vec4 skinnedNormal = skin * vec4(aNormal, 0.0);
+
+    vec4 worldPos = uModel * skinnedPos;
+    vPos    = worldPos.xyz;
+    vNormal = normalize(uNormalMat * skinnedNormal.xyz);
+
+    vWaveH     = 0.0;
+    vVertColor = vec3(1.0);
+    vTexCoord  = aTexCoord;
+    gl_Position = uProj * uView * worldPos;
+}
