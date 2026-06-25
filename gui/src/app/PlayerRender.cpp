@@ -328,3 +328,113 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
     toon.setBool ("uCircleClip", false);
     toon.setBool ("uShoreBlend", false);
     float ringPulse = 0.70f + 0.30f * std::sin(elapsed * 3.f);
+    for (const GuiPlayer* pp : drawList) {
+        const GuiPlayer& p = *pp;
+        if (p.level == 0) continue;             // eggs have no level ring
+        glm::vec3 base = (p.level % 2 == 1) ? glm::vec3(0.60f, 0.20f, 1.0f)  // odd → purple
+                                            : glm::vec3(1.0f, 1.0f, 1.0f);   // even → white
+        glm::vec3 col = base * ringPulse;
+        glm::vec2 rw = ctx.playerAnims[p.id].curWorld;
+        float wx = rw.x;
+        float wz = rw.y;
+        glm::mat4 M = glm::translate(glm::mat4(1.f), {wx, 0.06f, wz});
+        M = glm::scale(M, glm::vec3(TILE * 0.5f, 1.f, TILE * 0.5f));
+        glm::mat3 N3 = glm::mat3(glm::transpose(glm::inverse(M)));
+        toon.setMat4("uModel",     glm::value_ptr(M));
+        toon.setMat3("uNormalMat", glm::value_ptr(N3));
+        toon.setVec3("uColor",     col.r, col.g, col.b);
+        levelRing.draw();
+    }
+    toon.setBool("uEmissive", false);
+    glDepthMask(GL_TRUE);
+    glEnable(GL_CULL_FACE);
+    glDisable(GL_BLEND);
+
+    // ── evolution glow: white envelope that peaks mid-effect ──────────
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    glDepthMask(GL_FALSE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+    auraShader.use();
+    auraShader.setMat4("uView", glm::value_ptr(view));
+    auraShader.setMat4("uProj", glm::value_ptr(proj));
+    for (const GuiPlayer* pp : drawList) {
+        const GuiPlayer& p = *pp;
+        PlayerAnim& pa = ctx.playerAnims[p.id];
+        if (pa.evoT <= 0.f || p.level < 1) continue;
+        float e    = 1.f - pa.evoT / ctx.evoDur;            // 0 -> 1
+        float glow = std::sin(e * 3.14159f);            // peak at mid
+        SkinnedMesh& m = ctx.tiers[tierOf(ctx.tiers, p.level)].mesh;
+        m.computeBones(0, pa.animTime, pBones, true, false);
+        auraShader.setMat4Array("uBones[0]", MAX_BONES, glm::value_ptr(pBones[0]));
+        auraShader.setVec3 ("uColor", 0.85f, 0.95f, 1.0f);
+        auraShader.setFloat("uAlpha", glow * 0.95f);
+        glm::mat4 M = playerModel(ctx, p);
+        M = glm::scale(M, glm::vec3(1.0f + 0.14f * glow));
+        auraShader.setMat4("uModel", glm::value_ptr(M));
+        m.draw();
+    }
+
+    // ── evolution sparkles: little twinkling stars ────────────────────
+    for (auto& s : ctx.sparks) {
+        s.vel.y -= 1.5f * dt;
+        s.pos += s.vel * dt;
+        s.life -= dt;
+    }
+    ctx.sparks.erase(std::remove_if(ctx.sparks.begin(), ctx.sparks.end(),
+        [](const Spark& s) { return s.life <= 0.f; }), ctx.sparks.end());
+    if (!ctx.sparks.empty()) {
+        starShader.use();
+        starShader.setMat4("uView", glm::value_ptr(view));
+        starShader.setMat4("uProj", glm::value_ptr(proj));
+        glBlendFunc(GL_ONE, GL_ONE);
+        glBindVertexArray(sparkVAO);
+        for (auto& s : ctx.sparks) {
+            float k  = s.life / s.maxLife;
+            float tw = 0.55f + 0.45f * std::sin(elapsed * s.twFreq + s.phase);
+            starShader.setVec3 ("uCenter", s.pos.x, s.pos.y, s.pos.z);
+            starShader.setFloat("uSize",   s.size);
+            starShader.setVec3 ("uColor",  s.color.r, s.color.g, s.color.b);
+            starShader.setFloat("uIntensity", (0.4f + 0.9f * k) * tw);
+            glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+        }
+        glBindVertexArray(0);
+    }
+
+    // ── night sky: scattered stars + Big Dipper constellation (additive) ──
+    if (nightF > 0.02f)
+        ctx.constellation.renderNightSky(starShader, sparkVAO, view, proj,
+                                         camPos, elapsed, nightF);
+
+    glDepthMask(GL_TRUE);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glDisable(GL_BLEND);
+}
+
+void updateAndDrawPlayers(PlayerRenderCtx& ctx,
+                          Shader& skinShader, Shader& auraShader,
+                          Shader& toon, Shader& starShader, Shader& eggShader,
+                          unsigned sparkVAO,
+                          const glm::mat4& view, const glm::mat4& proj,
+                          const glm::vec3& camPos, const glm::vec3& sunDir,
+                          const glm::vec3& lightCol, float ambScale,
+                          float nightF, float elapsed, float dt) {
+    bool havePlayerMesh = ctx.tiers[0].loaded || ctx.tiers[1].loaded ||
+                          ctx.tiers[2].loaded || ctx.tiers[3].loaded;
+    if (!havePlayerMesh || !(ctx.testMode || ctx.netConnected)) return;
+
+    // unified draw list: demo players, otherwise live server players
+    std::vector<const GuiPlayer*> drawList;
+    if (ctx.testMode) {
+        for (const auto& p : ctx.testPlayers) drawList.push_back(&p);
+    } else {
+        for (const auto& kv : ctx.netClient.state().players) drawList.push_back(&kv.second);
+    }
+
+    updatePlayerStates(ctx, drawList, dt);
+    drawPlayerPasses(ctx, drawList, skinShader, auraShader, toon, starShader, eggShader,
+                     sparkVAO, view, proj, camPos, sunDir, lightCol, ambScale,
+                     nightF, elapsed, dt);
+}
