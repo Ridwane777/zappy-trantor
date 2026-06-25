@@ -19,3 +19,14 @@ struct MenuConfig {
 };
 
 // Runs the startup screen until the user starts or quits.
+//   returns true  -> user pressed Start; `out` holds the chosen host/port.
+//   returns false -> user closed the window / quit.
+// Requires a current OpenGL context (GLEW already initialised) on `window`.
+// `font` is the display font for the menu; `uiFont` is the in-game font used for
+// the settings panel (readable numerals for host/port).
+bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,
+             MenuConfig &out);
+
+// Renders one loading-screen frame: a title, a progress bar at `progress`
+// (0..1) and a status line. Call repeatedly between asset-load steps. Pumps
+// window events so the window stays responsive during the load.
