@@ -20,3 +20,11 @@ void main() {
     float spikes = (sx + sy) * 0.55;
 
     float i = (core + halo + spikes) * uIntensity;
+
+    // fade fully to zero by the quad edge (r=1) so no square outline shows
+    i *= 1.0 - smoothstep(0.55, 1.0, r);
+
+    // whiten the very centre so the core looks white-hot, coloured outward
+    vec3 col = uColor * i + vec3(1.0) * core * uIntensity * 0.8;
+    FragColor = vec4(col, 1.0);
+}
