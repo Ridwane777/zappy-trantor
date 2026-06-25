@@ -17,3 +17,10 @@ FILES=(json.hpp tiny_gltf.h tinygltf_json.hpp)
 mkdir -p "$INCDIR"
 for f in "${FILES[@]}"; do
     [ -s "$INCDIR/$f" ] && { echo "  $f déjà installé ($INCDIR)"; continue; }
+    echo "  installation de $f -> $INCDIR ..."
+    tmp="$(mktemp)"
+    curl -fsSL "$BASE/$f" -o "$tmp"
+    install -m 644 "$tmp" "$INCDIR/$f"
+    rm -f "$tmp"
+done
+echo "OK — headers tiers installés dans $INCDIR (comme une lib système)"
