@@ -1,1 +1,3 @@
 #version 330 core
+uniform vec3  uColor;
+uniform float uAlpha;
