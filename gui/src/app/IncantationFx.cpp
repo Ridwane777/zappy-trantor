@@ -44,3 +44,26 @@ void drawIncantations(const std::vector<IncantationEffect>& fx, Shader& incant,
         incant.setBool("uPillarMode", false);
         incant.setVec3("uRingCenter", ix.pos.x, ix.pos.y, ix.pos.z);
         incant.setFloat("uRingInnerR", INNER_R);
+        incant.setFloat("uRingOuterR", DOMAIN_R);
+        incant.setVec3 ("uColor", 0.25f, 1.0f, 0.90f);
+        incant.setFloat("uAlpha", fade * 0.90f);
+        {
+            glm::mat4 Mr = glm::translate(glm::mat4(1.f), ix.pos + glm::vec3(0, 0.02f, 0));
+            Mr = glm::rotate(Mr, ringRot, {0.f, 1.f, 0.f});
+            Mr = glm::scale(Mr, glm::vec3(DOMAIN_R));
+            glm::mat3 Nr = glm::mat3(glm::transpose(glm::inverse(Mr)));
+            incant.setMat4("uModel",     glm::value_ptr(Mr));
+            incant.setMat3("uNormalMat", glm::value_ptr(Nr));
+            dashedRing.draw();
+        }
+
+        // ── pillars: Gaussian beam (diff+spec) + Fresnel ──────────
+        incant.setBool("uPillarMode", true);
+        incant.setVec3("uColor", 0.30f, 1.0f, 0.92f);
+        for (int i = 0; i < N_PILLARS; ++i) {
+            float baseAngle = ringRot + PI2 * (i + 0.75f) / N_PILLARS;
+            float px = DOMAIN_R * std::cos(baseAngle);
+            float pz = DOMAIN_R * std::sin(baseAngle);
+
+            float phase = std::fmod(elapsed * 1.8f + i * (1.0f / N_PILLARS), 1.0f);
+            float h = phase < 0.4f ? phase / 0.4f
