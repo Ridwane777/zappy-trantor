@@ -159,3 +159,84 @@ void GuiClient::poll()
         return;
     }
 
+    std::size_t nl;
+    while ((nl = _readBuf.find('\n')) != std::string::npos) {
+        std::string line = _readBuf.substr(0, nl);
+        _readBuf.erase(0, nl + 1);
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+        if (!line.empty())
+            _processLine(line);
+    }
+}
+
+// ── protocol dispatch ───────────────────────────────────────────────────────────
+
+void GuiClient::_processLine(const std::string &line)
+{
+    std::istringstream iss(line);
+    std::string cmd;
+    iss >> cmd;
+
+    if (cmd == "msz") {
+        int w, h;
+        if (iss >> w >> h)
+            _state.resizeGrid(w, h);
+
+    } else if (cmd == "sgt") {
+        int t;
+        if (iss >> t)
+            _state.timeUnit = t;
+
+    } else if (cmd == "sst") {
+        // custom: seconds until next resource reset (resyncs the GUI countdown)
+        int s;
+        if (iss >> s)
+            _state.secondsToReset = static_cast<float>(s);
+
+    } else if (cmd == "tna") {
+        std::string team;
+        if (iss >> team)
+            _state.teams.push_back(team);
+
+    } else if (cmd == "bct") {
+        int x, y;
+        if (iss >> x >> y && _state.inBounds(x, y)) {
+            GuiTile &t = _state.tileAt(x, y);
+            for (int i = 0; i < GUI_RES_COUNT; ++i)
+                iss >> t.res[i];
+        }
+
+    } else if (cmd == "pnw") {
+        GuiPlayer p;
+        std::string idTok;
+        iss >> idTok >> p.x >> p.y >> p.orientation >> p.level >> p.team;
+        p.id = parseId(idTok);
+        _state.players[p.id] = p;
+
+    } else if (cmd == "ppo") {
+        std::string idTok;
+        int x, y, o;
+        if (iss >> idTok >> x >> y >> o) {
+            auto it = _state.players.find(parseId(idTok));
+            if (it != _state.players.end()) {
+                it->second.x = x;
+                it->second.y = y;
+                it->second.orientation = o;
+            }
+        }
+
+    } else if (cmd == "plv") {
+        std::string idTok;
+        int lvl;
+        if (iss >> idTok >> lvl) {
+            int id = parseId(idTok);
+            auto it = _state.players.find(id);
+            if (it != _state.players.end())
+                it->second.level = lvl;
+            _logEvent(id, "reached level " + std::to_string(lvl), 1);
+        }
+
+    } else if (cmd == "pgt") {
+        // player took a resource off a tile
+        std::string idTok;
