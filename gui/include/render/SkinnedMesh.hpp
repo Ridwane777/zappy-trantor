@@ -43,3 +43,25 @@ public:
     void loadVertexColors(const std::string& colPath);
     void loadTexture(const std::string& pngPath);
     void loadAnimFrom(const std::string& path);
+
+    void computeBones(int animIndex, float t, glm::mat4 boneMats[MAX_BONES],
+                      bool loop = true, bool reversed = false) const;
+
+    void draw() const;
+
+    int   animCount()                  const { return (int)animations_.size(); }
+    const std::string& animName(int i) const { return animations_[i].name; }
+    float animDuration(int i)          const { return animations_[i].duration; }
+
+    glm::vec3 boundsMin() const { return bmin_; }
+    glm::vec3 boundsMax() const { return bmax_; }
+
+    int  boneCount()                            const { return (int)invBindMats_.size(); }
+    int  boneIndexByName(const std::string& n)  const;
+    void addAnimation(Animation a);
+
+    // Returns per-bone local TRS sampled from animation animIdx at time t.
+    std::vector<LocalTRS> extractLocalTRS(int animIdx, float t) const;
+
+    // Apply localRot to a bone and propagate the world-space delta to all
+    // its descendants. Call after computeBones to overlay procedural motion.
