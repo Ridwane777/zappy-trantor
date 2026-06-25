@@ -27,3 +27,13 @@ public:
 private:
     unsigned int vao = 0;
     unsigned int vbo = 0;
+    unsigned int ebo = 0;
+    int          indexCount = 0;
+
+    int       _stride  = 6;
+    glm::vec3 _centroid{0.f, 0.f, 0.f};
+    float     _radius = 1.f;
+    float     _yMin   = 0.f;
+
+    void cleanup();
+};
