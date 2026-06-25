@@ -71,3 +71,76 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
                  "   grid " + std::to_string(state->width) + "x" + std::to_string(state->height) +
                  "   t/u " + std::to_string(state->timeUnit) +
                  "   teams " + std::to_string(state->teams.size()) +
+                 "   players " + std::to_string(state->players.size()) +
+                 "   eggs " + std::to_string(state->eggs.size());
+        info.setFillColor(sf::Color(150, 220, 255, 200));
+    } else {
+        status = "OFFLINE (viewer)   map.json " +
+                 std::to_string(mapW) + "x" + std::to_string(mapH);
+        info.setFillColor(sf::Color(230, 180, 140, 190));
+    }
+    info.setString(status);
+    info.setCharacterSize(18);
+    sf::FloatRect b = info.getLocalBounds();
+    info.setPosition(ws.x - b.width - 14.f, 14.f);
+    win.draw(info);
+
+    // ── retractable sidebar (teams / players / levels) ──────────────────────
+    _hits.clear();
+    const float pad = 14.f;
+    float panelX = ws.x - WIDTH * _anim;
+    float tabW = 26.f, tabH = 60.f, tabX = panelX - tabW, tabY = 96.f;
+    sf::RectangleShape tab(sf::Vector2f(tabW, tabH));
+    tab.setPosition(tabX, tabY);
+    tab.setFillColor(sf::Color(20, 26, 38, 210));
+    tab.setOutlineColor(sf::Color(90, 130, 180, 200));
+    tab.setOutlineThickness(1.f);
+    win.draw(tab);
+    sf::Text arrow; arrow.setFont(font);
+    arrow.setString(_open ? ">" : "<");
+    arrow.setCharacterSize(20); arrow.setFillColor(sf::Color(180, 210, 255));
+    arrow.setPosition(tabX + 8.f, tabY + 16.f); win.draw(arrow);
+    _hits.push_back({sf::FloatRect(tabX, tabY, tabW, tabH), 2, "", -1});
+
+    if (_anim > 0.01f && state) {
+        _panelX = panelX;
+        sf::RectangleShape panel(sf::Vector2f(WIDTH, (float)ws.y));
+        panel.setPosition(panelX, 0.f);
+        panel.setFillColor(sf::Color(14, 18, 28, 235));
+        win.draw(panel);
+
+        float x = panelX + pad, y = 46.f;
+
+        // events: countdown to the next resource reset (fixed header)
+        {
+            sf::Text eh; eh.setFont(font); eh.setString("EVENTS");
+            eh.setCharacterSize(18); eh.setFillColor(sf::Color(185, 205, 240));
+            eh.setPosition(x, y); win.draw(eh); y += 26.f;
+            float sr = state->secondsToReset;
+            std::string ts;
+            if (sr < 0.f) {
+                ts = "--:--";
+            } else {
+                int s = (int)sr, mm = s / 60, ss = s % 60;
+                ts = std::to_string(mm) + ":" + (ss < 10 ? "0" : "") + std::to_string(ss);
+            }
+            sf::RectangleShape er(sf::Vector2f(WIDTH - 2 * pad, 24.f));
+            er.setPosition(x, y);
+            bool soon = (sr >= 0.f && sr <= 12.f);
+            er.setFillColor(soon ? sf::Color(255, 180, 90, 70) : sf::Color(255, 255, 255, 12));
+            win.draw(er);
+            sf::Text et; et.setFont(font); et.setString("Resource reset");
+            et.setCharacterSize(14); et.setFillColor(sf::Color(150, 225, 170));
+            et.setPosition(x + 6.f, y + 3.f); win.draw(et);
+            sf::Text ev; ev.setFont(font); ev.setString(ts);
+            ev.setCharacterSize(15); ev.setFillColor(sf::Color(240, 240, 248));
+            sf::FloatRect vb = ev.getLocalBounds();
+            ev.setPosition(x + (WIDTH - 2 * pad) - vb.width - 8.f, y + 2.f);
+            win.draw(ev);
+            y += 38.f;
+        }
+
+        sf::Text title; title.setFont(font); title.setString("TEAMS");
+        title.setCharacterSize(20); title.setFillColor(sf::Color(200, 220, 255));
+        title.setPosition(x, y); win.draw(title); y += 34.f;
+
