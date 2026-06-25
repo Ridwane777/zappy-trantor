@@ -19,3 +19,10 @@ void main() {
 
     // golden sun-glitter streak toward the sun, shimmering with the ripples
     float along   = dot(normalize(vXZ + 1e-4), uSunXZ);       // 1 toward the sun
+    float streak  = smoothstep(0.45, 1.0, along);
+    float shimmer = texture(uTex, vUV * 7.0 + uTime * 0.05).r;
+    c += uSunCol * streak * (0.35 + 0.65 * shimmer) * 0.9;
+
+    float edge = 1.0 - smoothstep(0.55, 1.0, length(vXZ));    // soft, round edges
+    FragColor = vec4(c, uAlpha * edge);
+}
