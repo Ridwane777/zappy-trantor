@@ -48,3 +48,28 @@ Shader::Shader(const std::string& vertPath, const std::string& fragPath) {
     glGetProgramiv(id, GL_LINK_STATUS, &success);
     if (!success) {
         char log[1024];
+        glGetProgramInfoLog(id, 1024, nullptr, log);
+        glDeleteShader(vert);
+        glDeleteShader(frag);
+        glDeleteProgram(id);
+        throw GUIException(std::string("Shader link error:\n") + log);
+    }
+
+    glDeleteShader(vert);
+    glDeleteShader(frag);
+}
+
+Shader::~Shader() {
+    if (id) glDeleteProgram(id);
+}
+
+void Shader::use() const {
+    glUseProgram(id);
+}
+
+void Shader::setInt(const std::string& name, int v) const {
+    glUniform1i(glGetUniformLocation(id, name.c_str()), v);
+}
+
+void Shader::setFloat(const std::string& name, float v) const {
+    glUniform1f(glGetUniformLocation(id, name.c_str()), v);
