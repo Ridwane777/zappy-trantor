@@ -67,3 +67,26 @@ void AudioManager::playLoop(const std::string &name, float volume)
     _loopVoice.setBuffer(it->second);
     _loopVoice.setLoop(true);
     _loopVoice.setVolume(volume);
+    _loopVoice.play();
+}
+
+void AudioManager::setLoopVolume(float volume) { _loopVoice.setVolume(volume); }
+
+void AudioManager::stopLoop() { _loopVoice.stop(); }
+
+void AudioManager::play(const std::string &name, float volume)
+{
+    if (_muted) return;
+    auto it = _buffers.find(name);
+    if (it == _buffers.end()) return;         // clip missing -> silent
+
+    // find a free voice, else steal the first
+    sf::Sound *voice = nullptr;
+    for (auto &v : _voices)
+        if (v.getStatus() != sf::Sound::Playing) { voice = &v; break; }
+    if (!voice) voice = &_voices.front();
+
+    voice->setBuffer(it->second);
+    voice->setVolume(volume);
+    voice->play();
+}
