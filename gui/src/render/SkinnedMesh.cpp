@@ -673,3 +673,229 @@ void SkinnedMesh::computeBones(int animIdx, float t,
                                glm::mat4 boneMats[MAX_BONES],
                                bool loop, bool reversed) const
 {
+    int n = (int)invBindMats_.size();
+    if (n == 0) {
+        for (int i = 0; i < MAX_BONES; ++i) boneMats[i] = glm::mat4(1.f);
+        return;
+    }
+
+    if (n > MAX_BONES) n = MAX_BONES;
+
+    std::vector<glm::mat4> local(n, glm::mat4(1.f));
+
+    if (animIdx >= 0 && animIdx < (int)animations_.size()) {
+        auto& anim = animations_[animIdx];
+        float dur = anim.duration;
+        if (dur > 0.f) {
+            if (loop)    t = std::fmod(t, dur);
+            else         t = std::min(t, dur);
+            if (reversed) t = dur - t;
+        }
+
+        for (auto& ch : anim.channels) {
+            int ji = ch.boneIndex;
+            if (ji >= n) continue;
+
+            glm::vec3 T(0.f), S(1.f);
+            glm::quat R(1.f,0.f,0.f,0.f);
+
+            if (!ch.transKeys.empty())  T = sampleLinear(ch.timesT, ch.transKeys, t);
+            if (!ch.rotKeys.empty())    R = sampleSlerp (ch.timesR, ch.rotKeys,   t);
+            if (!ch.scaleKeys.empty())  S = sampleLinear(ch.timesS, ch.scaleKeys, t);
+
+            glm::mat4 m = glm::translate(glm::mat4(1.f), T)
+                        * glm::toMat4(R)
+                        * glm::scale(glm::mat4(1.f), S);
+            local[ji] = m;
+        }
+    }
+
+    // accumulate global transforms (parents before children — joints are
+    // stored in topological order by GLTF spec)
+    std::vector<glm::mat4> global(n);
+    for (int i = 0; i < n; ++i) {
+        int p = parentOf_[i];
+        global[i] = (p >= 0 && p < n) ? global[p] * local[i] : local[i];
+    }
+
+    for (int i = 0; i < n; ++i)
+        boneMats[i] = global[i] * invBindMats_[i];
+
+    // identity for unused slots
+    for (int i = n; i < MAX_BONES; ++i)
+        boneMats[i] = glm::mat4(1.f);
+}
+
+// ── GPU upload / draw ─────────────────────────────────────────────────────────
+
+void SkinnedMesh::upload(const std::vector<float>& verts,
+                         const std::vector<unsigned int>& idx)
+{
+    indexCount_ = (GLsizei)idx.size();
+    glGenVertexArrays(1, &vao_);
+    glGenBuffers(1, &vbo_);
+    glGenBuffers(1, &ebo_);
+
+    glBindVertexArray(vao_);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_);
+    glBufferData(GL_ARRAY_BUFFER, verts.size()*4, verts.data(), GL_STATIC_DRAW);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, idx.size()*4, idx.data(), GL_STATIC_DRAW);
+
+    const GLsizei stride = 16 * sizeof(float);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);       // pos
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3*4));   // normal
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, stride, (void*)(6*4));   // joints
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, stride, (void*)(10*4));  // weights
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, stride, (void*)(14*4));  // uv
+    glEnableVertexAttribArray(4);
+
+    glBindVertexArray(0);
+}
+
+void SkinnedMesh::loadVertexColors(const std::string& colPath)
+{
+    std::string blob = zappy::assetBytes(colPath);   // local or streamed from CDN
+    if (blob.size() < 4) { std::cerr << "loadVertexColors: cannot open " << colPath << "\n"; return; }
+
+    unsigned int n = 0;
+    std::memcpy(&n, blob.data(), 4);
+    std::vector<float> colors(n * 3);
+    size_t need = (size_t)n * 3 * sizeof(float);
+    if (blob.size() >= 4 + need)
+        std::memcpy(colors.data(), blob.data() + 4, need);
+
+    glBindVertexArray(vao_);
+    if (!colorVbo_) glGenBuffers(1, &colorVbo_);
+    glBindBuffer(GL_ARRAY_BUFFER, colorVbo_);
+    glBufferData(GL_ARRAY_BUFFER, colors.size()*4, colors.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(4, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), (void*)0);
+    glEnableVertexAttribArray(4);
+    glBindVertexArray(0);
+    std::cout << "Loaded vertex colors: " << n << " verts from " << colPath << "\n";
+}
+
+void SkinnedMesh::loadTexture(const std::string& pngPath)
+{
+    std::string png = zappy::assetBytes(pngPath);   // local or streamed from CDN
+    sf::Image img;
+    if (png.empty() || !img.loadFromMemory(png.data(), png.size())) {
+        std::cerr << "loadTexture: cannot open " << pngPath << "\n";
+        return;
+    }
+    auto sz = img.getSize();
+
+    if (!texId_) glGenTextures(1, &texId_);
+    glBindTexture(GL_TEXTURE_2D, texId_);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, sz.x, sz.y, 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, img.getPixelsPtr());
+    glGenerateMipmap(GL_TEXTURE_2D);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    std::cout << "Loaded texture " << sz.x << "x" << sz.y << " from " << pngPath << "\n";
+}
+
+void SkinnedMesh::draw() const
+{
+    if (texId_) {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, texId_);
+    }
+    glBindVertexArray(vao_);
+    glDrawElements(GL_TRIANGLES, indexCount_, GL_UNSIGNED_INT, nullptr);
+    glBindVertexArray(0);
+    if (texId_) glBindTexture(GL_TEXTURE_2D, 0);
+}
+
+// ── bone utilities ────────────────────────────────────────────────────────────
+
+int SkinnedMesh::boneIndexByName(const std::string& n) const
+{
+    for (int i = 0; i < (int)boneNames_.size(); ++i)
+        if (boneNames_[i] == n) return i;
+    return -1;
+}
+
+void SkinnedMesh::addAnimation(Animation a)
+{
+    animations_.push_back(std::move(a));
+}
+
+void SkinnedMesh::overlayBoneChain(int rootBoneIdx, const glm::mat4& localRot,
+                                    glm::mat4 boneMats[MAX_BONES]) const
+{
+    int n = (int)invBindMats_.size();
+    if (rootBoneIdx < 0 || rootBoneIdx >= n) return;
+
+    // global[root] = boneMats[root] * inverse(invBind[root])
+    // W = global[root] * localRot * global[root]^-1  (world-space delta)
+    // newBoneMats[j] = W * boneMats[j]  for root and all descendants
+    glm::mat4 bind_root = glm::inverse(invBindMats_[rootBoneIdx]);
+    glm::mat4 global_root = boneMats[rootBoneIdx] * bind_root;
+    glm::mat4 W = global_root * localRot * glm::inverse(global_root);
+
+    for (int j = 0; j < n; ++j) {
+        bool isDesc = (j == rootBoneIdx);
+        if (!isDesc) {
+            int p = parentOf_[j];
+            while (p >= 0) {
+                if (p == rootBoneIdx) { isDesc = true; break; }
+                p = parentOf_[p];
+            }
+        }
+        if (isDesc) boneMats[j] = W * boneMats[j];
+    }
+}
+
+std::vector<LocalTRS> SkinnedMesh::extractLocalTRS(int animIdx, float t) const
+{
+    int n = (int)invBindMats_.size();
+    std::vector<LocalTRS> out(n);
+
+    if (animIdx < 0 || animIdx >= (int)animations_.size()) return out;
+    auto& anim = animations_[animIdx];
+    float dur = anim.duration;
+    if (dur > 0.f) t = std::fmod(t, dur);
+
+    for (auto& ch : anim.channels) {
+        int ji = ch.boneIndex;
+        if (ji < 0 || ji >= n) continue;
+        if (!ch.transKeys.empty()) out[ji].t = sampleLinear(ch.timesT, ch.transKeys, t);
+        if (!ch.rotKeys.empty())   out[ji].r = sampleSlerp (ch.timesR, ch.rotKeys,   t);
+        if (!ch.scaleKeys.empty()) out[ji].s = sampleLinear(ch.timesS, ch.scaleKeys, t);
+    }
+    return out;
+}
+
+// ── move / destructor ─────────────────────────────────────────────────────────
+
+SkinnedMesh::~SkinnedMesh()
+{
+    if (vao_)     { glDeleteVertexArrays(1, &vao_); glDeleteBuffers(1, &vbo_); glDeleteBuffers(1, &ebo_); }
+    if (colorVbo_) glDeleteBuffers(1, &colorVbo_);
+    if (texId_)    glDeleteTextures(1, &texId_);
+}
+
+SkinnedMesh::SkinnedMesh(SkinnedMesh&& o) noexcept
+    : vao_(o.vao_), vbo_(o.vbo_), ebo_(o.ebo_), indexCount_(o.indexCount_),
+      colorVbo_(o.colorVbo_), texId_(o.texId_),
+      invBindMats_(std::move(o.invBindMats_)),
+      parentOf_(std::move(o.parentOf_)),
+      animations_(std::move(o.animations_)),
+      bmin_(o.bmin_), bmax_(o.bmax_)
+{ o.vao_ = o.vbo_ = o.ebo_ = o.colorVbo_ = o.texId_ = 0; }
+
+SkinnedMesh& SkinnedMesh::operator=(SkinnedMesh&& o) noexcept
+{
+    if (this != &o) {
+        this->~SkinnedMesh();
+        new(this) SkinnedMesh(std::move(o));
+    }
+    return *this;
+}
