@@ -92,3 +92,35 @@ Mesh& Mesh::operator=(Mesh&& other) noexcept {
         _stride    = other._stride;
         _centroid  = other._centroid;
         _radius    = other._radius;
+        _yMin      = other._yMin;
+        other.vao = 0; other.vbo = 0; other.ebo = 0;
+    }
+    return *this;
+}
+
+void Mesh::cleanup() {
+    if (ebo) { glDeleteBuffers(1, &ebo); ebo = 0; }
+    if (vbo) { glDeleteBuffers(1, &vbo); vbo = 0; }
+    if (vao) { glDeleteVertexArrays(1, &vao); vao = 0; }
+}
+
+Mesh::~Mesh() {
+    cleanup();
+}
+
+void Mesh::draw() const {
+    glBindVertexArray(vao);
+    glDrawElements(GL_TRIANGLES, indexCount, GL_UNSIGNED_INT, nullptr);
+    glBindVertexArray(0);
+}
+
+int Mesh::vertCount() const {
+    return indexCount;
+}
+
+glm::vec3 Mesh::centroid() const {
+    return _centroid;
+}
+
+float Mesh::boundingRadius() const { return _radius; }
+float Mesh::yMin()           const { return _yMin;   }
