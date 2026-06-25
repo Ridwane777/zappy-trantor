@@ -44,3 +44,26 @@ void AudioManager::init(const std::string &dir)
     std::cout << "[audio] " << loaded << " sfx loaded from " << dir << "\n";
 }
 
+void AudioManager::playMusic(const std::string &name, bool loop, float volume)
+{
+    if (_muted) return;
+    std::string path;
+    if (!_resolve(name, path)) return;        // no music file yet -> silent
+    // sf::Music streams from the buffer -> keep it alive (assetBytesKept)
+    const std::string &b = zappy::assetBytesKept(path);
+    if (b.empty() || !_music.openFromMemory(b.data(), b.size())) return;
+    _music.setLoop(loop);
+    _music.setVolume(volume);
+    _music.play();
+}
+
+void AudioManager::stopMusic() { _music.stop(); }
+
+void AudioManager::playLoop(const std::string &name, float volume)
+{
+    if (_muted) return;
+    auto it = _buffers.find(name);
+    if (it == _buffers.end()) return;         // clip missing -> silent
+    _loopVoice.setBuffer(it->second);
+    _loopVoice.setLoop(true);
+    _loopVoice.setVolume(volume);
