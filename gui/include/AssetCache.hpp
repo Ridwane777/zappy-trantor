@@ -31,3 +31,37 @@ inline const std::string &cdnBase()
         return std::string(env ? env
             : "https://pub-6d9e00b90894418295af58a44ecfe1df.r2.dev");
     }();
+    return base;
+}
+
+namespace detail {
+inline std::mutex &storeMutex() { static std::mutex m; return m; }
+inline std::unordered_map<std::string, std::string> &store()
+{
+    static std::unordered_map<std::string, std::string> s;
+    return s;
+}
+
+// Lecture brute : fichier local si présent, sinon stream depuis le CDN en RAM
+// (curl vers stdout), SANS écrire de fichier.
+inline std::string fetchRaw(const std::string &path)
+{
+    std::ifstream f(path, std::ios::binary);
+    if (f.good())
+        return std::string((std::istreambuf_iterator<char>(f)),
+                            std::istreambuf_iterator<char>());
+
+    const std::string prefix = "assets/";
+    if (path.rfind(prefix, 0) != 0)
+        return {};
+    std::string rel = path.substr(prefix.size());
+
+    std::string cmd = "curl -fsSL --connect-timeout 10 --max-time 120 '"
+                    + cdnBase() + "/" + rel + "'";
+    FILE *p = popen(cmd.c_str(), "r");
+    if (!p) return {};
+    std::string out;
+    char buf[1 << 16];
+    size_t n;
+    while ((n = fread(buf, 1, sizeof buf, p)) > 0)
+        out.append(buf, n);
