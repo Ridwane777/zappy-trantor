@@ -61,3 +61,25 @@ struct PlayerRenderCtx {
     glm::vec3 mewPos; float mewYaw; float mewScale;
 
     bool haveMoon;
+    SkinnedMesh& moonMesh;
+    glm::vec3 moonDir;
+
+    TexturedMesh* eggMeshTex;
+
+    HudOverlay& hud;
+    Constellation& constellation;
+};
+
+// Builds the unified draw list (demo or live players), advances every
+// player's walk/turn/evolution state, then runs every draw pass that depends
+// on it: solid skinned characters, Mew (admin mount), the night moon,
+// team-selection aura glow, eggs, ground level rings, evolution glow +
+// sparkles, and the night-sky/constellation overlay.
+void updateAndDrawPlayers(PlayerRenderCtx& ctx,
+                          Shader& skinShader, Shader& auraShader,
+                          Shader& toon, Shader& starShader, Shader& eggShader,
+                          unsigned sparkVAO,
+                          const glm::mat4& view, const glm::mat4& proj,
+                          const glm::vec3& camPos, const glm::vec3& sunDir,
+                          const glm::vec3& lightCol, float ambScale,
+                          float nightF, float elapsed, float dt);
