@@ -569,3 +569,288 @@ bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,
             lightBright = 1.6f + 0.35f * std::sin(animT * 13.f);   // bright, uneasy pulse
             if (phaseT >= FLOAT_DUR) {
                 phase = Phase::REVEALING; phaseT = 0.f;
+                spawnExplosion(LOGO_POS);                    // flash + motes of light
+                flashStr = 1.f;
+                flash2D  = 1.f;
+                audio.play("burst", 100.f);                  // light explodes into motes
+                audio.play("lensflare", 100.f);              // logo sets in with a lens-flare shimmer
+            }
+        } else if (phase == Phase::REVEALING) {
+            // logo eases in over the first ~55% while the flash/motes fade out
+            logoReveal = std::min(phaseT / (REVEAL_DUR * 0.55f), 1.f);
+            if (phaseT >= REVEAL_DUR) {
+                phase = Phase::READY; phaseT = 0.f;
+                audio.playMusic("menu_music", true, 40.f);   // calm loop while in the menu
+            }
+        } else {
+            logoReveal = 1.f;
+        }
+
+        // particles + flash decay
+        for (auto &p : particles) {
+            p.vel.y -= 2.0f * dt;                            // gentle gravity (floaty)
+            p.vel   *= (1.f - 0.6f * dt);                    // air drag
+            p.pos += p.vel * dt;
+            p.life -= dt;
+        }
+        particles.erase(std::remove_if(particles.begin(), particles.end(),
+            [](const Particle &p) { return p.life <= 0.f; }), particles.end());
+        flashStr = std::max(0.f, flashStr - dt * 2.0f);
+        flash2D  = std::max(0.f, flash2D  - dt * 0.667f);    // flash fade (~1.5s)
+
+        // ── camera (orbits the fixed logo; drag to look around it) ────────────
+        sf::Vector2u ws = window.getSize();
+        float aspect = (ws.y > 0) ? float(ws.x) / float(ws.y) : 1.7f;
+        glm::vec3 target(0.f, 1.5f, 0.f);                 // orbit pivot = the logo
+        glm::vec3 camPos = target + camDist * glm::vec3(
+            std::cos(camPitch) * std::sin(camYaw),
+            std::sin(camPitch),
+            std::cos(camPitch) * std::cos(camYaw));
+        glm::mat4 view = glm::lookAt(camPos, target, glm::vec3(0, 1, 0));
+        glm::mat4 proj = glm::perspective(glm::radians(42.f), aspect, 0.1f, 200.f);
+
+        // ── render 3D ─────────────────────────────────────────────────────────
+        glClearColor(0.015f, 0.02f, 0.035f, 1.f);
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+        // tropical sunset sky — only after the explosion reveals the scene
+        glm::vec3 sunDir = glm::normalize(glm::vec3(0.35f, 0.16f, -0.92f));
+        if (phase == Phase::REVEALING || phase == Phase::READY) {
+            glm::mat4 invVP  = glm::inverse(proj * view);
+            glDisable(GL_DEPTH_TEST);
+            glDisable(GL_CULL_FACE);
+            skyShader.use();
+            skyShader.setVec3 ("uSkyTop",      0.16f, 0.26f, 0.55f);
+            skyShader.setVec3 ("uSkyHorizon",  0.98f, 0.52f, 0.30f);
+            skyShader.setMat4 ("uInvViewProj", glm::value_ptr(invVP));
+            skyShader.setVec3 ("uCamPos",      camPos.x, camPos.y, camPos.z);
+            skyShader.setVec3 ("uSunDir",      sunDir.x, sunDir.y, sunDir.z);
+            skyShader.setVec3 ("uMoonDir",     0.f, -1.f, 0.f);
+            skyShader.setFloat("uSunStrength",  1.f);
+            skyShader.setFloat("uMoonStrength", 0.f);
+            glBindVertexArray(glowVAO);
+            glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+            glBindVertexArray(0);
+        }
+
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+
+        // ── sand floor + swaying vegetation: fixed living backdrop ──
+        if (phase == Phase::REVEALING || phase == Phase::READY) {
+            setPhongDefaults(phong);
+            phong.use();
+            phong.setMat4 ("uView",  glm::value_ptr(view));
+            phong.setMat4 ("uProj",  glm::value_ptr(proj));
+            phong.setVec3 ("uCamPos", camPos.x, camPos.y, camPos.z);
+            phong.setVec3 ("uDirLightDir",   -0.4f, -0.8f, -0.5f);
+            phong.setVec3 ("uDirLightColor",  1.0f, 0.85f, 0.6f);   // warm sunset light
+            phong.setVec3 ("uPointLight0Color", 0.f, 0.f, 0.f);
+            phong.setVec3 ("uPointLight1Color", 0.f, 0.f, 0.f);
+            phong.setFloat("uAmbientStrength", 0.5f);
+            phong.setFloat("uTime", animT);
+            glDisable(GL_CULL_FACE);                                // veg double-sided
+
+            // sand floor — soft-faded disc that melts into the water/horizon
+            sandShader.use();
+            sandShader.setMat4 ("uView", glm::value_ptr(view));
+            sandShader.setMat4 ("uProj", glm::value_ptr(proj));
+            sandShader.setFloat("uSize", 30.f);
+            sandShader.setFloat("uY",   -0.05f);
+            sandShader.setVec3 ("uColor",    0.90f, 0.82f, 0.58f);
+            sandShader.setVec3 ("uColorFar", 0.82f, 0.74f, 0.66f);  // hazier toward the horizon
+            sandShader.setFloat("uAlpha", 1.0f);
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glDepthMask(GL_FALSE);
+            glBindVertexArray(glowVAO);
+            glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+            glBindVertexArray(0);
+            glDepthMask(GL_TRUE);
+            glDisable(GL_BLEND);
+
+            // swaying vegetation
+            phong.use();
+            phong.setBool("uSway", true);
+            for (auto &vg : veg) {
+                glm::mat4 M = glm::translate(glm::mat4(1.f), vg.pos);
+                M = glm::rotate(M, vg.rotY, glm::vec3(0.f, 1.f, 0.f));
+                M = glm::scale(M, glm::vec3(vg.scale));
+                glm::mat3 N3 = glm::mat3(glm::transpose(glm::inverse(M)));
+                phong.setVec3("uColor", vg.col.r, vg.col.g, vg.col.b);
+                phong.setMat4("uModel", glm::value_ptr(M));
+                phong.setMat3("uNormalMat", glm::value_ptr(N3));
+                vg.m->draw();
+            }
+            phong.setBool("uSway", false);
+
+            // toon outline around the vegetation (expanded back faces = silhouette)
+            outline.use();
+            outline.setMat4 ("uView", glm::value_ptr(view));
+            outline.setMat4 ("uProj", glm::value_ptr(proj));
+            outline.setFloat("uTime", animT);
+            outline.setBool ("uSway", true);
+            outline.setFloat("uOutlineWidth", 0.005f);
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_FRONT);
+            for (auto &vg : veg) {
+                glm::mat4 M = glm::translate(glm::mat4(1.f), vg.pos);
+                M = glm::rotate(M, vg.rotY, glm::vec3(0.f, 1.f, 0.f));
+                M = glm::scale(M, glm::vec3(vg.scale));
+                glm::mat3 N3 = glm::mat3(glm::transpose(glm::inverse(M)));
+                outline.setMat4("uModel", glm::value_ptr(M));
+                outline.setMat3("uNormalMat", glm::value_ptr(N3));
+                vg.m->draw();
+            }
+            glCullFace(GL_BACK);
+        }
+
+        // ── phoenix flyby across the sky every ~30 s ──
+        if (havePhoenix && phase == Phase::READY) {
+            if (!phoenixFlying) {
+                phoenixTimer += dt;
+                if (phoenixTimer >= 30.f) { phoenixFlying = true; phoenixProg = 0.f; phoenixTimer = 0.f; }
+            } else {
+                phoenixProg += dt / 8.f;                 // ~8 s to cross
+                if (phoenixProg >= 1.f) phoenixFlying = false;
+            }
+            if (phoenixFlying) {
+                glm::mat4 pBones[MAX_BONES];
+                phoenixMesh.computeBones(0, animT, pBones, true, false);   // "Take 001"
+                float px = glm::mix(-16.f, 16.f, phoenixProg);
+                float py = 3.0f + std::sin(phoenixProg * 3.14159f) * 0.8f; // gentle arc
+                float pz = -2.f;                                          // in front of the vegetation
+                glm::mat4 M = glm::translate(glm::mat4(1.f), glm::vec3(px, py, pz));
+                M = glm::rotate(M, glm::radians(phxYaw), glm::vec3(0, 1, 0));  // face travel
+                M = glm::scale(M, glm::vec3(0.00225f));  // half size, in the foreground
+                glm::mat3 N3 = glm::mat3(glm::transpose(glm::inverse(M)));
+                setPhongDefaults(skinShader);
+                skinShader.use();
+                skinShader.setMat4 ("uView",  glm::value_ptr(view));
+                skinShader.setMat4 ("uProj",  glm::value_ptr(proj));
+                skinShader.setVec3 ("uCamPos", camPos.x, camPos.y, camPos.z);
+                skinShader.setVec3 ("uDirLightDir",   -0.4f, -0.6f, -0.7f);
+                skinShader.setVec3 ("uDirLightColor",  1.0f, 0.72f, 0.5f);
+                skinShader.setVec3 ("uPointLight0Color", 0.f, 0.f, 0.f);
+                skinShader.setVec3 ("uPointLight1Color", 0.f, 0.f, 0.f);
+                skinShader.setFloat("uAmbientStrength", 0.7f);
+                skinShader.setBool ("uUseTexture", true);
+                skinShader.setInt  ("uTexture", 0);
+                skinShader.setMat4Array("uBones[0]", MAX_BONES, glm::value_ptr(pBones[0]));
+                skinShader.setMat4 ("uModel",     glm::value_ptr(M));
+                skinShader.setMat3 ("uNormalMat", glm::value_ptr(N3));
+                glDisable(GL_CULL_FACE);
+                phoenixMesh.draw();
+                glEnable(GL_CULL_FACE);
+            }
+        }
+
+        setPhongDefaults(phong);
+        phong.use();
+        phong.setMat4("uView", glm::value_ptr(view));
+        phong.setMat4("uProj", glm::value_ptr(proj));
+        phong.setVec3("uCamPos", camPos.x, camPos.y, camPos.z);
+        phong.setVec3("uDirLightDir", -0.4f, -1.0f, -0.5f);
+        phong.setVec3("uDirLightColor", 0.7f, 0.75f, 0.95f);
+        // point light 0 = explosion flash; point light 1 unused
+        phong.setVec3("uPointLight0Pos", LOGO_POS.x, LOGO_POS.y, LOGO_POS.z);
+        phong.setVec3("uPointLight0Color", flashStr * 1.6f, flashStr * 2.2f, flashStr * 3.f);
+        phong.setVec3("uPointLight1Pos", 0.f, 10.f, 0.f);
+        phong.setVec3("uPointLight1Color", 0.f, 0.f, 0.f);
+
+        auto drawMesh = [&](Mesh &m, const glm::mat4 &model, glm::vec3 color,
+                            bool emissive, float alpha) {
+            glm::mat3 nrm = glm::mat3(glm::transpose(glm::inverse(model)));
+            phong.use();
+            phong.setMat4("uModel", glm::value_ptr(model));
+            phong.setMat3("uNormalMat", glm::value_ptr(nrm));
+            phong.setVec3("uColor", color.r, color.g, color.b);
+            phong.setBool("uEmissive", emissive);
+            phong.setFloat("uAlpha", alpha);
+            m.draw();
+        };
+
+        // falling light
+        if (phase == Phase::FALLING || phase == Phase::FLOATING) {
+            starShader.use();
+            starShader.setMat4("uView", glm::value_ptr(view));
+            starShader.setMat4("uProj", glm::value_ptr(proj));
+            starShader.setVec3("uCenter", 0.f, lightY, 0.f);
+            starShader.setFloat("uSize", lightScale * 2.5f);  // halo bigger than core
+            starShader.setVec3("uColor", 0.30f, 0.55f, 1.0f); // blue glow
+            starShader.setFloat("uIntensity", lightBright);
+
+            glDepthMask(GL_FALSE);
+            glDisable(GL_DEPTH_TEST);
+            glDisable(GL_CULL_FACE);
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_ONE, GL_ONE);                       // additive
+            glBindVertexArray(glowVAO);
+            glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+            glBindVertexArray(0);
+            glDisable(GL_BLEND);
+            glEnable(GL_DEPTH_TEST);
+            glDepthMask(GL_TRUE);
+            glEnable(GL_CULL_FACE);
+        }
+
+        // explosion motes — each a tiny glowing star, twinkling uncannily
+        if (!particles.empty()) {
+            starShader.use();
+            starShader.setMat4("uView", glm::value_ptr(view));
+            starShader.setMat4("uProj", glm::value_ptr(proj));
+            glDepthMask(GL_FALSE);
+            glDisable(GL_DEPTH_TEST);
+            glDisable(GL_CULL_FACE);
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_ONE, GL_ONE);                 // additive
+            glBindVertexArray(glowVAO);
+            for (auto &p : particles) {
+                float k = p.life / p.maxLife;                       // 1 -> 0 fade
+                float twinkle = 0.55f + 0.45f * std::sin(animT * p.twFreq + p.phase);
+                starShader.setVec3 ("uCenter", p.pos.x, p.pos.y, p.pos.z);
+                starShader.setFloat("uSize",   p.size * 6.0f);      // small star
+                starShader.setVec3 ("uColor",  p.color.r, p.color.g, p.color.b);
+                starShader.setFloat("uIntensity", (0.5f + 0.9f * k) * twinkle);
+                glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+            }
+            glBindVertexArray(0);
+            glDisable(GL_BLEND);
+            glEnable(GL_DEPTH_TEST);
+            glDepthMask(GL_TRUE);
+            glEnable(GL_CULL_FACE);
+        }
+
+        // drifting fireflies (tropical ambience), once the scene has settled
+        if (phase == Phase::READY) {
+            for (auto &p : fireflies) {
+                p.vel += glm::vec3(frand(-0.4f, 0.4f), frand(-0.3f, 0.3f), frand(-0.4f, 0.4f)) * dt;
+                p.vel  = glm::clamp(p.vel, glm::vec3(-0.5f), glm::vec3(0.5f));
+                p.pos += p.vel * dt;
+                if (p.pos.x < -5.f) p.pos.x = 5.f;  if (p.pos.x >  5.f) p.pos.x = -5.f;
+                if (p.pos.z < -3.f) p.pos.z = 2.5f; if (p.pos.z >  2.5f) p.pos.z = -3.f;
+                if (p.pos.y <  0.2f){ p.pos.y = 0.2f; p.vel.y = std::abs(p.vel.y); }
+                if (p.pos.y >  2.5f){ p.pos.y = 2.5f; p.vel.y = -std::abs(p.vel.y); }
+            }
+            starShader.use();
+            starShader.setMat4("uView", glm::value_ptr(view));
+            starShader.setMat4("uProj", glm::value_ptr(proj));
+            glDepthMask(GL_FALSE);
+            glDisable(GL_DEPTH_TEST);
+            glDisable(GL_CULL_FACE);
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_ONE, GL_ONE);
+            glBindVertexArray(glowVAO);
+            for (auto &p : fireflies) {
+                float s  = 0.5f + 0.5f * std::sin(animT * p.twFreq + p.phase);
+                float tw = 0.15f + 0.85f * s * s * s;        // firefly pulse (mostly off, soft blinks)
+                starShader.setVec3 ("uCenter", p.pos.x, p.pos.y, p.pos.z);
+                starShader.setFloat("uSize",   p.size * 2.2f);
+                starShader.setVec3 ("uColor",  p.color.r, p.color.g, p.color.b);
+                starShader.setFloat("uIntensity", 0.5f * tw);
+                glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+            }
+            glBindVertexArray(0);
+            glDisable(GL_BLEND);
+            glEnable(GL_DEPTH_TEST);
