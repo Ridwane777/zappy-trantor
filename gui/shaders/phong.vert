@@ -12,3 +12,17 @@ uniform bool  uWave;
 uniform bool  uSway;
 
 out vec3  vPos;
+out vec3  vNormal;
+out float vWaveH;
+out vec3  vVertColor;
+out vec2  vTexCoord;
+
+void main() {
+    vec3 pos = aPos;
+    vec3 norm = aNormal;
+
+    if (uWave) {
+        // Overlapping sine waves on XZ for ocean surface
+        float wx = pos.x * 0.9 + uTime * 1.6;
+        float wz = pos.z * 0.7 + uTime * 1.1 + 1.3;
+        float wd = (pos.x + pos.z) * 0.5 + uTime * 2.0;
