@@ -7,3 +7,8 @@ uniform vec3  uCenter;
 uniform float uSize;
 uniform mat4  uView;
 uniform mat4  uProj;
+
+out vec2 vUV;
+
+void main() {
+    vec3 right = vec3(uView[0][0], uView[1][0], uView[2][0]);
