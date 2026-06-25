@@ -50,3 +50,56 @@ Key parseCorner(const std::string &s)
 }
 
 } // namespace
+
+// ── lifecycle ────────────────────────────────────────────────────────────────
+
+TexturedMesh::~TexturedMesh() { cleanup(); }
+
+void TexturedMesh::cleanup()
+{
+    if (_ebo) glDeleteBuffers(1, &_ebo);
+    if (_vbo) glDeleteBuffers(1, &_vbo);
+    if (_vao) glDeleteVertexArrays(1, &_vao);
+    if (_texId) glDeleteTextures(1, &_texId);
+    _vao = _vbo = _ebo = _texId = 0;
+}
+
+TexturedMesh::TexturedMesh(TexturedMesh &&o) noexcept
+{
+    *this = std::move(o);
+}
+
+TexturedMesh &TexturedMesh::operator=(TexturedMesh &&o) noexcept
+{
+    if (this != &o) {
+        cleanup();
+        _vao = o._vao; _vbo = o._vbo; _ebo = o._ebo; _texId = o._texId;
+        _indexCount = o._indexCount; _centroid = o._centroid; _radius = o._radius;
+        o._vao = o._vbo = o._ebo = o._texId = 0;
+        o._indexCount = 0;
+    }
+    return *this;
+}
+
+// ── loading ──────────────────────────────────────────────────────────────────
+
+TexturedMesh TexturedMesh::load(const std::string &objPath, const std::string &texPath)
+{
+    std::string objSrc = zappy::assetBytes(objPath);   // local or streamed from CDN
+    if (objSrc.empty())
+        throw GUIException("TexturedMesh: cannot open " + objPath);
+    std::istringstream f(objSrc);
+
+    std::vector<std::array<float, 3>> positions;
+    std::vector<std::array<float, 2>> uvs;
+    std::vector<std::array<float, 3>> normals;
+
+    std::vector<float>        verts;     // interleaved pos3 + nrm3 + uv2
+    std::vector<unsigned int> indices;
+    std::unordered_map<Key, unsigned int, KeyHash> seen;
+
+    auto resolve = [&](int idx, int n) { return idx < 0 ? n + idx : idx - 1; };
+
+    std::string line;
+    while (std::getline(f, line)) {
+        if (line.size() < 2) continue;
