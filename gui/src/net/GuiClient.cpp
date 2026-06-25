@@ -78,3 +78,84 @@ bool GuiClient::connect(const std::string &host, int port, std::string &err)
     }
 
     int fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    if (fd < 0) {
+        err = std::string("socket() failed: ") + std::strerror(errno);
+        freeaddrinfo(res);
+        return false;
+    }
+
+    // Bound the handshake so a wrong host/port can't hang the menu.
+    struct timeval tv{};
+    tv.tv_sec = 5;
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+    if (::connect(fd, res->ai_addr, res->ai_addrlen) < 0) {
+        err = std::string("connect() failed: ") + std::strerror(errno);
+        close(fd);
+        freeaddrinfo(res);
+        return false;
+    }
+    freeaddrinfo(res);
+
+    // Server greets with "WELCOME\n"; reply with "GRAPHIC\n".
+    std::string welcome;
+    char ch;
+    while (welcome.size() < 64) {
+        ssize_t n = read(fd, &ch, 1);
+        if (n <= 0) {
+            err = "no WELCOME from server (timeout or closed)";
+            close(fd);
+            return false;
+        }
+        if (ch == '\n')
+            break;
+        welcome += ch;
+    }
+    if (welcome.rfind("WELCOME", 0) != 0) {
+        err = "unexpected greeting: '" + welcome + "'";
+        close(fd);
+        return false;
+    }
+
+    const char *graphic = "GRAPHIC\n";
+    if (write(fd, graphic, std::strlen(graphic)) < 0) {
+        err = std::string("write() failed: ") + std::strerror(errno);
+        close(fd);
+        return false;
+    }
+
+    // Stream is now non-blocking for the render loop.
+    fcntl(fd, F_SETFL, O_NONBLOCK);
+    _fd = fd;
+    _readBuf.clear();
+    _state = GuiState{};
+    return true;
+}
+
+// ── receive loop ───────────────────────────────────────────────────────────────
+
+void GuiClient::poll()
+{
+    if (_fd < 0)
+        return;
+
+    char buf[8192];
+    while (true) {
+        ssize_t n = read(_fd, buf, sizeof(buf));
+        if (n > 0) {
+            _readBuf.append(buf, static_cast<std::size_t>(n));
+            continue;
+        }
+        if (n == 0) {            // peer closed
+            disconnect();
+            return;
+        }
+        // n < 0
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            break;               // nothing more for now
+        if (errno == EINTR)
+            continue;
+        disconnect();            // real error
+        return;
+    }
+
