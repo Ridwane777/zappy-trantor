@@ -144,3 +144,76 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
         title.setCharacterSize(20); title.setFillColor(sf::Color(200, 220, 255));
         title.setPosition(x, y); win.draw(title); y += 34.f;
 
+        // ── scrollable team/player list (clipped to its own view) ────────────
+        const float listTop = y;
+        bool popupOpen = (_selPlayer >= 0 && state->players.count(_selPlayer));
+        const float popupH = popupOpen ? 234.f : 0.f;
+        float listH = std::max(1.f, (float)ws.y - listTop - popupH);
+
+        sf::View prevView = win.getView();
+        sf::View lv;
+        lv.setSize(WIDTH, listH);
+        lv.setCenter(panelX + WIDTH * 0.5f, listTop + listH * 0.5f + _scroll);
+        lv.setViewport(sf::FloatRect(panelX / ws.x, listTop / ws.y, WIDTH / ws.x, listH / ws.y));
+        win.setView(lv);
+
+        float cy = listTop;   // content y (rows are drawn here; the view applies _scroll)
+        auto rowOnScreen = [&](float ry, float rh) {     // is row (content ry) inside the band?
+            float sy = ry - _scroll;
+            return sy + rh > listTop && sy < listTop + listH;
+        };
+        for (int ti = 0; ti < (int)state->teams.size(); ++ti) {
+            const std::string &tname = state->teams[ti];
+            sf::Color tcol = teamColorU(ti);
+            bool selT = (_selTeam == tname);
+            sf::RectangleShape hr(sf::Vector2f(WIDTH - 2 * pad, 26.f));
+            hr.setPosition(x, cy);
+            hr.setFillColor(selT ? sf::Color(tcol.r, tcol.g, tcol.b, 80)
+                                 : sf::Color(255, 255, 255, 14));
+            win.draw(hr);
+            sf::Text th; th.setFont(font);
+            th.setString((selT ? "v " : "> ") + tname);
+            th.setCharacterSize(18); th.setFillColor(tcol);
+            th.setPosition(x + 6.f, cy + 2.f); win.draw(th);
+            if (rowOnScreen(cy, 26.f))
+                _hits.push_back({sf::FloatRect(x, cy - _scroll, WIDTH - 2 * pad, 26.f),
+                                 0, tname, -1});
+            cy += 30.f;
+
+            std::vector<const GuiPlayer *> tp;
+            for (const auto &kv : state->players)
+                if (kv.second.team == tname) tp.push_back(&kv.second);
+            std::sort(tp.begin(), tp.end(),
+                      [](const GuiPlayer *a, const GuiPlayer *c) { return a->id < c->id; });
+            for (const GuiPlayer *p : tp) {
+                bool selP = (_selPlayer == p->id);
+                sf::RectangleShape pr(sf::Vector2f(WIDTH - 2 * pad - 12.f, 22.f));
+                pr.setPosition(x + 12.f, cy);
+                pr.setFillColor(selP ? sf::Color(tcol.r, tcol.g, tcol.b, 60)
+                                     : sf::Color(255, 255, 255, 8));
+                win.draw(pr);
+                sf::Text pt; pt.setFont(font);
+                pt.setString("Player #" + std::to_string(p->id) + "   Lv " +
+                             (p->level == 0 ? std::string("egg") : std::to_string(p->level)));
+                pt.setCharacterSize(15);
+                pt.setFillColor(selP ? sf::Color(255, 255, 255) : sf::Color(200, 210, 225));
+                pt.setPosition(x + 18.f, cy + 2.f); win.draw(pt);
+                if (rowOnScreen(cy, 22.f))
+                    _hits.push_back({sf::FloatRect(x + 12.f, cy - _scroll, WIDTH - 2 * pad - 12.f,
+                                     22.f), 1, tname, p->id});
+                cy += 24.f;
+            }
+            cy += 8.f;
+        }
+        win.setView(prevView);
+        _maxScroll = std::max(0.f, (cy - listTop) - listH);
+        if (_scroll > _maxScroll) _scroll = _maxScroll;
+
+        // ── inventory popup for the selected player (pinned at the bottom) ────
+        if (popupOpen) {
+            const GuiPlayer &sp = state->players.at(_selPlayer);
+            float pw = WIDTH - 2 * pad;
+            float py = (float)ws.y - 226.f;
+            sf::RectangleShape box(sf::Vector2f(pw, 218.f));
+            box.setPosition(x, py);
+            box.setFillColor(sf::Color(8, 12, 20, 244));
