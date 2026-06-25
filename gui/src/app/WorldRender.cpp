@@ -126,3 +126,67 @@ void drawProps(Shader& toon, Shader& outline, const MapData& map,
         }
     }
     toon.setBool("uSway", false);
+}
+
+void drawResources(Shader& egg, const std::unique_ptr<TexturedMesh>* gemTex,
+                   const MapData& map, const glm::vec3& sunDir,
+                   const glm::vec3& lightCol, float ambScale,
+                   const glm::mat4& view, const glm::mat4& proj, float elapsed)
+{
+    bool anyGem = false;
+    for (int i = 1; i < 7; ++i) anyGem |= (bool)gemTex[i];
+    if (!anyGem) return;
+
+    egg.use();
+    egg.setMat4 ("uView", glm::value_ptr(view));
+    egg.setMat4 ("uProj", glm::value_ptr(proj));
+    egg.setInt  ("uTex", 0);
+    egg.setVec3 ("uDirLightDir",   sunDir.x, sunDir.y, sunDir.z);
+    egg.setVec3 ("uDirLightColor", lightCol.x, lightCol.y, lightCol.z);
+    egg.setVec3 ("uPointPos",   0.f, 10.f, 0.f);
+    egg.setVec3 ("uPointColor", 0.f, 0.f, 0.f);
+    egg.setFloat("uAmbient", 0.55f * ambScale);
+    egg.setFloat("uAlpha",   1.f);
+    egg.setFloat("uBright",  1.15f);
+    glDisable(GL_CULL_FACE);
+
+    const float spreadR = 0.30f;
+    for (auto& tile : map.tiles) {
+        bool anyRes = false;
+        for (int i = 1; i < 7; ++i) anyRes |= (tile.res[i] > 0 && gemTex[i]);
+        if (!anyRes) continue;
+
+        float wx = tile.x * TILE + TILE * 0.5f;
+        float wz = tile.y * TILE + TILE * 0.5f;
+        float tileHash = float(tile.x * 17 + tile.y * 31);
+
+        int slot = 0;
+        for (int i = 1; i < 7; ++i) {           // stones only (food drawn below)
+            if (tile.res[i] == 0 || !gemTex[i]) continue;
+            TexturedMesh* gm = gemTex[i].get();
+
+            float angle = slot * (2.f * 3.14159f / 7.f) + tileHash * 0.05f;
+            float ox = spreadR * std::sin(angle);
+            float oz = spreadR * std::cos(angle);
+            float bob  = 0.35f + 0.08f * std::sin(elapsed * 1.5f + tileHash * 0.12f + i * 0.9f);
+            float spin = elapsed * 1.2f + tileHash * 0.08f + i * 0.45f;
+            float r = gm->boundingRadius();
+            float s = (r > 1e-4f) ? 0.22f / r : 0.22f;
+
+            glm::mat4 M = glm::translate(glm::mat4(1.f), {wx+ox, bob, wz+oz});
+            M = glm::rotate(M, spin, {0.f, 1.f, 0.f});
+            M = glm::scale(M, glm::vec3(s));
+            M = glm::translate(M, -gm->centroid());
+            glm::mat3 N3 = glm::mat3(glm::transpose(glm::inverse(M)));
+
+            egg.setMat4("uModel",     glm::value_ptr(M));
+            egg.setMat3("uNormalMat", glm::value_ptr(N3));
+            gm->draw();
+            ++slot;
+        }
+    }
+    glEnable(GL_CULL_FACE);
+}
+
+void drawFood(Shader& egg, const std::unique_ptr<TexturedMesh>* foodMesh,
+              const MapData& map, const glm::vec3& sunDir,
