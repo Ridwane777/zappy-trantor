@@ -13,3 +13,9 @@ out vec3 vNormal;
 out vec2 vUV;
 
 void main() {
+    vec4 wp = uModel * vec4(aPos, 1.0);
+    vPos    = wp.xyz;
+    vNormal = normalize(uNormalMat * aNormal);
+    vUV     = aUV;
+    gl_Position = uProj * uView * wp;
+}
