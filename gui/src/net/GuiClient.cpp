@@ -240,3 +240,84 @@ void GuiClient::_processLine(const std::string &line)
     } else if (cmd == "pgt") {
         // player took a resource off a tile
         std::string idTok;
+        int r;
+        if (iss >> idTok >> r)
+            _logEvent(parseId(idTok), std::string("grabbed ") + resName(r), 0);
+
+    } else if (cmd == "pin") {
+        // pin #id X Y q0 q1 q2 q3 q4 q5 q6  — player inventory (GUI request reply)
+        std::string idTok;
+        int x, y;
+        if (iss >> idTok >> x >> y) {
+            auto it = _state.players.find(parseId(idTok));
+            if (it != _state.players.end()) {
+                it->second.x = x;
+                it->second.y = y;
+                for (int i = 0; i < GUI_RES_COUNT; ++i)
+                    iss >> it->second.inv[i];
+                it->second.invKnown = true;
+            }
+        }
+
+    } else if (cmd == "pdi") {
+        std::string idTok;
+        if (iss >> idTok) {
+            int id = parseId(idTok);
+            _logEvent(id, "died", 2);          // log before erasing (keeps team)
+            _state.players.erase(id);
+        }
+
+    } else if (cmd == "enw") {
+        GuiEgg e;
+        std::string eggTok, playerTok;
+        if (iss >> eggTok >> playerTok >> e.x >> e.y) {
+            e.id = parseId(eggTok);
+            _state.eggs[e.id] = e;
+        }
+
+    } else if (cmd == "edi") {
+        std::string eggTok;
+        if (iss >> eggTok)
+            _state.eggs.erase(parseId(eggTok));
+
+    } else if (cmd == "pic") {
+        // pic X Y L #id #id ...  — incantation begins
+        GuiIncantation fx;
+        int lvl;
+        if (iss >> fx.x >> fx.y >> lvl) {
+            fx.resolved = false;
+            _incantations.push_back(fx);
+            std::string idTok;
+            int firstId = -1;
+            while (iss >> idTok) {
+                int id = parseId(idTok);
+                if (firstId < 0) firstId = id;
+                auto it = _state.players.find(id);
+                if (it != _state.players.end())
+                    it->second.incanting = true;
+            }
+            if (firstId >= 0)
+                _logEvent(firstId, "begins an incantation", 3);
+        }
+
+    } else if (cmd == "pie") {
+        // pie X Y result  — incantation ends
+        GuiIncantation fx;
+        int result = 0;
+        if (iss >> fx.x >> fx.y >> result) {
+            fx.resolved = true;
+            fx.success  = (result != 0);
+            _incantations.push_back(fx);
+        }
+        for (auto &kv : _state.players)     // clear incanting flags on this tile
+            if (kv.second.x == fx.x && kv.second.y == fx.y)
+                kv.second.incanting = false;
+
+    } else if (cmd == "seg") {
+        std::string team;
+        if (iss >> team)
+            _state.winner = team;
+    }
+    // pgt/pdr/pfk/pex/pbc/smg/etc.: tile state already refreshed via bct,
+    // so they're intentionally ignored for now (room for FX hooks later).
+}
