@@ -6,3 +6,7 @@
 #include <string>
 #include <utility>
 
+class GUIException : public std::exception {
+public:
+    explicit GUIException(std::string message) : _message(std::move(message)) {}
+
