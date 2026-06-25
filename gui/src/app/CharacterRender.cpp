@@ -118,3 +118,44 @@ void drawCharacters(std::vector<Character>& chars, Shader& skin, Shader& aura,
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE);
 
+    aura.use();
+    aura.setMat4("uView", glm::value_ptr(view));
+    aura.setMat4("uProj", glm::value_ptr(proj));
+    aura.setVec3("uColor", 0.30f, 1.0f, 0.45f);
+
+    for (auto& ch : chars) {
+        if (ch.auraTimer <= 0.f) continue;
+
+        constexpr float AURA_DUR   = 30.f;
+        constexpr float FADE_IN_T  =  2.f;
+        constexpr float FADE_OUT_T =  4.f;
+        float ea = AURA_DUR - ch.auraTimer;
+        float t = (ea < FADE_IN_T)            ? ea / FADE_IN_T
+                 :(ch.auraTimer > FADE_OUT_T) ? 1.f
+                 : ch.auraTimer / FADE_OUT_T;
+        float pulse = 1.0f + 0.08f * std::sin(elapsed * 2.5f);
+
+        int  drawAnim = ch.idleAnim; bool loop=true, rev=false;
+        if (ch.fallAnim >= 0) {
+            if (ch.state==CharState::FALLING||ch.state==CharState::GROUNDED||ch.state==CharState::RISING)
+                drawAnim=ch.fallAnim;
+            if (ch.state==CharState::RISING)   rev=true;
+            if (ch.state==CharState::GROUNDED) loop=false;
+        }
+        ch.mesh.computeBones(drawAnim, ch.animTime, boneMats, loop, rev);
+        aura.setMat4Array("uBones[0]", MAX_BONES, glm::value_ptr(boneMats[0]));
+
+        glm::mat4 M = glm::translate(glm::mat4(1.f), ch.worldPos);
+        M = glm::rotate(M, glm::radians(ch.rotY), {0.f,1.f,0.f});
+        M = glm::scale(M, glm::vec3(ch.scale));
+        aura.setMat4("uModel", glm::value_ptr(M));
+        aura.setFloat("uAlpha", t * 0.05f * pulse);
+        ch.mesh.draw();
+    }
+
+    glDepthMask(GL_TRUE);
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glDisable(GL_BLEND);
+}
