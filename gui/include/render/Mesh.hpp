@@ -17,3 +17,13 @@ public:
     Mesh& operator=(Mesh&& other) noexcept;
 
     void draw() const;
+    int  vertCount() const;
+
+    glm::vec3 centroid()       const;
+    float     boundingRadius() const;
+    float     yMin()           const;
+    bool      hasVertexColor() const { return _stride == 9; }
+
+private:
+    unsigned int vao = 0;
+    unsigned int vbo = 0;
