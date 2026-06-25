@@ -56,3 +56,23 @@ $(NAME): $(OBJS)
 # missing, `make` runs setup_libs.sh once before compiling (zero manual setup).
 DEPS_STAMP := $(HOME)/.local/include/tiny_gltf.h
 
+deps:
+	@./scripts/setup_libs.sh
+
+$(DEPS_STAMP):
+	@./scripts/setup_libs.sh
+
+# objects need the deps installed (installed once, order-only prerequisite)
+$(OBJS): | $(DEPS_STAMP)
+
+clean:
+	rm -f $(OBJS) $(DEPS)
+
+-include $(DEPS)
+
+fclean: clean
+	rm -f $(NAME)
+
+re: fclean all
+
+.PHONY: all deps clean fclean re
