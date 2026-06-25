@@ -65,3 +65,26 @@ public:
 
     // Apply localRot to a bone and propagate the world-space delta to all
     // its descendants. Call after computeBones to overlay procedural motion.
+    void overlayBoneChain(int rootBoneIdx, const glm::mat4& localRot,
+                          glm::mat4 boneMats[MAX_BONES]) const;
+
+private:
+    GLuint vao_ = 0, vbo_ = 0, ebo_ = 0, colorVbo_ = 0, texId_ = 0;
+    GLsizei indexCount_ = 0;
+
+    std::vector<glm::mat4> invBindMats_;
+    std::vector<int>       parentOf_;
+    std::vector<std::string> boneNames_;
+
+    std::vector<Animation> animations_;
+
+    glm::vec3 bmin_{0}, bmax_{0};
+
+    void upload(const std::vector<float>& verts,
+                const std::vector<unsigned int>& idx);
+
+    friend bool tryLoadCache(const std::string&, SkinnedMesh&,
+                             std::vector<float>&, std::vector<unsigned int>&);
+    friend void saveCache(const std::string&, const SkinnedMesh&,
+                          const std::vector<float>&, const std::vector<unsigned int>&);
+};
