@@ -113,3 +113,42 @@ Mesh ObjLoader::load(const std::string& path) {
         if (c[0] < 0.999f || c[1] < 0.999f || c[2] < 0.999f) { hasVCol = true; break; }
 
     // Build interleaved vertex buffer (stride 9 with colors, 6 without)
+    const int stride = hasVCol ? 9 : 6;
+    std::vector<float>        verts;
+    std::vector<unsigned int> indices;
+    std::unordered_map<VertKey, unsigned int, VertKeyHash> cache;
+
+    for (auto& face : faces) {
+        for (int k = 0; k < 3; ++k) {
+            VertKey key{face[k].pi, face[k].ni};
+            auto it = cache.find(key);
+            if (it != cache.end()) {
+                indices.push_back(it->second);
+            } else {
+                unsigned int idx = (unsigned int)(verts.size() / stride);
+                cache[key] = idx;
+                auto& p = positions[face[k].pi];
+                verts.push_back(p[0]); verts.push_back(p[1]); verts.push_back(p[2]);
+                if (face[k].ni >= 0 && face[k].ni < (int)normals.size()) {
+                    auto& n = normals[face[k].ni];
+                    verts.push_back(n[0]); verts.push_back(n[1]); verts.push_back(n[2]);
+                } else {
+                    verts.push_back(0); verts.push_back(1); verts.push_back(0);
+                }
+                if (hasVCol) {
+                    auto& c = vertColors[face[k].pi];
+                    verts.push_back(c[0]); verts.push_back(c[1]); verts.push_back(c[2]);
+                }
+                indices.push_back(idx);
+            }
+        }
+    }
+
+    if (verts.empty()) {
+        // Return a minimal dummy mesh
+        verts   = {0,0,0, 0,1,0, 1,0,0, 0,1,0, 0,0,1, 0,1,0};
+        indices = {0,1,2};
+    }
+
+    return Mesh(verts, indices);
+}
