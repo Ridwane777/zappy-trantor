@@ -15,3 +15,11 @@ uniform float uBright;       // overall brightness multiplier (reflection dims i
 out vec4 FragColor;
 
 void main() {
+    vec3 base = texture(uTex, vUV).rgb;
+
+    vec3 N = normalize(vNormal);
+    vec3 L = normalize(-uDirLightDir);
+    float diff = max(dot(N, L), 0.0);
+
+    vec3 col = base * uAmbient + base * uDirLightColor * diff;
+
