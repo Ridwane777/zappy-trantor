@@ -68,3 +68,27 @@ void drawTreeMotes(std::vector<Spark>& motes, bool charging, float chargeT,
     motes.erase(std::remove_if(motes.begin(), motes.end(),
         [](const Spark& s) { return s.life <= 0.f; }), motes.end());
 
+    // render: additive glowing twinkling billboards (the star-particle kit)
+    if (motes.empty()) return;
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE);
+    glDepthMask(GL_FALSE);
+    glDisable(GL_CULL_FACE);
+    star.use();
+    star.setMat4("uView", glm::value_ptr(view));
+    star.setMat4("uProj", glm::value_ptr(proj));
+    glBindVertexArray(vao);
+    for (auto& m : motes) {
+        float k  = m.life / m.maxLife;
+        float tw = 0.5f + 0.5f * std::sin(elapsed * m.twFreq + m.phase);  // erratic flicker
+        star.setVec3 ("uCenter", m.pos.x, m.pos.y, m.pos.z);
+        star.setFloat("uSize",   m.size);
+        star.setVec3 ("uColor",  m.color.r, m.color.g, m.color.b);
+        star.setFloat("uIntensity", (0.30f + 1.0f * k) * tw);
+        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    }
+    glBindVertexArray(0);
+    glDepthMask(GL_TRUE);
+    glEnable(GL_CULL_FACE);
+    glDisable(GL_BLEND);
+}
