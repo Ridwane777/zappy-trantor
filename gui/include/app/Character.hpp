@@ -19,3 +19,11 @@ struct Character {
     float       rotY;
     float       scale      = 1.f;
     int         idleAnim   = 0;
+    int         fallAnim   = -1;
+    CharState   state      = CharState::IDLE;
+    float       animTime      = 0.f;
+    float       stateTimer    = 0.f;
+    float       auraTimer     = 0.f;
+    bool        auraTriggered = false;
+    bool        incanting     = false;
+};
