@@ -11,3 +11,9 @@ set -euo pipefail
 
 PREFIX="${PREFIX:-$HOME/.local}"
 INCDIR="$PREFIX/include"
+BASE="https://raw.githubusercontent.com/Knight-coder-19/gltf-json-header-libs/master"
+FILES=(json.hpp tiny_gltf.h tinygltf_json.hpp)
+
+mkdir -p "$INCDIR"
+for f in "${FILES[@]}"; do
+    [ -s "$INCDIR/$f" ] && { echo "  $f déjà installé ($INCDIR)"; continue; }
