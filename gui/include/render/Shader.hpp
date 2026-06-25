@@ -16,3 +16,9 @@ public:
     void setMat3     (const std::string& name, const float* mat) const;
     void setBool (const std::string& name, bool        v) const;
 
+private:
+    unsigned int id;
+
+    static unsigned int compileShader(unsigned int type, const std::string& src);
+    static std::string  readFile(const std::string& path);
+};
