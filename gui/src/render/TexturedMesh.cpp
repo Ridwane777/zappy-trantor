@@ -103,3 +103,55 @@ TexturedMesh TexturedMesh::load(const std::string &objPath, const std::string &t
     std::string line;
     while (std::getline(f, line)) {
         if (line.size() < 2) continue;
+        std::istringstream iss(line);
+        std::string tok;
+        iss >> tok;
+        if (tok == "v") {
+            std::array<float, 3> p; iss >> p[0] >> p[1] >> p[2];
+            positions.push_back(p);
+        } else if (tok == "vt") {
+            std::array<float, 2> t{0, 0}; iss >> t[0] >> t[1];
+            uvs.push_back(t);
+        } else if (tok == "vn") {
+            std::array<float, 3> n; iss >> n[0] >> n[1] >> n[2];
+            normals.push_back(n);
+        } else if (tok == "f") {
+            std::vector<Key> corners;
+            std::string c;
+            while (iss >> c) corners.push_back(parseCorner(c));
+            // triangulate fan
+            for (std::size_t i = 1; i + 1 < corners.size(); ++i) {
+                for (Key k : {corners[0], corners[i], corners[i + 1]}) {
+                    auto it = seen.find(k);
+                    if (it != seen.end()) { indices.push_back(it->second); continue; }
+                    int vi = resolve(k.v, positions.size());
+                    int ti = k.vt ? resolve(k.vt, uvs.size()) : -1;
+                    int ni = k.vn ? resolve(k.vn, normals.size()) : -1;
+                    auto &p = positions[vi];
+                    verts.insert(verts.end(), {p[0], p[1], p[2]});
+                    if (ni >= 0 && ni < (int)normals.size())
+                        verts.insert(verts.end(), {normals[ni][0], normals[ni][1], normals[ni][2]});
+                    else
+                        verts.insert(verts.end(), {0.f, 1.f, 0.f});
+                    if (ti >= 0 && ti < (int)uvs.size())
+                        verts.insert(verts.end(), {uvs[ti][0], uvs[ti][1]});
+                    else
+                        verts.insert(verts.end(), {0.f, 0.f});
+                    unsigned int newIdx = (unsigned int)(seen.size());
+                    seen[k] = newIdx;
+                    indices.push_back(newIdx);
+                }
+            }
+        }
+    }
+    if (verts.empty())
+        throw GUIException("TexturedMesh: no geometry in " + objPath);
+
+    TexturedMesh m;
+    m._indexCount = (int)indices.size();
+
+    // bounds (centroid + radius) from positions
+    glm::vec3 lo(1e9f), hi(-1e9f), sum(0.f);
+    for (auto &p : positions) {
+        glm::vec3 v(p[0], p[1], p[2]);
+        lo = glm::min(lo, v); hi = glm::max(hi, v); sum += v;
