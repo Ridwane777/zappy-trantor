@@ -17,3 +17,12 @@ glm::vec3 Camera::getPos() const {
     );
 }
 
+glm::mat4 Camera::getView() const {
+    return glm::lookAt(getPos(), target, glm::vec3(0.f, 1.f, 0.f));
+}
+
+glm::mat4 Camera::getProjection(float aspect) const {
+    return glm::perspective(glm::radians(45.f), aspect, 0.01f, 1000.f);
+}
+
+void Camera::onMouseDrag(float dx, float dy) {
