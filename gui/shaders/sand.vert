@@ -9,3 +9,7 @@ uniform float uY;
 
 out vec2 vXZ;
 
+void main() {
+    vXZ = aCorner;
+    gl_Position = uProj * uView * vec4(aCorner.x * uSize, uY, aCorner.y * uSize, 1.0);
+}
