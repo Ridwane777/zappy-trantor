@@ -67,3 +67,27 @@ void drawIncantations(const std::vector<IncantationEffect>& fx, Shader& incant,
 
             float phase = std::fmod(elapsed * 1.8f + i * (1.0f / N_PILLARS), 1.0f);
             float h = phase < 0.4f ? phase / 0.4f
+                    : phase < 0.7f ? 1.0f
+                    : (1.0f - phase) / 0.3f;
+            h = h * h;
+            float pillarH = h * TILE * 0.55f;
+            if (pillarH < 0.005f) continue;
+
+            glm::mat4 Mv = glm::translate(glm::mat4(1.f),
+                ix.pos + glm::vec3(px, 0.02f, pz));
+            Mv = glm::rotate(Mv, baseAngle, {0.f, 1.f, 0.f});
+            Mv = glm::scale(Mv, {TILE * 0.055f, pillarH, 1.f});
+            glm::mat3 Nv = glm::mat3(glm::transpose(glm::inverse(Mv)));
+            incant.setFloat("uAlpha", fade * h * 0.80f);
+            incant.setMat4("uModel",     glm::value_ptr(Mv));
+            incant.setMat3("uNormalMat", glm::value_ptr(Nv));
+            vquad.draw();
+        }
+    }
+
+    glDepthMask(GL_TRUE);
+    glDepthFunc(GL_LESS);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    glDisable(GL_BLEND);
+}
