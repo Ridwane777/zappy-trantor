@@ -448,3 +448,228 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
 
         // parent lookup via node children + store bone names
         sm.boneNames_.resize(numJoints);
+        for (int j = 0; j < numJoints; ++j) {
+            int nodeIdx = skin.joints[j];
+            sm.boneNames_[j] = model.nodes[nodeIdx].name;
+            for (auto& child : model.nodes[nodeIdx].children) {
+                auto it = std::find(skin.joints.begin(), skin.joints.end(), child);
+                if (it != skin.joints.end())
+                    sm.parentOf_[it - skin.joints.begin()] = j;
+            }
+        }
+    }
+
+    // ── mesh geometry ─────────────────────────────────────────────────────────
+    // vertex layout: pos(3) normal(3) joints(4) weights(4) uv(2) → 16 floats
+    std::vector<float>        verts;
+    std::vector<unsigned int> indices;
+
+    for (auto& mesh : model.meshes) {
+        for (auto& prim : mesh.primitives) {
+            if (prim.mode != TINYGLTF_MODE_TRIANGLES) continue;
+
+            auto posIt = prim.attributes.find("POSITION");
+            auto nrmIt = prim.attributes.find("NORMAL");
+            auto j0It  = prim.attributes.find("JOINTS_0");
+            auto w0It  = prim.attributes.find("WEIGHTS_0");
+            auto uvIt  = prim.attributes.find("TEXCOORD_0");
+            if (posIt == prim.attributes.end()) continue;
+
+            auto& posAcc = model.accessors[posIt->second];
+            size_t nv = posAcc.count;
+            const float* pos = floatPtr(model, posIt->second);
+            const float* nrm = (nrmIt != prim.attributes.end())
+                               ? floatPtr(model, nrmIt->second) : nullptr;
+            const float* uv  = (uvIt  != prim.attributes.end())
+                               ? floatPtr(model, uvIt->second)  : nullptr;
+
+            std::vector<float> jvec(nv*4, 0.f), wvec(nv*4, 0.f);
+            if (j0It != prim.attributes.end()) {
+                auto& jAcc = model.accessors[j0It->second];
+                if (jAcc.componentType == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
+                    auto& bv  = model.bufferViews[jAcc.bufferView];
+                    auto& buf = model.buffers[bv.buffer];
+                    const uint8_t* jb = buf.data.data() + bv.byteOffset + jAcc.byteOffset;
+                    for (size_t i = 0; i < nv*4; ++i) jvec[i] = (float)jb[i];
+                } else {
+                    const uint16_t* ju = u16Ptr(model, j0It->second);
+                    for (size_t i = 0; i < nv*4; ++i) jvec[i] = (float)ju[i];
+                }
+            }
+            if (w0It != prim.attributes.end()) {
+                const float* wf = floatPtr(model, w0It->second);
+                for (size_t i = 0; i < nv*4; ++i) wvec[i] = wf[i];
+            }
+            // non-skinned primitive: bind every vertex fully to bone 0 (identity)
+            // so the GPU skinning leaves the mesh in place instead of collapsing it
+            if (j0It == prim.attributes.end() && w0It == prim.attributes.end()) {
+                for (size_t i = 0; i < nv; ++i) wvec[i*4+0] = 1.f;
+            }
+
+            unsigned int base = (unsigned int)(verts.size() / 16);
+            for (size_t i = 0; i < nv; ++i) {
+                verts.push_back(pos[i*3+0]); verts.push_back(pos[i*3+1]); verts.push_back(pos[i*3+2]);
+                if (nrm) { verts.push_back(nrm[i*3+0]); verts.push_back(nrm[i*3+1]); verts.push_back(nrm[i*3+2]); }
+                else      { verts.push_back(0); verts.push_back(1); verts.push_back(0); }
+                verts.push_back(jvec[i*4+0]); verts.push_back(jvec[i*4+1]);
+                verts.push_back(jvec[i*4+2]); verts.push_back(jvec[i*4+3]);
+                verts.push_back(wvec[i*4+0]); verts.push_back(wvec[i*4+1]);
+                verts.push_back(wvec[i*4+2]); verts.push_back(wvec[i*4+3]);
+                if (uv) { verts.push_back(uv[i*2+0]); verts.push_back(uv[i*2+1]); }
+                else    { verts.push_back(0.f); verts.push_back(0.f); }
+
+                sm.bmin_.x = std::min(sm.bmin_.x, pos[i*3+0]);
+                sm.bmin_.y = std::min(sm.bmin_.y, pos[i*3+1]);
+                sm.bmin_.z = std::min(sm.bmin_.z, pos[i*3+2]);
+                sm.bmax_.x = std::max(sm.bmax_.x, pos[i*3+0]);
+                sm.bmax_.y = std::max(sm.bmax_.y, pos[i*3+1]);
+                sm.bmax_.z = std::max(sm.bmax_.z, pos[i*3+2]);
+            }
+
+            auto primIdx = getIndices(model, prim.indices);
+            for (auto idx : primIdx) indices.push_back(base + idx);
+        }
+    }
+
+
+    std::cout << "SkinnedMesh " << path
+              << "  v=" << verts.size()/16
+              << "  f=" << indices.size()/3
+              << "  joints=" << numJoints << "\n";
+
+    // ── animations ────────────────────────────────────────────────────────────
+    if (!model.skins.empty()) {
+        auto& skin = model.skins[0];
+        for (auto& anim : model.animations) {
+            Animation a;
+            a.name = anim.name;
+            a.duration = 0.f;
+
+            for (auto& ch : anim.channels) {
+                if (ch.target_node < 0) continue;
+                // map node → joint index
+                auto it = std::find(skin.joints.begin(), skin.joints.end(), ch.target_node);
+                if (it == skin.joints.end()) continue;
+                int ji = (int)(it - skin.joints.begin());
+
+                auto& samp = anim.samplers[ch.sampler];
+                const float* times = floatPtr(model, samp.input);
+                size_t       nk    = model.accessors[samp.input].count;
+                const float* vals  = floatPtr(model, samp.output);
+
+                // find or create channel for this joint
+                BoneChannel* bc = nullptr;
+                for (auto& c : a.channels)
+                    if (c.boneIndex == ji) { bc = &c; break; }
+                if (!bc) { a.channels.push_back({ji}); bc = &a.channels.back(); }
+
+                if (nk > 0) a.duration = std::max(a.duration, times[nk-1]);
+
+                if (ch.target_path == "translation") {
+                    bc->timesT.assign(times, times+nk);
+                    bc->transKeys.resize(nk);
+                    for (size_t i = 0; i < nk; ++i)
+                        bc->transKeys[i] = {vals[i*3], vals[i*3+1], vals[i*3+2]};
+                } else if (ch.target_path == "rotation") {
+                    bc->timesR.assign(times, times+nk);
+                    bc->rotKeys.resize(nk);
+                    for (size_t i = 0; i < nk; ++i)
+                        // GLTF quat is x,y,z,w; glm is w,x,y,z
+                        bc->rotKeys[i] = glm::quat(vals[i*4+3], vals[i*4], vals[i*4+1], vals[i*4+2]);
+                } else if (ch.target_path == "scale") {
+                    bc->timesS.assign(times, times+nk);
+                    bc->scaleKeys.resize(nk);
+                    for (size_t i = 0; i < nk; ++i)
+                        bc->scaleKeys[i] = {vals[i*3], vals[i*3+1], vals[i*3+2]};
+                }
+            }
+            sm.animations_.push_back(std::move(a));
+        }
+    }
+
+    sm.upload(verts, indices);
+    saveCache(path, sm, verts, indices);
+    return sm;
+}
+
+// ── load extra animation from a second GLB (same skeleton) ───────────────────
+
+void SkinnedMesh::loadAnimFrom(const std::string& path)
+{
+    // ── fast path: anim-only cache ────────────────────────────────────────────
+    {
+        std::vector<Animation> loaded;
+        if (tryLoadAnimOnlyCache(path, loaded)) {
+            for (auto& a : loaded) {
+                animations_.push_back(std::move(a));
+                std::cout << "  + anim (cache) '" << animations_.back().name
+                          << "' dur=" << animations_.back().duration << "s\n";
+            }
+            return;
+        }
+    }
+
+    tinygltf::Model model;
+    std::string err, warn;
+    bool ok = loadGltfModel(path, model, err, warn);
+    if (!ok) { std::cerr << "loadAnimFrom failed: " << err << "\n"; return; }
+
+    if (model.skins.empty()) return;
+    auto& skin = model.skins[0];
+
+    for (auto& anim : model.animations) {
+        Animation a;
+        a.name = anim.name.empty() ? path : anim.name;
+        a.duration = 0.f;
+
+        for (auto& ch : anim.channels) {
+            if (ch.target_node < 0) continue;
+            auto it = std::find(skin.joints.begin(), skin.joints.end(), ch.target_node);
+            if (it == skin.joints.end()) continue;
+            int ji = (int)(it - skin.joints.begin());
+
+            auto& samp = anim.samplers[ch.sampler];
+            const float* times = floatPtr(model, samp.input);
+            size_t       nk    = model.accessors[samp.input].count;
+            const float* vals  = floatPtr(model, samp.output);
+
+            BoneChannel* bc = nullptr;
+            for (auto& c : a.channels)
+                if (c.boneIndex == ji) { bc = &c; break; }
+            if (!bc) { a.channels.push_back({ji}); bc = &a.channels.back(); }
+
+            if (nk > 0) a.duration = std::max(a.duration, times[nk-1]);
+
+            if (ch.target_path == "translation") {
+                bc->timesT.assign(times, times+nk);
+                bc->transKeys.resize(nk);
+                for (size_t i = 0; i < nk; ++i)
+                    bc->transKeys[i] = {vals[i*3], vals[i*3+1], vals[i*3+2]};
+            } else if (ch.target_path == "rotation") {
+                bc->timesR.assign(times, times+nk);
+                bc->rotKeys.resize(nk);
+                for (size_t i = 0; i < nk; ++i)
+                    bc->rotKeys[i] = glm::quat(vals[i*4+3], vals[i*4], vals[i*4+1], vals[i*4+2]);
+            } else if (ch.target_path == "scale") {
+                bc->timesS.assign(times, times+nk);
+                bc->scaleKeys.resize(nk);
+                for (size_t i = 0; i < nk; ++i)
+                    bc->scaleKeys[i] = {vals[i*3], vals[i*3+1], vals[i*3+2]};
+            }
+        }
+        animations_.push_back(std::move(a));
+        std::cout << "  + anim '" << animations_.back().name
+                  << "' dur=" << animations_.back().duration << "s\n";
+    }
+
+    // collect only the newly-added animations and write anim-only cache
+    std::vector<Animation> newAnims(animations_.end() - (int)model.animations.size(), animations_.end());
+    saveAnimCache(path, newAnims);
+}
+
+// ── bone evaluation ───────────────────────────────────────────────────────────
+
+void SkinnedMesh::computeBones(int animIdx, float t,
+                               glm::mat4 boneMats[MAX_BONES],
+                               bool loop, bool reversed) const
+{
