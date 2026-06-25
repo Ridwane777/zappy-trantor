@@ -261,3 +261,266 @@ int GuiApp::run(int argc, char** argv)
                 std::cerr << "Gem " << gemName[i] << " load: " << e.what() << "\n";
             }
         }
+    }
+
+    // billboard quad for evolution sparkles (corners -1..1)
+    unsigned int sparkVAO = 0, sparkVBO = 0;
+    {
+        const float quad[] = { -1.f,-1.f,  1.f,-1.f,  1.f,1.f,  -1.f,1.f };
+        glGenVertexArrays(1, &sparkVAO);
+        glGenBuffers(1, &sparkVBO);
+        glBindVertexArray(sparkVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, sparkVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quad), quad, GL_STATIC_DRAW);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2 * sizeof(float), (void *)0);
+        glEnableVertexAttribArray(0);
+        glBindVertexArray(0);
+    }
+
+    // ── load skinned characters (Character/CharState in app/Character.hpp) ──────
+    std::vector<Character> characters;
+    const float CHAR_HEIGHT = 0.01f;
+
+    // ── incantation ritual effects (type + draw in app/IncantationFx) ──────────
+    std::vector<IncantationEffect> incantations;
+    float incantCooldown = 25.f;  // first demo fires at 25s
+
+    const std::string CHAR_DIR   = "assets/characters/";
+    const std::string FEMALE_DIR = CHAR_DIR + "female/Meshy_AI_Huntress_of_the_Wild_biped_Animation_";
+    const std::string MALE_DIR   = CHAR_DIR + "male/Meshy_AI_Ironhorn_Wanderer_biped_Animation_";
+
+    advanceLoadingTo(window, hudFont, 0.10f, "Loading characters...");
+
+    // ── female: Huntress — Idle_6, then laying down after 10s ────────────────
+    try {
+        Character c;
+        c.mesh     = SkinnedMesh::load(FEMALE_DIR + "Idle_15_withSkin.glb");
+        c.mesh.loadAnimFrom(FEMALE_DIR + "Walking_withSkin.glb");           // anim index 1
+        c.worldPos = {14*TILE+TILE*.5f, 0.f, 13*TILE+TILE*.5f};
+        c.rotY     = 180.f;
+        float meshH = c.mesh.boundsMax().y - c.mesh.boundsMin().y;
+        c.scale    = (meshH > 0.001f) ? CHAR_HEIGHT / meshH : 1.f;
+        c.idleAnim = 0;
+        c.state    = CharState::IDLE;
+        c.mesh.loadTexture(CHAR_DIR + "female/player_female.png");
+        characters.push_back(std::move(c));
+    } catch (std::exception& e) { std::cerr << "Female load: " << e.what() << "\n"; }
+    advanceLoadingTo(window, hudFont, 0.35f, "Loaded Huntress");
+
+    // ── male: Barefoot Survivor — Idle_11 ─────────────────────────────────────
+    try {
+        Character c;
+        c.mesh     = SkinnedMesh::load(MALE_DIR + "Idle_11_withSkin.glb");  // 0 idle
+        c.mesh.loadAnimFrom(MALE_DIR + "Walking_withSkin.glb");            // 1 walk
+        c.mesh.loadTexture(CHAR_DIR + "male/player_male.png");
+        c.worldPos = {13*TILE+TILE*.5f, 0.f, 13*TILE+TILE*.5f};
+        c.rotY     = 200.f;
+        float meshH = c.mesh.boundsMax().y - c.mesh.boundsMin().y;
+        c.scale    = (meshH > 0.001f) ? CHAR_HEIGHT / meshH : 1.f;
+        characters.push_back(std::move(c));
+    } catch (std::exception& e) { std::cerr << "Male load: " << e.what() << "\n"; }
+    advanceLoadingTo(window, hudFont, 0.55f, "Loaded Wanderer");
+
+    // ── player tiers: one character per 2 levels (1-2,3-4,5-6,7-8) ─────────────
+    // anim slots: 0 idle, 1 walk, 2 run, 3 turn-left, 4 turn-right (run/turn
+    // optional — only present for the Meshy "biped" exports).
+    PlayerTier tiers[4];
+    const char* tierDir[4] = { "woodsprite", "nomad", "nyxara", "huntress" };
+    // The skinned mesh is far larger than its bind-pose bounds (armature scale),
+    // so empirical per-tier factors are used; globally overridable via env.
+    float globalPScale = std::getenv("ZAPPY_PSCALE")
+                       ? (float)std::atof(std::getenv("ZAPPY_PSCALE")) : 0.05f / 6.f;
+    for (int t = 0; t < 4; ++t) {
+        std::string dir = std::string("assets/characters/") + tierDir[t] + "/";
+        try {
+            tiers[t].mesh = SkinnedMesh::load(dir + "idle.glb");
+            tiers[t].mesh.loadAnimFrom(dir + "walk.glb");
+            // optional extra anims — load only if the tier actually has them
+            // (presence checked via the RAM store, not a local file)
+            for (const char* a : {"run.glb", "turn_left.glb", "turn_right.glb"})
+                if (!zappy::assetBytes(dir + a).empty())
+                    tiers[t].mesh.loadAnimFrom(dir + a);
+            tiers[t].mesh.loadTexture(dir + "player.png");
+            tiers[t].scale  = globalPScale;
+            tiers[t].loaded = true;
+        } catch (std::exception& e) {
+            std::cerr << "Tier " << tierDir[t] << " load: " << e.what() << "\n";
+        }
+    }
+    advanceLoadingTo(window, hudFont, 0.70f, "Loaded players");
+
+    // Decorative demo characters (Huntress/Ironhorn at island centre) are not
+    // server-driven — drop them so only live players are shown.
+    characters.clear();
+
+    // ── load map ──────────────────────────────────────────────────────────────
+    MapData map;
+    try { map = loadMap(MAP_FILE); }
+    catch (std::exception& e) { std::cerr << e.what() << "\n"; return 1; }
+    time_t lastMtime = fileMtime(MAP_FILE);
+
+    // Build seamless flat ground meshes (no OBJ tile seams)
+    auto landMesh  = buildGroundMesh(map.tiles, "tile",  false);
+    auto cliffMesh = buildGroundMesh(map.tiles, "tile",  true);
+    auto waterMesh = buildGroundMesh(map.tiles, "water", false);
+
+    // Infinite ocean plane — large quad so no sky bleeds past the map edge
+    auto oceanMesh = []() {
+        const float S = 4000.f, Y = -1.82f;
+        std::vector<float> v = {
+            -S,Y,-S, 0,1,0,  S,Y,-S, 0,1,0,
+             S,Y, S, 0,1,0, -S,Y, S, 0,1,0
+        };
+        std::vector<unsigned int> i = {0,1,2, 0,2,3};
+        return Mesh(v, i);
+    }();
+
+    advanceLoadingTo(window, hudFont, 0.85f, "Building terrain...");
+
+    // Pre-warm prop mesh cache
+    for (auto& t : map.tiles)
+        for (auto& p : t.props) getMesh(p.model);
+
+    advanceLoadingTo(window, hudFont, 1.0f, "Ready");
+
+    // Index map tiles by (x,y) so live server resources can be written in O(1).
+    std::unordered_map<long long, std::size_t> tileIndex;
+    for (std::size_t k = 0; k < map.tiles.size(); ++k)
+        tileIndex[(long long)map.tiles[k].y * 100000 + map.tiles[k].x] = k;
+
+    // ── connect to the server as a GRAPHIC client ─────────────────────────────
+    GuiClient netClient;
+    bool netConnected = false;
+    {
+        std::string err;
+        netConnected = netClient.connect(menuCfg.host, menuCfg.port, err);
+        if (netConnected)
+            std::cout << "[net] connected to " << menuCfg.host << ":"
+                      << menuCfg.port << "\n";
+        else
+            std::cerr << "[net] connect failed: " << err
+                      << " - running as offline viewer\n";
+    }
+
+    // (font already loaded above for the startup menu)
+
+    // per-player animation state (movement/turn detection from discrete updates)
+    std::unordered_map<int, PlayerAnim> playerAnims;
+
+    // evolution sparkles + tree motes (Spark defined in app/Particle.hpp)
+    std::vector<Spark> sparks;
+    std::vector<Spark> treeMotes;          // uncanny tree-of-life energy particles
+    const float EVO_DUR = 2.0f;    // length of the evolution flash (matches level-up sfx)
+
+    // ── local demo mode: ZAPPY_TESTPLAYERS=N spawns N dummy players that grow
+    // from level 1 to 8, one level every 20s (loops). Renders without a server.
+    bool testMode = std::getenv("ZAPPY_TESTPLAYERS") != nullptr;
+    std::vector<GuiPlayer> testPlayers;
+    float testTimer = 0.f;
+    if (testMode) {
+        int n = std::atoi(std::getenv("ZAPPY_TESTPLAYERS"));
+        if (n <= 0) n = 4;
+        // a horizontal row toward the front-left of the island (clear of the tree)
+        int rowY = map.h / 2 + 4;
+        int startX = map.w / 2 - n;
+        for (int i = 0; i < n; ++i) {
+            GuiPlayer p;
+            p.id = 1000 + i;
+            p.x = startX + i * 2;
+            p.y = rowY;
+            p.orientation = 3;                  // face the camera (south)
+            p.level = 1;
+            p.team = "demo";
+            testPlayers.push_back(p);
+        }
+        std::cout << "[test] spawned " << n << " demo players (grow 1->8, 20s each)\n";
+    }
+
+    // ── camera (isometric-ish: 45° yaw, 50° pitch) ───────────────────────────
+    float cx = map.w * TILE * 0.5f;
+    float cz = map.h * TILE * 0.5f;
+    float camYaw   = 45.f  * 3.14159f / 180.f;
+    float camPitch = 35.f  * 3.14159f / 180.f;
+    int   nightOverride = 0;   // 0=auto cycle, 1=force night, 2=force day (toggle with N)
+    float camDist  = std::max(map.w, map.h) * TILE * 1.1f;
+    float camTargetY = 0.f;
+    if (testMode && !testPlayers.empty()) {            // frame the demo row
+        int n = (int)testPlayers.size();
+        cx = (map.w / 2) * TILE;                       // centre of the row
+        cz = (map.h / 2 + 4) * TILE;
+        camTargetY = 1.6f;                             // look at body height
+        camDist  = 12.f + n * 3.f;
+        camPitch = 16.f * 3.14159f / 180.f;            // lower, more side-on
+    }
+
+    bool  dragging = false;
+    sf::Vector2i lastMouse;
+
+    // ── admin mode: press A, type "admin1234", fly Mew in 3rd person, Q to quit ──
+    SkinnedMesh mewMesh;
+    bool  haveMew = false;
+    try {
+        mewMesh = SkinnedMesh::load("assets/characters/mew/scene.gltf");
+        mewMesh.loadTexture("assets/characters/mew/textures/blinn1_baseColor.jpeg");
+        haveMew = true;
+    } catch (std::exception& e) { std::cerr << "Mew load: " << e.what() << "\n"; }
+
+    // ── night-cycle moon (textured, self-lit, fades in at night) ──
+    SkinnedMesh moonMesh;
+    bool haveMoon = false;
+    try {
+        moonMesh = SkinnedMesh::load("assets/models/moon/scene.gltf");
+        moonMesh.loadTexture("assets/models/moon/textures/moon_baseColor.png");
+        haveMoon = true;
+    } catch (std::exception& e) { std::cerr << "Moon load: " << e.what() << "\n"; }
+
+    // lowest Mew may descend to — keeps his whole body above the map surface
+    const float MEW_FLOOR = std::getenv("ZAPPY_MEW_FLOOR")
+                          ? (float)std::atof(std::getenv("ZAPPY_MEW_FLOOR")) : 1.0f;
+    const float MEW_SCALE = std::getenv("ZAPPY_MEW_SCALE")
+                          ? (float)std::atof(std::getenv("ZAPPY_MEW_SCALE")) : 0.27f;
+    // pose figée à l'arrêt : une frame de vol (pas la frame 0 qui est verticale)
+    float       mewIdlePose = std::getenv("ZAPPY_MEW_POSE")
+                          ? (float)std::atof(std::getenv("ZAPPY_MEW_POSE")) : 2.0f;
+    const float mewAnimDur = (haveMew && mewMesh.animCount() > 0)
+                          ? mewMesh.animDuration(0) : 11.f;
+    bool        adminPrompt = false;     // password input box open
+    bool        adminEatNext = false;    // ignore the 'a' that opened the box
+    bool        adminMode   = false;     // currently flying Mew
+    std::string adminInput;
+    glm::vec3   mewPos(cx, 6.f, cz);
+    float       mewYaw = 0.f, mewAnimTime = mewIdlePose;
+    bool        mewMoving = false;
+    float       mewFlyTimer = 0.f;   // throttles the whoosh while Mew is moving
+    float       mewMeowTimer = 10.f; // random ambient meow every ~10 s in admin mode
+
+    // ── night sky: scattered stars + Big Dipper + Mew's purple-energy channel ──
+    Constellation constellation;
+    // third-person camera offset around Mew (mouse look), reset with R
+    float admCamYaw = 0.f, admCamPitch = 0.32f;
+
+    // ── in-game audio: ambient bed + event SFX (missing clips are silent) ───────
+    AudioManager gameAudio;
+    gameAudio.init("assets/audio");
+    if (netConnected) gameAudio.playMusic("game_music", true, 35.f);
+    unsigned long lastLogTotal = 0;   // for draining new action events into SFX
+    float pickupCooldown = 0.f;       // throttles the (frequent) grab blip
+
+    sf::Clock clock;
+    float elapsed  = 0.f;
+
+    // ── Tree of Life pulse state ──────────────────────────────────────────────
+    const glm::vec3 TREE_POS     = {22*TILE, 0.f, 22*TILE};
+    const float CHARGE_DURATION  =  8.f;   // seconds to charge up
+    const float IDLE_DURATION    = 52.f;   // seconds idle before next charge
+    const float WAVE_SPEED       = 14.f;   // world units / second
+    const float WAVE_MAXR        = map.w * TILE * 1.1f;
+
+    enum class PulseState { IDLE, CHARGING, RELEASING };
+    PulseState pulseState  = PulseState::IDLE;
+    PulseState prevPulse   = PulseState::IDLE;   // edge-detect charge→release
+    float      pulseTimer  = 0.f;   // time spent in current state
+    float      chargeT     = 0.f;   // 0→1 charge progress
+    float      treeGlow    = 0.f;   // foliage emissive: tracks charge, fades out after release
+    float      waveRadius  = 0.f;
+
