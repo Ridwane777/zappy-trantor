@@ -6,3 +6,6 @@
 // shader as a GL_TRIANGLE_FAN quad facing the camera.
 struct Spark {
     glm::vec3 pos, vel;
+    float life, maxLife, size, phase, twFreq;
+    glm::vec3 color;
+};
