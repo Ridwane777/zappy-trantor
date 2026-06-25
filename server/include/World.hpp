@@ -23,6 +23,10 @@ public:
     void        addPlayer(int fd, const std::string &team);
     void        removePlayer(int fd);
     std::vector<std::string> getGuiSnapshot() const;
+    // GUI inventory request: "pin #id X Y q0..q6\n", or "" if no such player.
+    std::string guiPlayerInventory(int id) const;
+    // Respawn map resources and push the refreshed tiles (bct) to GUI clients.
+    void respawnAndBroadcast();
 
     std::function<void(const std::string &)> onGuiEvent;
     std::function<void(int fd, const std::string &)> onPlayerEvent;

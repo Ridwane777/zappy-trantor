@@ -6,6 +6,7 @@
 #include <vector>
 #include <unordered_map>
 #include <poll.h>
+#include <chrono>
 
 class Server {
 public:
@@ -21,6 +22,13 @@ private:
     std::vector<Client> _clients;
     std::unordered_map<std::string, int> _slots;
     World _world;
+
+    // Resource-reset cycle: every _resetInterval seconds the map respawns and the
+    // GUI is told (custom "sst" line) so it can count down + pulse the tree of life.
+    // Default 5 min; overridable via env ZAPPY_RESET_INTERVAL (seconds) for testing.
+    double _resetInterval = 300.0;
+    std::chrono::steady_clock::time_point _lastReset;
+    double _secondsToNextReset() const;
 
     void _createSocket();
     void _bindAndListen();

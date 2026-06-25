@@ -144,6 +144,30 @@ std::vector<std::string> World::getGuiSnapshot() const
     return msgs;
 }
 
+void World::respawnAndBroadcast()
+{
+    _map.spawnResources();
+    if (onGuiEvent)
+        for (int y = 0; y < _map.getHeight(); y++)
+            for (int x = 0; x < _map.getWidth(); x++)
+                onGuiEvent(bctMsg(x, y, _map.getTile(x, y)));
+}
+
+std::string World::guiPlayerInventory(int id) const
+{
+    for (const auto &p : _players) {
+        if (p.id != id)
+            continue;
+        std::ostringstream oss;
+        oss << "pin #" << p.id << " " << p.x << " " << p.y;
+        for (int i = 0; i < RESOURCE_COUNT; i++)
+            oss << " " << p.inventory[i];
+        oss << "\n";
+        return oss.str();
+    }
+    return "";
+}
+
 std::string World::_cmdForward(Player &p)
 {
     switch (p.orientation) {
@@ -444,17 +468,28 @@ std::string World::_cmdIncantation(Player &p)
         for (int q = 0; q < req[r + 1]; q++)
             t.remove(static_cast<Resource>(r + 1));
 
+    // The AI expects "Elevation underway" immediately, then "Current level: k".
+    if (onPlayerEvent)
+        onPlayerEvent(p.fd, "Elevation underway\n");
+
     // Monte le niveau de tous les joueurs participants
+    int startLevel = p.level;
     std::ostringstream picMsg;
-    picMsg << "pic " << p.x << " " << p.y << " " << p.level;
+    picMsg << "pic " << p.x << " " << p.y << " " << startLevel;
     for (auto &other : _players) {
-        if (other.x == p.x && other.y == p.y && other.level == p.level) {
+        if (other.x == p.x && other.y == p.y && other.level == startLevel) {
             other.level++;
             other.isIncanting = false;
             picMsg << " #" << other.id;
             if (onGuiEvent)
                 onGuiEvent("plv #" + std::to_string(other.id) + " " +
                            std::to_string(other.level) + "\n");
+            // Every participant is told its new level. Non-initiators receive it
+            // unsolicited, so the AI buffers "Current level" out-of-band (like a
+            // broadcast) to avoid desyncing its request/response stream.
+            if (onPlayerEvent)
+                onPlayerEvent(other.fd, "Current level: " +
+                              std::to_string(other.level) + "\n");
         }
     }
 
@@ -477,5 +512,5 @@ std::string World::_cmdIncantation(Player &p)
         }
     }
 
-    return "Elevation underway";
+    return "";   // replies (Elevation underway + Current level) already sent above
 }

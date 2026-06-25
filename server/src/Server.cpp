@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <cstring>
+#include <cstdlib>
 
 Server::Server(const ServerConfig &config) : _fd(-1), _config(config), _world(_config)
 {
@@ -21,6 +22,20 @@ Server::Server(const ServerConfig &config) : _fd(-1), _config(config), _world(_c
     _world.onPlayerEvent = [this](int fd, const std::string &msg) {
         _sendToPlayer(fd, msg);
     };
+    _lastReset = std::chrono::steady_clock::now();
+    if (const char *env = std::getenv("ZAPPY_RESET_INTERVAL")) {
+        double v = std::atof(env);
+        if (v > 0.0)
+            _resetInterval = v;
+    }
+}
+
+double Server::_secondsToNextReset() const
+{
+    double elapsed = std::chrono::duration<double>(
+        std::chrono::steady_clock::now() - _lastReset).count();
+    double remaining = _resetInterval - elapsed;
+    return remaining > 0.0 ? remaining : 0.0;
 }
 
 void Server::_broadcastToGui(const std::string &msg)
@@ -46,6 +61,8 @@ void Server::_sendGuiBootstrap(Client &client)
     for (const auto &msg : _world.getGuiSnapshot())
         client.queueWrite(msg);
     client.queueWrite("sgt " + std::to_string(_config.freq) + "\n");
+    // Custom GUI-only line: seconds until the next resource reset (for countdown).
+    client.queueWrite("sst " + std::to_string((int)_secondsToNextReset()) + "\n");
 }
 
 void Server::_bindAndListen()
@@ -136,9 +153,28 @@ bool Server::_handleClient(std::size_t index)
     Client &client = _clients[clientIndex];
     client.appendToReadBuffer(buf, n);
 
+    // Process every complete line: the first is the team handshake, the rest are
+    // gameplay commands from AI clients (GUI clients don't send commands).
     std::string line;
-    if (client.getState() == ClientState::WAITING_TEAM_NAME && client.extractLine(line))
-        _processHandshake(index, line);
+    while (client.extractLine(line)) {
+        if (client.getState() == ClientState::WAITING_TEAM_NAME) {
+            _processHandshake(index, line);
+        } else if (client.getState() == ClientState::AI) {
+            std::string resp = _world.executeCommand(client.getFd(), line);
+            if (!resp.empty())                 // empty = command sent its own reply
+                client.queueWrite(resp + "\n");
+        } else if (client.getState() == ClientState::GUI) {
+            // GUI requests: "pin #id" → reply with that player's inventory
+            std::size_t h = line.find('#');
+            if (line.rfind("pin", 0) == 0 && h != std::string::npos) {
+                try {
+                    std::string resp = _world.guiPlayerInventory(std::stoi(line.substr(h + 1)));
+                    if (!resp.empty())
+                        client.queueWrite(resp);
+                } catch (...) {}
+            }
+        }
+    }
 
     return false;
 }
@@ -173,8 +209,19 @@ void Server::run()
                 _fds[i].events |= POLLOUT;
         }
 
-        if (poll(_fds.data(), _fds.size(), -1) == -1)
+        // Wake at least every 500 ms so the resource-reset cycle fires on time
+        // even when no client is sending anything.
+        int timeoutMs = static_cast<int>(_secondsToNextReset() * 1000.0);
+        if (timeoutMs < 0 || timeoutMs > 500)
+            timeoutMs = 500;
+        if (poll(_fds.data(), _fds.size(), timeoutMs) == -1)
             throw std::runtime_error("poll() failed");
+
+        if (_secondsToNextReset() <= 0.0) {            // resource reset due
+            _world.respawnAndBroadcast();
+            _lastReset = std::chrono::steady_clock::now();
+            _broadcastToGui("sst " + std::to_string((int)_resetInterval) + "\n");
+        }
 
         if (_fds[0].revents & POLLIN)
             _acceptClient();
