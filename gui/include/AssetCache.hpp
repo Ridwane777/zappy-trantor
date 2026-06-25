@@ -99,3 +99,37 @@ inline std::string assetBytes(const std::string &path)
 
 // NON-BLOQUANT : renvoie les octets seulement s'ils sont DÉJÀ en RAM (préfetchés),
 // sinon vide — ne déclenche jamais de téléchargement. Pour le thread principal
+// (ex. l'écran de chargement) qui ne doit jamais bloquer sur le réseau.
+inline std::string assetBytesIfCached(const std::string &path)
+{
+    auto &st = detail::store();
+    std::lock_guard<std::mutex> lk(detail::storeMutex());
+    auto it = st.find(path);
+    return (it != st.end()) ? it->second : std::string();
+}
+
+// Télécharge `paths` EN PARALLÈLE dans le store RAM (`concurrency` curl à la
+// fois). `done` est incrémenté à chaque fichier terminé (pour une barre de
+// progression). Bloquant : à lancer sur un thread de fond pendant que le thread
+// principal anime l'écran de chargement et pompe les événements fenêtre.
+inline void prefetch(const std::vector<std::string> &paths,
+                     std::atomic<size_t> *done, int concurrency = 12)
+{
+    std::atomic<size_t> idx{0};
+    auto worker = [&] {
+        size_t i;
+        while ((i = idx.fetch_add(1)) < paths.size()) {
+            // retry transient failures so the asset is REALLY cached before we
+            // report it done — otherwise the main thread re-streams it and freezes
+            for (int tries = 0; tries < 4; ++tries)
+                if (!assetBytesKept(paths[i]).empty()) break;
+            if (done) done->fetch_add(1);
+        }
+    };
+    std::vector<std::thread> ts;
+    int n = concurrency < 1 ? 1 : concurrency;
+    for (int k = 0; k < n; ++k) ts.emplace_back(worker);
+    for (auto &t : ts) t.join();
+}
+
+} // namespace zappy
