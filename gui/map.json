@@ -10109,3 +10109,3374 @@
         {
           "model": "cliff_rock",
           "dx": 0.312,
+          "dz": -0.067,
+          "rot_y": 131.6,
+          "scale": 0.833
+        },
+        {
+          "model": "rock_2",
+          "dx": 0.224,
+          "dz": -0.076,
+          "rot_y": 282.2,
+          "scale": 0.895
+        }
+      ],
+      "resources": {
+        "linemate": 1,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 25,
+      "y": 20,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 26,
+      "y": 20,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 27,
+      "y": 20,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 0,
+      "y": 21,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 1,
+      "y": 21,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 2,
+      "y": 21,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 3,
+      "y": 21,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_2",
+          "dx": 0.14,
+          "dz": 0.218,
+          "rot_y": 160.8,
+          "scale": 0.96
+        },
+        {
+          "model": "cliff_rock",
+          "dx": -0.251,
+          "dz": -0.088,
+          "rot_y": 121.8,
+          "scale": 0.915
+        },
+        {
+          "model": "rock_2",
+          "dx": 0.182,
+          "dz": -0.299,
+          "rot_y": 347.2,
+          "scale": 0.752
+        }
+      ],
+      "resources": {
+        "phiras": 2
+      }
+    },
+    {
+      "x": 4,
+      "y": 21,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": 0.375,
+          "dz": -0.057,
+          "rot_y": 23.1,
+          "scale": 0.817
+        },
+        {
+          "model": "cliff_rock",
+          "dx": -0.407,
+          "dz": -0.102,
+          "rot_y": 354.4,
+          "scale": 0.934
+        }
+      ],
+      "resources": {
+        "linemate": 1
+      }
+    },
+    {
+      "x": 5,
+      "y": 21,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_2",
+          "dx": 0.086,
+          "dz": 0.392,
+          "rot_y": 295.3,
+          "scale": 0.942
+        },
+        {
+          "model": "rock_1",
+          "dx": -0.262,
+          "dz": 0.138,
+          "rot_y": 289.4,
+          "scale": 0.836
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.088,
+          "dz": 0.014,
+          "rot_y": 83.4,
+          "scale": 0.801
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 1
+      }
+    },
+    {
+      "x": 6,
+      "y": 21,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": -0.42,
+          "dz": -0.288,
+          "rot_y": 358.9,
+          "scale": 0.817
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.088,
+          "dz": 0.072,
+          "rot_y": 186.4,
+          "scale": 0.807
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 1
+      }
+    },
+    {
+      "x": 7,
+      "y": 21,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": -0.181,
+          "dz": 0.277,
+          "rot_y": 329.4,
+          "scale": 0.714
+        },
+        {
+          "model": "plant_1",
+          "dx": -0.188,
+          "dz": 0.089,
+          "rot_y": 70.0,
+          "scale": 0.853
+        }
+      ],
+      "resources": {
+        "food": 2,
+        "deraumere": 1,
+        "sibur": 1
+      }
+    },
+    {
+      "x": 8,
+      "y": 21,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": -0.078,
+          "dz": -0.331,
+          "rot_y": 26.1,
+          "scale": 0.701
+        },
+        {
+          "model": "plant_1",
+          "dx": 0.254,
+          "dz": 0.384,
+          "rot_y": 315.4,
+          "scale": 0.825
+        },
+        {
+          "model": "mapletree_1",
+          "dx": 0.163,
+          "dz": 0.391,
+          "rot_y": 202.7,
+          "scale": 0.815
+        }
+      ],
+      "resources": {
+        "linemate": 1
+      }
+    },
+    {
+      "x": 9,
+      "y": 21,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "plant_1",
+          "dx": -0.035,
+          "dz": -0.033,
+          "rot_y": 211.3,
+          "scale": 0.637
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.363,
+          "dz": 0.112,
+          "rot_y": 357.9,
+          "scale": 0.792
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.155,
+          "dz": 0.383,
+          "rot_y": 185.9,
+          "scale": 0.632
+        }
+      ],
+      "resources": {
+        "linemate": 2,
+        "deraumere": 1,
+        "mendiane": 1,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 10,
+      "y": 21,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": -0.342,
+          "dz": 0.146,
+          "rot_y": 295.6,
+          "scale": 0.648
+        },
+        {
+          "model": "plant_1",
+          "dx": -0.02,
+          "dz": -0.123,
+          "rot_y": 322.0,
+          "scale": 0.695
+        },
+        {
+          "model": "plant_1",
+          "dx": 0.154,
+          "dz": 0.344,
+          "rot_y": 179.6,
+          "scale": 0.678
+        }
+      ],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 11,
+      "y": 21,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "flower_1",
+          "dx": -0.246,
+          "dz": -0.25,
+          "rot_y": 89.9,
+          "scale": 0.778
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.33,
+          "dz": 0.353,
+          "rot_y": 243.3,
+          "scale": 0.789
+        },
+        {
+          "model": "mapletree_1",
+          "dx": 0.222,
+          "dz": 0.035,
+          "rot_y": 15.2,
+          "scale": 0.746
+        }
+      ],
+      "resources": {
+        "linemate": 1,
+        "deraumere": 1,
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 12,
+      "y": 21,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "palmtree_1",
+          "dx": 0.33,
+          "dz": 0.27,
+          "rot_y": 312.8,
+          "scale": 0.598
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 13,
+      "y": 21,
+      "ground": "tile",
+      "props": []
+    },
+    {
+      "x": 14,
+      "y": 21,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 15,
+      "y": 21,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": 0.052,
+          "dz": -0.303,
+          "rot_y": 287.7,
+          "scale": 0.596
+        }
+      ],
+      "resources": {
+        "linemate": 1,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 16,
+      "y": 21,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "plant_1",
+          "dx": -0.072,
+          "dz": 0.127,
+          "rot_y": 62.9,
+          "scale": 0.695
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "deraumere": 1,
+        "sibur": 1
+      }
+    },
+    {
+      "x": 17,
+      "y": 21,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": 0.159,
+          "dz": -0.41,
+          "rot_y": 75.9,
+          "scale": 0.769
+        },
+        {
+          "model": "normaltree_1",
+          "dx": 0.095,
+          "dz": -0.202,
+          "rot_y": 197.5,
+          "scale": 0.687
+        },
+        {
+          "model": "mapletree_1",
+          "dx": 0.095,
+          "dz": -0.113,
+          "rot_y": 179.6,
+          "scale": 0.681
+        }
+      ],
+      "resources": {
+        "food": 3,
+        "deraumere": 1,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 18,
+      "y": 21,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": 0.298,
+          "dz": -0.185,
+          "rot_y": 64.8,
+          "scale": 0.661
+        },
+        {
+          "model": "mapletree_1",
+          "dx": -0.228,
+          "dz": -0.336,
+          "rot_y": 97.2,
+          "scale": 0.687
+        },
+        {
+          "model": "mapletree_1",
+          "dx": -0.1,
+          "dz": -0.297,
+          "rot_y": 345.3,
+          "scale": 0.666
+        }
+      ],
+      "resources": {
+        "sibur": 1,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 19,
+      "y": 21,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": -0.0,
+          "dz": 0.416,
+          "rot_y": 305.8,
+          "scale": 0.754
+        },
+        {
+          "model": "rock_1",
+          "dx": 0.24,
+          "dz": -0.168,
+          "rot_y": 202.4,
+          "scale": 0.766
+        },
+        {
+          "model": "normaltree_1",
+          "dx": 0.16,
+          "dz": -0.37,
+          "rot_y": 293.0,
+          "scale": 0.744
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "sibur": 1
+      }
+    },
+    {
+      "x": 20,
+      "y": 21,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": -0.139,
+          "dz": -0.117,
+          "rot_y": 201.7,
+          "scale": 0.854
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.403,
+          "dz": -0.318,
+          "rot_y": 312.3,
+          "scale": 0.861
+        },
+        {
+          "model": "normaltree_1",
+          "dx": 0.064,
+          "dz": 0.125,
+          "rot_y": 62.8,
+          "scale": 0.817
+        }
+      ],
+      "resources": {
+        "mendiane": 2
+      }
+    },
+    {
+      "x": 21,
+      "y": 21,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": -0.011,
+          "dz": 0.199,
+          "rot_y": 320.3,
+          "scale": 0.721
+        },
+        {
+          "model": "normaltree_1",
+          "dx": 0.111,
+          "dz": -0.298,
+          "rot_y": 60.3,
+          "scale": 0.824
+        }
+      ]
+    },
+    {
+      "x": 22,
+      "y": 21,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": 0.06,
+          "dz": 0.293,
+          "rot_y": 25.7,
+          "scale": 0.669
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.154,
+          "dz": -0.175,
+          "rot_y": 96.3,
+          "scale": 0.785
+        }
+      ],
+      "resources": {
+        "linemate": 1,
+        "phiras": 1,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 23,
+      "y": 21,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": 0.319,
+          "dz": -0.12,
+          "rot_y": 211.3,
+          "scale": 1.04
+        },
+        {
+          "model": "rock_1",
+          "dx": -0.278,
+          "dz": -0.42,
+          "rot_y": 262.0,
+          "scale": 0.949
+        },
+        {
+          "model": "rock_3",
+          "dx": 0.177,
+          "dz": -0.37,
+          "rot_y": 60.1,
+          "scale": 0.781
+        }
+      ],
+      "resources": {
+        "linemate": 1
+      }
+    },
+    {
+      "x": 24,
+      "y": 21,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_3",
+          "dx": 0.043,
+          "dz": -0.417,
+          "rot_y": 142.9,
+          "scale": 0.979
+        },
+        {
+          "model": "cliff_rock",
+          "dx": -0.209,
+          "dz": -0.303,
+          "rot_y": 235.7,
+          "scale": 1.016
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 1
+      }
+    },
+    {
+      "x": 25,
+      "y": 21,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 26,
+      "y": 21,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 27,
+      "y": 21,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 0,
+      "y": 22,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 1,
+      "y": 22,
+      "ground": "water",
+      "props": [
+        {
+          "model": "boat",
+          "dx": -0.264,
+          "dz": 0.092,
+          "rot_y": 309.7,
+          "scale": 0.465
+        }
+      ]
+    },
+    {
+      "x": 2,
+      "y": 22,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 3,
+      "y": 22,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 4,
+      "y": 22,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": -0.049,
+          "dz": 0.413,
+          "rot_y": 251.1,
+          "scale": 0.803
+        },
+        {
+          "model": "rock_1",
+          "dx": 0.115,
+          "dz": 0.12,
+          "rot_y": 203.0,
+          "scale": 0.907
+        },
+        {
+          "model": "rock_1",
+          "dx": -0.167,
+          "dz": -0.134,
+          "rot_y": 194.3,
+          "scale": 0.991
+        }
+      ],
+      "resources": {
+        "linemate": 1
+      }
+    },
+    {
+      "x": 5,
+      "y": 22,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": -0.211,
+          "dz": -0.173,
+          "rot_y": 0.0,
+          "scale": 0.995
+        },
+        {
+          "model": "rock_2",
+          "dx": -0.137,
+          "dz": -0.027,
+          "rot_y": 3.0,
+          "scale": 1.027
+        },
+        {
+          "model": "rock_3",
+          "dx": -0.02,
+          "dz": -0.432,
+          "rot_y": 155.0,
+          "scale": 0.838
+        }
+      ],
+      "resources": {
+        "food": 3,
+        "linemate": 1
+      }
+    },
+    {
+      "x": 6,
+      "y": 22,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": -0.111,
+          "dz": -0.078,
+          "rot_y": 201.8,
+          "scale": 0.868
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.209,
+          "dz": -0.097,
+          "rot_y": 136.2,
+          "scale": 0.829
+        }
+      ]
+    },
+    {
+      "x": 7,
+      "y": 22,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": 0.222,
+          "dz": 0.344,
+          "rot_y": 290.7,
+          "scale": 0.794
+        },
+        {
+          "model": "normaltree_1",
+          "dx": 0.204,
+          "dz": 0.259,
+          "rot_y": 148.6,
+          "scale": 0.835
+        }
+      ],
+      "resources": {
+        "linemate": 1,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 8,
+      "y": 22,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": 0.115,
+          "dz": 0.099,
+          "rot_y": 98.0,
+          "scale": 0.779
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.404,
+          "dz": -0.378,
+          "rot_y": 192.6,
+          "scale": 0.675
+        }
+      ],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 9,
+      "y": 22,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": 0.181,
+          "dz": 0.191,
+          "rot_y": 83.8,
+          "scale": 0.666
+        },
+        {
+          "model": "mapletree_1",
+          "dx": -0.133,
+          "dz": -0.158,
+          "rot_y": 287.8,
+          "scale": 0.87
+        }
+      ]
+    },
+    {
+      "x": 10,
+      "y": 22,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "flower_1",
+          "dx": -0.143,
+          "dz": 0.289,
+          "rot_y": 342.6,
+          "scale": 0.643
+        },
+        {
+          "model": "rock_1",
+          "dx": -0.36,
+          "dz": -0.025,
+          "rot_y": 69.2,
+          "scale": 0.832
+        },
+        {
+          "model": "flower_1",
+          "dx": 0.276,
+          "dz": -0.318,
+          "rot_y": 276.5,
+          "scale": 0.69
+        }
+      ],
+      "resources": {
+        "phiras": 1
+      }
+    },
+    {
+      "x": 11,
+      "y": 22,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": 0.2,
+          "dz": -0.392,
+          "rot_y": 165.9,
+          "scale": 0.815
+        },
+        {
+          "model": "mapletree_1",
+          "dx": 0.405,
+          "dz": -0.023,
+          "rot_y": 245.3,
+          "scale": 0.705
+        },
+        {
+          "model": "normaltree_1",
+          "dx": 0.108,
+          "dz": -0.385,
+          "rot_y": 337.5,
+          "scale": 0.755
+        }
+      ],
+      "resources": {
+        "food": 2
+      }
+    },
+    {
+      "x": 12,
+      "y": 22,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "plant_1",
+          "dx": -0.205,
+          "dz": 0.264,
+          "rot_y": 310.9,
+          "scale": 0.544
+        }
+      ],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 13,
+      "y": 22,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "plant_1",
+          "dx": -0.119,
+          "dz": -0.226,
+          "rot_y": 99.4,
+          "scale": 0.524
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 1,
+        "sibur": 1
+      }
+    },
+    {
+      "x": 14,
+      "y": 22,
+      "ground": "tile",
+      "props": [],
+      "resources": {
+        "food": 3,
+        "linemate": 1
+      }
+    },
+    {
+      "x": 15,
+      "y": 22,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": 0.238,
+          "dz": -0.021,
+          "rot_y": 214.6,
+          "scale": 0.719
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.288,
+          "dz": -0.343,
+          "rot_y": 222.7,
+          "scale": 0.853
+        }
+      ],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 16,
+      "y": 22,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": -0.37,
+          "dz": 0.121,
+          "rot_y": 252.5,
+          "scale": 0.82
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.225,
+          "dz": 0.405,
+          "rot_y": 283.9,
+          "scale": 0.812
+        },
+        {
+          "model": "flower_1",
+          "dx": -0.051,
+          "dz": -0.258,
+          "rot_y": 248.1,
+          "scale": 0.716
+        }
+      ],
+      "resources": {
+        "food": 3,
+        "linemate": 2
+      }
+    },
+    {
+      "x": 17,
+      "y": 22,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "flower_1",
+          "dx": -0.012,
+          "dz": -0.052,
+          "rot_y": 106.1,
+          "scale": 0.797
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.263,
+          "dz": -0.128,
+          "rot_y": 263.7,
+          "scale": 0.696
+        }
+      ],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 18,
+      "y": 22,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "plant_1",
+          "dx": 0.046,
+          "dz": -0.362,
+          "rot_y": 55.8,
+          "scale": 0.701
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.112,
+          "dz": -0.419,
+          "rot_y": 229.7,
+          "scale": 0.721
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.404,
+          "dz": 0.3,
+          "rot_y": 279.4,
+          "scale": 0.687
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 1,
+        "deraumere": 1,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 19,
+      "y": 22,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": 0.034,
+          "dz": -0.099,
+          "rot_y": 188.7,
+          "scale": 0.899
+        },
+        {
+          "model": "rock_1",
+          "dx": 0.099,
+          "dz": -0.156,
+          "rot_y": 230.7,
+          "scale": 0.783
+        },
+        {
+          "model": "rock_1",
+          "dx": -0.381,
+          "dz": 0.295,
+          "rot_y": 46.7,
+          "scale": 1.012
+        }
+      ],
+      "resources": {
+        "deraumere": 1,
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 20,
+      "y": 22,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": -0.353,
+          "dz": 0.062,
+          "rot_y": 301.1,
+          "scale": 0.947
+        },
+        {
+          "model": "rock_1",
+          "dx": 0.177,
+          "dz": -0.215,
+          "rot_y": 131.9,
+          "scale": 0.932
+        }
+      ],
+      "resources": {
+        "food": 2
+      }
+    },
+    {
+      "x": 21,
+      "y": 22,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "plant_1",
+          "dx": -0.245,
+          "dz": -0.007,
+          "rot_y": 320.3,
+          "scale": 0.649
+        },
+        {
+          "model": "flower_1",
+          "dx": -0.369,
+          "dz": 0.049,
+          "rot_y": 337.8,
+          "scale": 0.73
+        }
+      ],
+      "resources": {
+        "linemate": 1
+      }
+    },
+    {
+      "x": 22,
+      "y": 22,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "tree_of_life",
+          "dx": 0.0,
+          "dz": 0.0,
+          "rot_y": 0.0,
+          "scale": 16.6667
+        }
+      ],
+      "resources": {
+        "linemate": 1
+      }
+    },
+    {
+      "x": 23,
+      "y": 22,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": 0.023,
+          "dz": -0.221,
+          "rot_y": 225.1,
+          "scale": 0.804
+        },
+        {
+          "model": "rock_2",
+          "dx": -0.075,
+          "dz": -0.347,
+          "rot_y": 229.9,
+          "scale": 0.857
+        },
+        {
+          "model": "rock_1",
+          "dx": 0.145,
+          "dz": 0.337,
+          "rot_y": 60.1,
+          "scale": 0.804
+        }
+      ],
+      "resources": {
+        "linemate": 1,
+        "mendiane": 1,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 24,
+      "y": 22,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": -0.301,
+          "dz": 0.439,
+          "rot_y": 159.5,
+          "scale": 0.856
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.432,
+          "dz": -0.154,
+          "rot_y": 133.8,
+          "scale": 0.979
+        },
+        {
+          "model": "rock_1",
+          "dx": 0.199,
+          "dz": 0.095,
+          "rot_y": 202.7,
+          "scale": 0.814
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 1
+      }
+    },
+    {
+      "x": 25,
+      "y": 22,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 26,
+      "y": 22,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 27,
+      "y": 22,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 0,
+      "y": 23,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 1,
+      "y": 23,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 2,
+      "y": 23,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 3,
+      "y": 23,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 4,
+      "y": 23,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 5,
+      "y": 23,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": 0.434,
+          "dz": -0.174,
+          "rot_y": 108.1,
+          "scale": 0.817
+        },
+        {
+          "model": "rock_2",
+          "dx": -0.421,
+          "dz": 0.283,
+          "rot_y": 248.3,
+          "scale": 0.833
+        },
+        {
+          "model": "rock_1",
+          "dx": 0.05,
+          "dz": 0.375,
+          "rot_y": 55.7,
+          "scale": 0.761
+        }
+      ],
+      "resources": {
+        "linemate": 1,
+        "sibur": 1
+      }
+    },
+    {
+      "x": 6,
+      "y": 23,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": -0.117,
+          "dz": 0.072,
+          "rot_y": 83.9,
+          "scale": 0.993
+        },
+        {
+          "model": "cliff_rock",
+          "dx": -0.088,
+          "dz": 0.368,
+          "rot_y": 264.3,
+          "scale": 0.967
+        },
+        {
+          "model": "rock_2",
+          "dx": -0.288,
+          "dz": 0.287,
+          "rot_y": 248.3,
+          "scale": 0.923
+        }
+      ]
+    },
+    {
+      "x": 7,
+      "y": 23,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": -0.176,
+          "dz": 0.203,
+          "rot_y": 207.5,
+          "scale": 0.774
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.238,
+          "dz": -0.134,
+          "rot_y": 294.2,
+          "scale": 0.875
+        },
+        {
+          "model": "rock_3",
+          "dx": 0.325,
+          "dz": -0.24,
+          "rot_y": 235.0,
+          "scale": 0.931
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.244,
+          "dz": -0.103,
+          "rot_y": 109.7,
+          "scale": 0.762
+        }
+      ],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 8,
+      "y": 23,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": 0.002,
+          "dz": -0.246,
+          "rot_y": 18.2,
+          "scale": 0.969
+        },
+        {
+          "model": "rock_1",
+          "dx": -0.048,
+          "dz": 0.084,
+          "rot_y": 181.7,
+          "scale": 0.817
+        },
+        {
+          "model": "cliff_rock",
+          "dx": -0.093,
+          "dz": -0.324,
+          "rot_y": 29.7,
+          "scale": 0.921
+        }
+      ],
+      "resources": {
+        "linemate": 1,
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 9,
+      "y": 23,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": -0.365,
+          "dz": 0.002,
+          "rot_y": 278.6,
+          "scale": 0.789
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.052,
+          "dz": -0.011,
+          "rot_y": 234.8,
+          "scale": 0.809
+        }
+      ],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 10,
+      "y": 23,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_2",
+          "dx": -0.223,
+          "dz": -0.377,
+          "rot_y": 279.6,
+          "scale": 0.847
+        },
+        {
+          "model": "rock_3",
+          "dx": -0.361,
+          "dz": 0.151,
+          "rot_y": 152.5,
+          "scale": 0.854
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.083,
+          "dz": -0.419,
+          "rot_y": 109.7,
+          "scale": 1.046
+        }
+      ],
+      "resources": {
+        "food": 2,
+        "linemate": 2
+      }
+    },
+    {
+      "x": 11,
+      "y": 23,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "plant_1",
+          "dx": -0.049,
+          "dz": -0.298,
+          "rot_y": 16.2,
+          "scale": 0.826
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.106,
+          "dz": 0.216,
+          "rot_y": 307.0,
+          "scale": 0.657
+        },
+        {
+          "model": "normaltree_1",
+          "dx": 0.377,
+          "dz": 0.358,
+          "rot_y": 312.8,
+          "scale": 0.827
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 12,
+      "y": 23,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": -0.327,
+          "dz": -0.042,
+          "rot_y": 8.2,
+          "scale": 0.68
+        },
+        {
+          "model": "mapletree_1",
+          "dx": -0.249,
+          "dz": 0.02,
+          "rot_y": 93.1,
+          "scale": 0.746
+        }
+      ],
+      "resources": {
+        "food": 2
+      }
+    },
+    {
+      "x": 13,
+      "y": 23,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": 0.167,
+          "dz": -0.405,
+          "rot_y": 209.9,
+          "scale": 0.789
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.277,
+          "dz": -0.181,
+          "rot_y": 284.1,
+          "scale": 0.778
+        },
+        {
+          "model": "normaltree_1",
+          "dx": 0.13,
+          "dz": -0.413,
+          "rot_y": 139.9,
+          "scale": 0.695
+        }
+      ]
+    },
+    {
+      "x": 14,
+      "y": 23,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": 0.306,
+          "dz": -0.404,
+          "rot_y": 312.3,
+          "scale": 0.786
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.1,
+          "dz": 0.4,
+          "rot_y": 35.9,
+          "scale": 0.706
+        },
+        {
+          "model": "flower_1",
+          "dx": 0.027,
+          "dz": -0.263,
+          "rot_y": 180.2,
+          "scale": 0.74
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "phiras": 2
+      }
+    },
+    {
+      "x": 15,
+      "y": 23,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": -0.212,
+          "dz": 0.025,
+          "rot_y": 120.1,
+          "scale": 0.724
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.129,
+          "dz": -0.124,
+          "rot_y": 225.1,
+          "scale": 0.687
+        },
+        {
+          "model": "plant_1",
+          "dx": 0.001,
+          "dz": 0.262,
+          "rot_y": 225.3,
+          "scale": 0.841
+        }
+      ]
+    },
+    {
+      "x": 16,
+      "y": 23,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "flower_1",
+          "dx": -0.395,
+          "dz": 0.046,
+          "rot_y": 100.9,
+          "scale": 0.666
+        },
+        {
+          "model": "flower_1",
+          "dx": 0.132,
+          "dz": -0.346,
+          "rot_y": 137.6,
+          "scale": 0.861
+        },
+        {
+          "model": "mapletree_1",
+          "dx": 0.105,
+          "dz": -0.229,
+          "rot_y": 86.5,
+          "scale": 0.667
+        }
+      ],
+      "resources": {
+        "food": 2,
+        "linemate": 2
+      }
+    },
+    {
+      "x": 17,
+      "y": 23,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "plant_1",
+          "dx": -0.143,
+          "dz": 0.035,
+          "rot_y": 74.4,
+          "scale": 0.663
+        },
+        {
+          "model": "mapletree_1",
+          "dx": 0.252,
+          "dz": 0.305,
+          "rot_y": 111.2,
+          "scale": 0.799
+        },
+        {
+          "model": "mapletree_1",
+          "dx": -0.306,
+          "dz": 0.416,
+          "rot_y": 351.3,
+          "scale": 0.665
+        }
+      ],
+      "resources": {
+        "food": 2,
+        "mendiane": 1,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 18,
+      "y": 23,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_3",
+          "dx": -0.161,
+          "dz": 0.05,
+          "rot_y": 341.5,
+          "scale": 0.786
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.334,
+          "dz": 0.2,
+          "rot_y": 275.6,
+          "scale": 1.014
+        },
+        {
+          "model": "rock_1",
+          "dx": -0.078,
+          "dz": -0.05,
+          "rot_y": 336.2,
+          "scale": 1.018
+        },
+        {
+          "model": "rock_3",
+          "dx": -0.199,
+          "dz": 0.246,
+          "rot_y": 38.4,
+          "scale": 0.805
+        }
+      ],
+      "resources": {
+        "food": 2
+      }
+    },
+    {
+      "x": 19,
+      "y": 23,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": -0.205,
+          "dz": 0.059,
+          "rot_y": 83.1,
+          "scale": 0.82
+        },
+        {
+          "model": "rock_2",
+          "dx": -0.124,
+          "dz": 0.166,
+          "rot_y": 171.6,
+          "scale": 0.901
+        },
+        {
+          "model": "rock_1",
+          "dx": 0.187,
+          "dz": -0.111,
+          "rot_y": 306.8,
+          "scale": 0.897
+        },
+        {
+          "model": "cliff_rock",
+          "dx": -0.27,
+          "dz": -0.412,
+          "rot_y": 275.2,
+          "scale": 0.755
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "deraumere": 1,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 20,
+      "y": 23,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": 0.213,
+          "dz": 0.43,
+          "rot_y": 272.8,
+          "scale": 0.77
+        },
+        {
+          "model": "rock_3",
+          "dx": 0.427,
+          "dz": 0.323,
+          "rot_y": 176.4,
+          "scale": 0.847
+        },
+        {
+          "model": "rock_1",
+          "dx": -0.223,
+          "dz": -0.084,
+          "rot_y": 15.1,
+          "scale": 0.971
+        }
+      ],
+      "resources": {
+        "linemate": 2,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 21,
+      "y": 23,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": 0.098,
+          "dz": 0.213,
+          "rot_y": 213.8,
+          "scale": 0.908
+        },
+        {
+          "model": "rock_3",
+          "dx": 0.252,
+          "dz": 0.018,
+          "rot_y": 162.6,
+          "scale": 0.998
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.436,
+          "dz": 0.016,
+          "rot_y": 142.4,
+          "scale": 0.971
+        }
+      ],
+      "resources": {
+        "food": 3
+      }
+    },
+    {
+      "x": 22,
+      "y": 23,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": 0.115,
+          "dz": -0.397,
+          "rot_y": 104.8,
+          "scale": 0.869
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.288,
+          "dz": -0.034,
+          "rot_y": 152.1,
+          "scale": 0.934
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.015,
+          "dz": -0.315,
+          "rot_y": 298.8,
+          "scale": 0.886
+        }
+      ],
+      "resources": {
+        "linemate": 1,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 23,
+      "y": 23,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": 0.245,
+          "dz": 0.385,
+          "rot_y": 250.6,
+          "scale": 0.791
+        },
+        {
+          "model": "rock_1",
+          "dx": -0.043,
+          "dz": -0.283,
+          "rot_y": 212.5,
+          "scale": 0.964
+        },
+        {
+          "model": "cliff_rock",
+          "dx": -0.04,
+          "dz": -0.22,
+          "rot_y": 249.0,
+          "scale": 1.022
+        }
+      ],
+      "resources": {
+        "food": 3,
+        "deraumere": 1,
+        "phiras": 1
+      }
+    },
+    {
+      "x": 24,
+      "y": 23,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 25,
+      "y": 23,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 26,
+      "y": 23,
+      "ground": "water",
+      "props": [
+        {
+          "model": "lily_pad",
+          "dx": -0.028,
+          "dz": -0.077,
+          "rot_y": 188.6,
+          "scale": 0.477
+        }
+      ]
+    },
+    {
+      "x": 27,
+      "y": 23,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 0,
+      "y": 24,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 1,
+      "y": 24,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 2,
+      "y": 24,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 3,
+      "y": 24,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 4,
+      "y": 24,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 5,
+      "y": 24,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 6,
+      "y": 24,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": -0.308,
+          "dz": 0.325,
+          "rot_y": 64.4,
+          "scale": 0.964
+        },
+        {
+          "model": "rock_1",
+          "dx": -0.168,
+          "dz": 0.236,
+          "rot_y": 160.7,
+          "scale": 0.938
+        },
+        {
+          "model": "cliff_rock",
+          "dx": -0.324,
+          "dz": -0.261,
+          "rot_y": 224.1,
+          "scale": 0.826
+        }
+      ],
+      "resources": {
+        "sibur": 1
+      }
+    },
+    {
+      "x": 7,
+      "y": 24,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_2",
+          "dx": 0.038,
+          "dz": -0.435,
+          "rot_y": 317.8,
+          "scale": 0.821
+        },
+        {
+          "model": "rock_1",
+          "dx": -0.021,
+          "dz": -0.079,
+          "rot_y": 28.6,
+          "scale": 0.93
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.042,
+          "dz": 0.105,
+          "rot_y": 200.7,
+          "scale": 0.998
+        }
+      ],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 8,
+      "y": 24,
+      "ground": "water",
+      "props": [
+        {
+          "model": "lily_pad",
+          "dx": 0.086,
+          "dz": -0.259,
+          "rot_y": 307.4,
+          "scale": 0.533
+        }
+      ]
+    },
+    {
+      "x": 9,
+      "y": 24,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 10,
+      "y": 24,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_3",
+          "dx": -0.397,
+          "dz": -0.073,
+          "rot_y": 64.2,
+          "scale": 0.952
+        },
+        {
+          "model": "rock_1",
+          "dx": 0.169,
+          "dz": 0.084,
+          "rot_y": 283.4,
+          "scale": 0.803
+        },
+        {
+          "model": "rock_1",
+          "dx": 0.069,
+          "dz": 0.38,
+          "rot_y": 33.5,
+          "scale": 0.84
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "linemate": 1
+      }
+    },
+    {
+      "x": 11,
+      "y": 24,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": -0.363,
+          "dz": -0.061,
+          "rot_y": 198.2,
+          "scale": 0.7
+        },
+        {
+          "model": "normaltree_1",
+          "dx": 0.163,
+          "dz": -0.189,
+          "rot_y": 189.7,
+          "scale": 0.756
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "deraumere": 1,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 12,
+      "y": 24,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": -0.328,
+          "dz": 0.193,
+          "rot_y": 226.4,
+          "scale": 0.867
+        },
+        {
+          "model": "mapletree_1",
+          "dx": 0.158,
+          "dz": 0.364,
+          "rot_y": 355.1,
+          "scale": 0.699
+        },
+        {
+          "model": "mapletree_1",
+          "dx": -0.154,
+          "dz": 0.021,
+          "rot_y": 358.2,
+          "scale": 0.715
+        }
+      ],
+      "resources": {
+        "food": 2,
+        "linemate": 1
+      }
+    },
+    {
+      "x": 13,
+      "y": 24,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": 0.017,
+          "dz": 0.111,
+          "rot_y": 177.3,
+          "scale": 0.673
+        },
+        {
+          "model": "mapletree_1",
+          "dx": 0.175,
+          "dz": 0.403,
+          "rot_y": 0.6,
+          "scale": 0.636
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 14,
+      "y": 24,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "normaltree_1",
+          "dx": 0.292,
+          "dz": 0.252,
+          "rot_y": 359.6,
+          "scale": 0.729
+        },
+        {
+          "model": "normaltree_1",
+          "dx": 0.051,
+          "dz": 0.116,
+          "rot_y": 4.1,
+          "scale": 0.678
+        },
+        {
+          "model": "normaltree_1",
+          "dx": 0.244,
+          "dz": -0.161,
+          "rot_y": 182.4,
+          "scale": 0.708
+        }
+      ],
+      "resources": {
+        "phiras": 1,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 15,
+      "y": 24,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": -0.133,
+          "dz": 0.188,
+          "rot_y": 221.8,
+          "scale": 0.637
+        },
+        {
+          "model": "normaltree_1",
+          "dx": -0.142,
+          "dz": -0.136,
+          "rot_y": 242.1,
+          "scale": 0.85
+        }
+      ]
+    },
+    {
+      "x": 16,
+      "y": 24,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": -0.016,
+          "dz": 0.112,
+          "rot_y": 321.1,
+          "scale": 0.911
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.25,
+          "dz": -0.076,
+          "rot_y": 267.3,
+          "scale": 1.001
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.198,
+          "dz": -0.162,
+          "rot_y": 192.9,
+          "scale": 0.812
+        },
+        {
+          "model": "rock_2",
+          "dx": 0.264,
+          "dz": 0.341,
+          "rot_y": 127.3,
+          "scale": 1.041
+        }
+      ],
+      "resources": {
+        "food": 1,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 17,
+      "y": 24,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": 0.426,
+          "dz": 0.111,
+          "rot_y": 303.3,
+          "scale": 0.921
+        },
+        {
+          "model": "rock_1",
+          "dx": 0.084,
+          "dz": 0.321,
+          "rot_y": 270.6,
+          "scale": 0.962
+        },
+        {
+          "model": "cliff_rock",
+          "dx": -0.412,
+          "dz": -0.076,
+          "rot_y": 178.9,
+          "scale": 0.821
+        }
+      ],
+      "resources": {
+        "food": 2,
+        "linemate": 2,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 18,
+      "y": 24,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_3",
+          "dx": -0.25,
+          "dz": -0.174,
+          "rot_y": 40.4,
+          "scale": 0.985
+        },
+        {
+          "model": "rock_2",
+          "dx": 0.364,
+          "dz": -0.049,
+          "rot_y": 9.0,
+          "scale": 0.895
+        },
+        {
+          "model": "rock_1",
+          "dx": -0.273,
+          "dz": 0.373,
+          "rot_y": 263.7,
+          "scale": 0.907
+        }
+      ],
+      "resources": {
+        "linemate": 1,
+        "sibur": 2
+      }
+    },
+    {
+      "x": 19,
+      "y": 24,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 20,
+      "y": 24,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 21,
+      "y": 24,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 22,
+      "y": 24,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 23,
+      "y": 24,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 24,
+      "y": 24,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 25,
+      "y": 24,
+      "ground": "water",
+      "props": [
+        {
+          "model": "lily_pad",
+          "dx": -0.023,
+          "dz": 0.12,
+          "rot_y": 188.0,
+          "scale": 0.401
+        }
+      ]
+    },
+    {
+      "x": 26,
+      "y": 24,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 27,
+      "y": 24,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 0,
+      "y": 25,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 1,
+      "y": 25,
+      "ground": "water",
+      "props": [
+        {
+          "model": "lily_pad",
+          "dx": -0.254,
+          "dz": 0.012,
+          "rot_y": 237.2,
+          "scale": 0.462
+        }
+      ]
+    },
+    {
+      "x": 2,
+      "y": 25,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 3,
+      "y": 25,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 4,
+      "y": 25,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 5,
+      "y": 25,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 6,
+      "y": 25,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 7,
+      "y": 25,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 8,
+      "y": 25,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 9,
+      "y": 25,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 10,
+      "y": 25,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": -0.199,
+          "dz": -0.427,
+          "rot_y": 224.3,
+          "scale": 0.904
+        },
+        {
+          "model": "cliff_rock",
+          "dx": -0.132,
+          "dz": -0.16,
+          "rot_y": 51.0,
+          "scale": 0.961
+        }
+      ],
+      "resources": {
+        "linemate": 1,
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 11,
+      "y": 25,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": -0.377,
+          "dz": 0.1,
+          "rot_y": 121.9,
+          "scale": 0.883
+        },
+        {
+          "model": "cliff_rock",
+          "dx": -0.026,
+          "dz": 0.154,
+          "rot_y": 38.1,
+          "scale": 0.766
+        },
+        {
+          "model": "rock_1",
+          "dx": -0.282,
+          "dz": 0.085,
+          "rot_y": 213.4,
+          "scale": 1.001
+        }
+      ],
+      "resources": {
+        "food": 2,
+        "linemate": 1,
+        "deraumere": 2
+      }
+    },
+    {
+      "x": 12,
+      "y": 25,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "mapletree_1",
+          "dx": -0.158,
+          "dz": 0.267,
+          "rot_y": 256.6,
+          "scale": 0.791
+        },
+        {
+          "model": "mapletree_1",
+          "dx": 0.398,
+          "dz": 0.215,
+          "rot_y": 167.7,
+          "scale": 0.662
+        },
+        {
+          "model": "flower_1",
+          "dx": 0.353,
+          "dz": -0.027,
+          "rot_y": 164.0,
+          "scale": 0.794
+        }
+      ],
+      "resources": {
+        "linemate": 1,
+        "deraumere": 1,
+        "sibur": 1,
+        "thystame": 1
+      }
+    },
+    {
+      "x": 13,
+      "y": 25,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": -0.236,
+          "dz": -0.243,
+          "rot_y": 310.0,
+          "scale": 0.935
+        },
+        {
+          "model": "rock_3",
+          "dx": -0.095,
+          "dz": 0.176,
+          "rot_y": 239.5,
+          "scale": 0.987
+        },
+        {
+          "model": "rock_3",
+          "dx": -0.041,
+          "dz": -0.413,
+          "rot_y": 171.1,
+          "scale": 0.855
+        }
+      ],
+      "resources": {
+        "food": 1
+      }
+    },
+    {
+      "x": 14,
+      "y": 25,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": 0.236,
+          "dz": 0.092,
+          "rot_y": 45.9,
+          "scale": 0.781
+        },
+        {
+          "model": "rock_2",
+          "dx": 0.261,
+          "dz": -0.153,
+          "rot_y": 233.8,
+          "scale": 0.988
+        },
+        {
+          "model": "rock_1",
+          "dx": -0.087,
+          "dz": -0.076,
+          "rot_y": 223.5,
+          "scale": 0.914
+        }
+      ],
+      "resources": {
+        "food": 2,
+        "linemate": 1
+      }
+    },
+    {
+      "x": 15,
+      "y": 25,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": -0.14,
+          "dz": 0.276,
+          "rot_y": 212.7,
+          "scale": 0.985
+        },
+        {
+          "model": "rock_1",
+          "dx": 0.253,
+          "dz": 0.039,
+          "rot_y": 85.0,
+          "scale": 0.949
+        },
+        {
+          "model": "cliff_rock",
+          "dx": 0.379,
+          "dz": 0.065,
+          "rot_y": 175.2,
+          "scale": 0.928
+        },
+        {
+          "model": "rock_1",
+          "dx": 0.048,
+          "dz": 0.283,
+          "rot_y": 63.4,
+          "scale": 1.037
+        }
+      ]
+    },
+    {
+      "x": 16,
+      "y": 25,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": 0.276,
+          "dz": 0.239,
+          "rot_y": 136.4,
+          "scale": 0.898
+        },
+        {
+          "model": "rock_2",
+          "dx": -0.36,
+          "dz": 0.279,
+          "rot_y": 319.4,
+          "scale": 1.021
+        }
+      ],
+      "resources": {
+        "deraumere": 1,
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 17,
+      "y": 25,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": -0.311,
+          "dz": -0.309,
+          "rot_y": 191.3,
+          "scale": 0.867
+        },
+        {
+          "model": "rock_1",
+          "dx": -0.268,
+          "dz": 0.16,
+          "rot_y": 114.0,
+          "scale": 0.921
+        },
+        {
+          "model": "rock_3",
+          "dx": -0.172,
+          "dz": 0.39,
+          "rot_y": 156.5,
+          "scale": 1.045
+        }
+      ],
+      "resources": {
+        "linemate": 1
+      }
+    },
+    {
+      "x": 18,
+      "y": 25,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "cliff_rock",
+          "dx": -0.433,
+          "dz": 0.428,
+          "rot_y": 145.5,
+          "scale": 0.788
+        },
+        {
+          "model": "cliff_rock",
+          "dx": -0.115,
+          "dz": 0.043,
+          "rot_y": 19.1,
+          "scale": 0.961
+        },
+        {
+          "model": "rock_2",
+          "dx": -0.124,
+          "dz": 0.318,
+          "rot_y": 311.6,
+          "scale": 0.821
+        }
+      ]
+    },
+    {
+      "x": 19,
+      "y": 25,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 20,
+      "y": 25,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 21,
+      "y": 25,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 22,
+      "y": 25,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 23,
+      "y": 25,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 24,
+      "y": 25,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 25,
+      "y": 25,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 26,
+      "y": 25,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 27,
+      "y": 25,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 0,
+      "y": 26,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 1,
+      "y": 26,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 2,
+      "y": 26,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 3,
+      "y": 26,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 4,
+      "y": 26,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 5,
+      "y": 26,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 6,
+      "y": 26,
+      "ground": "water",
+      "props": [
+        {
+          "model": "lily_pad",
+          "dx": -0.271,
+          "dz": 0.124,
+          "rot_y": 175.2,
+          "scale": 0.487
+        }
+      ]
+    },
+    {
+      "x": 7,
+      "y": 26,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 8,
+      "y": 26,
+      "ground": "water",
+      "props": [
+        {
+          "model": "lily_pad",
+          "dx": -0.047,
+          "dz": -0.025,
+          "rot_y": 284.0,
+          "scale": 0.521
+        }
+      ]
+    },
+    {
+      "x": 9,
+      "y": 26,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 10,
+      "y": 26,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 11,
+      "y": 26,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": -0.044,
+          "dz": -0.127,
+          "rot_y": 66.9,
+          "scale": 0.931
+        },
+        {
+          "model": "rock_1",
+          "dx": 0.305,
+          "dz": -0.232,
+          "rot_y": 180.6,
+          "scale": 0.873
+        },
+        {
+          "model": "rock_1",
+          "dx": -0.117,
+          "dz": 0.421,
+          "rot_y": 204.5,
+          "scale": 0.961
+        }
+      ],
+      "resources": {
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 12,
+      "y": 26,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": 0.168,
+          "dz": -0.315,
+          "rot_y": 263.3,
+          "scale": 1.045
+        },
+        {
+          "model": "rock_3",
+          "dx": 0.245,
+          "dz": -0.031,
+          "rot_y": 28.2,
+          "scale": 1.017
+        }
+      ],
+      "resources": {
+        "linemate": 1
+      }
+    },
+    {
+      "x": 13,
+      "y": 26,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": 0.213,
+          "dz": 0.405,
+          "rot_y": 28.1,
+          "scale": 0.94
+        },
+        {
+          "model": "rock_2",
+          "dx": -0.165,
+          "dz": -0.394,
+          "rot_y": 123.7,
+          "scale": 0.984
+        }
+      ],
+      "resources": {
+        "food": 2,
+        "linemate": 1
+      }
+    },
+    {
+      "x": 14,
+      "y": 26,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_1",
+          "dx": -0.027,
+          "dz": 0.206,
+          "rot_y": 151.6,
+          "scale": 1.038
+        },
+        {
+          "model": "rock_2",
+          "dx": -0.185,
+          "dz": -0.409,
+          "rot_y": 332.2,
+          "scale": 0.975
+        },
+        {
+          "model": "rock_2",
+          "dx": 0.056,
+          "dz": -0.386,
+          "rot_y": 170.3,
+          "scale": 0.801
+        }
+      ],
+      "resources": {
+        "mendiane": 1
+      }
+    },
+    {
+      "x": 15,
+      "y": 26,
+      "ground": "tile",
+      "props": [
+        {
+          "model": "rock_3",
+          "dx": 0.272,
+          "dz": 0.109,
+          "rot_y": 103.3,
+          "scale": 0.775
+        },
+        {
+          "model": "rock_1",
+          "dx": 0.309,
+          "dz": -0.195,
+          "rot_y": 47.7,
+          "scale": 0.834
+        }
+      ],
+      "resources": {
+        "deraumere": 1
+      }
+    },
+    {
+      "x": 16,
+      "y": 26,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 17,
+      "y": 26,
+      "ground": "water",
+      "props": [
+        {
+          "model": "lily_pad",
+          "dx": -0.182,
+          "dz": 0.051,
+          "rot_y": 54.4,
+          "scale": 0.489
+        }
+      ]
+    },
+    {
+      "x": 18,
+      "y": 26,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 19,
+      "y": 26,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 20,
+      "y": 26,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 21,
+      "y": 26,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 22,
+      "y": 26,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 23,
+      "y": 26,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 24,
+      "y": 26,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 25,
+      "y": 26,
+      "ground": "water",
+      "props": [
+        {
+          "model": "lily_pad",
+          "dx": 0.243,
+          "dz": -0.194,
+          "rot_y": 178.5,
+          "scale": 0.599
+        }
+      ]
+    },
+    {
+      "x": 26,
+      "y": 26,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 27,
+      "y": 26,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 0,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 1,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 2,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 3,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 4,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 5,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 6,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 7,
+      "y": 27,
+      "ground": "water",
+      "props": [
+        {
+          "model": "lily_pad",
+          "dx": -0.057,
+          "dz": -0.111,
+          "rot_y": 268.6,
+          "scale": 0.55
+        }
+      ]
+    },
+    {
+      "x": 8,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 9,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 10,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 11,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 12,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 13,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 14,
+      "y": 27,
+      "ground": "water",
+      "props": [
+        {
+          "model": "boat",
+          "dx": -0.029,
+          "dz": 0.1,
+          "rot_y": 346.2,
+          "scale": 0.537
+        }
+      ]
+    },
+    {
+      "x": 15,
+      "y": 27,
+      "ground": "water",
+      "props": [
+        {
+          "model": "boat",
+          "dx": 0.077,
+          "dz": 0.255,
+          "rot_y": 155.4,
+          "scale": 0.584
+        }
+      ]
+    },
+    {
+      "x": 16,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 17,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 18,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 19,
+      "y": 27,
+      "ground": "water",
+      "props": [
+        {
+          "model": "lily_pad",
+          "dx": -0.061,
+          "dz": 0.153,
+          "rot_y": 269.7,
+          "scale": 0.547
+        }
+      ]
+    },
+    {
+      "x": 20,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 21,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 22,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 23,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 24,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 25,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 26,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    },
+    {
+      "x": 27,
+      "y": 27,
+      "ground": "water",
+      "props": []
+    }
+  ],
+  "atmosphere": {
+    "sky_color": [
+      0.44,
+      0.7,
+      0.94
+    ],
+    "fog_color": [
+      0.62,
+      0.82,
+      0.95
+    ],
+    "sun_angle": 42.0,
+    "clouds": [
+      {
+        "x": 24.69,
+        "y": 6.23,
+        "z": 20.81,
+        "scale": 4.29,
+        "drift_x": 0.0045,
+        "drift_z": 0.0487
+      },
+      {
+        "x": 4.81,
+        "y": 4.08,
+        "z": 4.05,
+        "scale": 4.17,
+        "drift_x": 0.007,
+        "drift_z": -0.0662
+      },
+      {
+        "x": 20.43,
+        "y": 6.1,
+        "z": 1.02,
+        "scale": 3.79,
+        "drift_x": -0.0661,
+        "drift_z": 0.0121
+      },
+      {
+        "x": 23.03,
+        "y": 5.27,
+        "z": 5.17,
+        "scale": 2.88,
+        "drift_x": 0.0418,
+        "drift_z": -0.0829
+      },
+      {
+        "x": 3.96,
+        "y": 4.07,
+        "z": 6.5,
+        "scale": 2.13,
+        "drift_x": -0.0054,
+        "drift_z": -0.0706
+      },
+      {
+        "x": 7.89,
+        "y": 5.0,
+        "z": 6.46,
+        "scale": 3.57,
+        "drift_x": 0.0108,
+        "drift_z": -0.0409
+      },
+      {
+        "x": 13.51,
+        "y": 6.42,
+        "z": 15.17,
+        "scale": 4.08,
+        "drift_x": 0.0419,
+        "drift_z": 0.064
+      },
+      {
+        "x": 15.08,
+        "y": 4.8,
+        "z": 1.0,
+        "scale": 3.2,
+        "drift_x": -0.0398,
+        "drift_z": -0.0932
+      },
+      {
+        "x": 13.63,
+        "y": 6.0,
+        "z": 10.0,
+        "scale": 2.5,
+        "drift_x": -0.04,
+        "drift_z": -0.0965
+      },
+      {
+        "x": 11.59,
+        "y": 6.21,
+        "z": 15.43,
+        "scale": 2.56,
+        "drift_x": 0.082,
+        "drift_z": -0.0806
+      },
+      {
+        "x": 27.47,
+        "y": 6.27,
+        "z": 9.45,
+        "scale": 4.44,
+        "drift_x": -0.052,
+        "drift_z": -0.069
+      },
+      {
+        "x": 17.45,
+        "y": 5.07,
+        "z": 24.23,
+        "scale": 2.65,
+        "drift_x": 0.0323,
+        "drift_z": 0.0577
+      },
+      {
+        "x": 18.8,
+        "y": 5.8,
+        "z": 17.01,
+        "scale": 3.09,
+        "drift_x": 0.0384,
+        "drift_z": -0.0132
+      },
+      {
+        "x": 20.12,
+        "y": 5.78,
+        "z": 10.63,
+        "scale": 2.48,
+        "drift_x": -0.0188,
+        "drift_z": -0.0361
+      }
+    ]
+  }
