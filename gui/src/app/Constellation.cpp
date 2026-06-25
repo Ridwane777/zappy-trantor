@@ -155,3 +155,56 @@ void Constellation::renderNightSky(Shader& star, unsigned vao, const glm::mat4& 
     // links between stars — strong once active, faint while charging
     float linkF = _active ? lit * pulse : chargeF * 0.35f;
     if (linkF > 0.02f) {
+        for (auto& L : kDipperLink) {
+            glm::vec3 a = dws[L[0]], b = dws[L[1]];
+            const int seg = 18;
+            for (int s = 1; s < seg; ++s) {
+                glm::vec3 wp = glm::mix(a, b, (float)s / seg);
+                star.setVec3 ("uCenter", wp.x, wp.y, wp.z);
+                star.setFloat("uSize",   2.8f);
+                star.setVec3 ("uColor",  0.55f, 0.78f, 1.0f);
+                star.setFloat("uIntensity", linkF * nightF * 1.5f);
+                glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+            }
+        }
+    }
+
+    // the 7 Big Dipper stars — brighten with charge, flash on the wave
+    for (int i = 0; i < 7; ++i) {
+        float inten = (0.55f + 1.3f * glowF + 2.2f * waveF) * pulse * nightF;
+        star.setVec3 ("uCenter", dws[i].x, dws[i].y, dws[i].z);
+        star.setFloat("uSize",   4.5f + 2.5f * glowF + 6.0f * waveF);
+        star.setVec3 ("uColor",  cstColor.x, cstColor.y, cstColor.z);
+        star.setFloat("uIntensity", inten);
+        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    }
+
+    glBindVertexArray(0);
+}
+
+void Constellation::renderMewEnergy(Shader& star, unsigned vao, const glm::mat4& view,
+                                    const glm::mat4& proj, float elapsed) const
+{
+    if (_motes.empty()) return;
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_ONE, GL_ONE);
+    glDepthMask(GL_FALSE);
+    glDisable(GL_CULL_FACE);
+    star.use();
+    star.setMat4("uView", glm::value_ptr(view));
+    star.setMat4("uProj", glm::value_ptr(proj));
+    glBindVertexArray(vao);
+    for (auto& m : _motes) {
+        float k  = m.life / m.maxLife;
+        float tw = 0.55f + 0.45f * std::sin(elapsed * m.twFreq + m.phase);
+        star.setVec3 ("uCenter", m.pos.x, m.pos.y, m.pos.z);
+        star.setFloat("uSize",   m.size);
+        star.setVec3 ("uColor",  m.color.r, m.color.g, m.color.b);
+        star.setFloat("uIntensity", (0.35f + 1.0f * k) * tw);
+        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    }
+    glBindVertexArray(0);
+    glDepthMask(GL_TRUE);
+    glEnable(GL_CULL_FACE);
+    glDisable(GL_BLEND);
+}
