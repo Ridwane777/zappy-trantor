@@ -35,3 +35,16 @@ public:
     // Additive pass: the purple energy motes around Mew (self-contained GL state).
     void renderMewEnergy(Shader& star, unsigned vao, const glm::mat4& view,
                          const glm::mat4& proj, float elapsed) const;
+
+private:
+    struct SkyStar { glm::vec3 dir; float size, phase, twFreq, bright; };
+    std::vector<SkyStar> _stars;
+    glm::vec3 _dipperDir[7];
+    glm::vec3 _dipperCenter{0.f};
+    float _charge   = 0.f;   // seconds Space held (0..5) -> progressive aura
+    bool  _active   = false; // constellation lit (stars + links glow)
+    float _waveT    = -1.f;  // activation-wave timer (>= 0 once triggered)
+    float _litT     = -1.f;  // 5 s illumination timer (fade in/out) while active
+    std::vector<Spark> _motes;
+    float _wavePrev = -2.f;  // edge-detect the activation burst
+};
