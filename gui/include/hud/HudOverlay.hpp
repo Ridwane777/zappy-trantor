@@ -30,3 +30,19 @@ public:
     bool handleScroll(sf::Vector2i mouse, float wheelDelta);
 
     // While a player popup is open, returns that player's id roughly every
+    // 0.33s (else -1) so the caller can request its inventory ("pin #id").
+    int inventoryPollTarget(float dt);
+
+    // Draw the whole overlay; rebuilds the hit regions for the next frame.
+    // `state` is null when offline. `mapW/mapH` feed the offline status line.
+    void draw(sf::RenderWindow &win, const GuiState *state,
+              const std::string &host, int port, int mapW, int mapH);
+
+    const std::string &selectedTeam() const { return _selTeam; }
+
+    // Distinct, readable per-team colour (indexed by team order).
+    static glm::vec3 teamColor3(int i);
+
+private:
+    // kind: 0=team header, 1=player row, 2=toggle tab, 3=panel background
+    struct Hit { sf::FloatRect rect; int kind; std::string team; int pid; };
