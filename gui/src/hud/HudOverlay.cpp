@@ -217,3 +217,77 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
             sf::RectangleShape box(sf::Vector2f(pw, 218.f));
             box.setPosition(x, py);
             box.setFillColor(sf::Color(8, 12, 20, 244));
+            box.setOutlineColor(sf::Color(90, 130, 180, 170));
+            box.setOutlineThickness(1.f);
+            win.draw(box);
+            sf::Text ht; ht.setFont(font);
+            ht.setString("Player #" + std::to_string(sp.id) + "  inventory");
+            ht.setCharacterSize(15); ht.setFillColor(sf::Color(210, 225, 255));
+            ht.setPosition(x + 8.f, py + 6.f); win.draw(ht);
+            static const char *RNAME[7] = {"Food", "Linemate", "Deraumere",
+                "Sibur", "Mendiane", "Phiras", "Thystame"};
+            static const sf::Color RCOL[7] = {
+                sf::Color(120, 220, 120), sf::Color(205, 205, 215),
+                sf::Color(120, 180, 255), sf::Color(110, 230, 210),
+                sf::Color(230, 170,  90), sf::Color(220, 120, 220),
+                sf::Color(255, 225, 120)};
+            float ry = py + 32.f;
+            for (int i = 0; i < 7; ++i) {
+                sf::Text nm; nm.setFont(font); nm.setString(RNAME[i]);
+                nm.setCharacterSize(14); nm.setFillColor(RCOL[i]);
+                nm.setPosition(x + 12.f, ry); win.draw(nm);
+                sf::Text ct; ct.setFont(font);
+                ct.setString(sp.invKnown ? std::to_string(sp.inv[i]) : "...");
+                ct.setCharacterSize(14); ct.setFillColor(sf::Color(235, 235, 245));
+                sf::FloatRect cb = ct.getLocalBounds();
+                ct.setPosition(x + pw - cb.width - 14.f, ry); win.draw(ct);
+                ry += 25.f;
+            }
+        } else if (_selPlayer >= 0) {
+            _selPlayer = -1;                              // selected player gone (died)
+        }
+        // panel background catch-all (last → row hits take priority): no orbit
+        _hits.push_back({sf::FloatRect(panelX, 0.f, WIDTH, (float)ws.y), 3, "", -1});
+    }
+
+    // ── action feed (bottom-left): grabs, level-ups, deaths, incantations ────
+    if (state) {
+        auto teamCol = [&](const std::string &tn) -> sf::Color {
+            for (int k = 0; k < (int)state->teams.size(); ++k)
+                if (state->teams[k] == tn) return teamColorU(k);
+            return sf::Color(190, 195, 205);
+        };
+        const int   maxLines = 13;
+        const float lineH = 17.f;
+        int n = (int)state->log.size();
+        int shown = std::min(n, maxLines);
+        float baseY = ws.y - 16.f - lineH;
+        if (shown > 0) {
+            sf::RectangleShape bg(sf::Vector2f(300.f, shown * lineH + 12.f));
+            bg.setPosition(8.f, baseY - (shown - 1) * lineH - 6.f);
+            bg.setFillColor(sf::Color(0, 0, 0, 95));
+            win.draw(bg);
+        }
+        for (int k = 0; k < shown; ++k) {
+            const GuiLogEntry &e = state->log[n - 1 - k];   // newest first
+            float ly = baseY - k * lineH;
+            int alpha = (int)(255.f * (1.f - 0.55f * (float)k / maxLines));
+            sf::Text nm; nm.setFont(font);
+            nm.setString("Player #" + std::to_string(e.playerId));
+            nm.setCharacterSize(14);
+            sf::Color nc = teamCol(e.team); nc.a = (sf::Uint8)alpha;
+            nm.setFillColor(nc);
+            nm.setPosition(14.f, ly); win.draw(nm);
+            sf::Color ac = e.kind == 1 ? sf::Color(150, 240, 160)    // level up
+                         : e.kind == 2 ? sf::Color(245, 120, 110)    // death
+                         : e.kind == 3 ? sf::Color(190, 160, 255)    // incantation
+                         :               sf::Color(208, 211, 220);   // grab
+            ac.a = (sf::Uint8)alpha;
+            sf::Text at; at.setFont(font);
+            at.setString(" " + e.action);
+            at.setCharacterSize(14); at.setFillColor(ac);
+            at.setPosition(14.f + nm.getLocalBounds().width + 5.f, ly);
+            win.draw(at);
+        }
+    }
+}
