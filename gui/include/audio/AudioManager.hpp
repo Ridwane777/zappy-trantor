@@ -19,3 +19,13 @@ public:
 
     // Fire-and-forget sound effect (no-op if the clip is missing).
     void play(const std::string &name, float volume = 100.f);
+
+    // Looping sound effect on a dedicated voice (e.g. a sustained sparkle held
+    // across a phase). Call stopLoop() to end it. Only one loop voice at a time.
+    void playLoop(const std::string &name, float volume = 100.f);
+    void setLoopVolume(float volume);          // live-adjust the loop (e.g. a swell)
+    void stopLoop();
+
+    void setMuted(bool m) { _muted = m; if (m) stopMusic(); }
+    bool muted() const { return _muted; }
+
