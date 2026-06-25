@@ -145,3 +145,76 @@ Mesh buildShoreMesh(const std::vector<Tile> &tiles, int dist)
         int d = distMap.count(t.y * 512 + t.x) ? distMap[t.y * 512 + t.x] : 999;
         if (d != dist) continue;
         float x0 = t.x * TILE - TILE * 0.501f, x1 = t.x * TILE + TILE * 0.501f;
+        float z0 = t.y * TILE - TILE * 0.501f, z1 = t.y * TILE + TILE * 0.501f;
+        float y = -1.80f;
+        verts.insert(verts.end(), {x0,y,z0, 0,1,0}); verts.insert(verts.end(), {x1,y,z0, 0,1,0});
+        verts.insert(verts.end(), {x1,y,z1, 0,1,0}); verts.insert(verts.end(), {x0,y,z1, 0,1,0});
+        idx.insert(idx.end(), {base,base+1,base+2, base,base+2,base+3}); base += 4;
+    }
+    if (verts.empty()) { verts={0,0,0,0,1,0, 0,0,0,0,1,0, 0,0,0,0,1,0}; idx={0,1,2}; }
+    return Mesh(verts, idx);
+}
+
+Mesh buildGroundMesh(const std::vector<Tile> &tiles, const std::string &groundType,
+                     bool cliffOnly)
+{
+    std::vector<float>        verts;
+    std::vector<unsigned int> idx;
+    unsigned int base = 0;
+
+    const float LAND_Y  =  0.00f;
+    const float WATER_Y = -1.80f;
+
+    for (auto &t : tiles) {
+        if (t.ground != groundType) continue;
+        float x0 = t.x * TILE - TILE * 0.501f;
+        float x1 = t.x * TILE + TILE * 0.501f;
+        float z0 = t.y * TILE - TILE * 0.501f;
+        float z1 = t.y * TILE + TILE * 0.501f;
+        float y  = (groundType == "water") ? WATER_Y : LAND_Y;
+
+        if (!cliffOnly) {
+            verts.insert(verts.end(), {x0,y,z0, 0,1,0});
+            verts.insert(verts.end(), {x1,y,z0, 0,1,0});
+            verts.insert(verts.end(), {x1,y,z1, 0,1,0});
+            verts.insert(verts.end(), {x0,y,z1, 0,1,0});
+            idx.insert(idx.end(), {base,base+1,base+2, base,base+2,base+3});
+            base += 4;
+        }
+        (void)cliffOnly;
+    }
+    if (verts.empty()) {
+        verts = {0,0,0, 0,1,0, 0,0,0, 0,1,0, 0,0,0, 0,1,0};
+        idx   = {0,1,2};
+    }
+    return Mesh(verts, idx);
+}
+
+void drawMesh(Shader &toon, Shader & /*unused*/, Mesh &mesh,
+              const glm::mat4 &model, const glm::mat3 &normalMat, const glm::vec3 &color,
+              const glm::mat4 & /*view*/, const glm::mat4 & /*proj*/,
+              float elapsed, bool sway)
+{
+    toon.use();
+    toon.setMat4("uModel",     glm::value_ptr(model));
+    toon.setMat3("uNormalMat", glm::value_ptr(normalMat));
+    toon.setVec3("uColor",     color.r, color.g, color.b);
+    toon.setBool("uEmissive",  false);
+    toon.setFloat("uTime",     elapsed);
+    toon.setBool("uSway",      sway);
+    mesh.draw();
+}
+
+Mesh buildGemMesh()
+{
+    const float r = 0.14f, h = 0.22f;
+    std::vector<float> v;
+    std::vector<unsigned int> idx;
+
+    auto addFace = [&](glm::vec3 a, glm::vec3 b, glm::vec3 c) {
+        glm::vec3 n = glm::normalize(glm::cross(b-a, c-a));
+        unsigned int base = (unsigned int)(v.size() / 6);
+        for (auto &p : {a,b,c}) { v.push_back(p.x); v.push_back(p.y); v.push_back(p.z);
+                                   v.push_back(n.x); v.push_back(n.y); v.push_back(n.z); }
+        idx.push_back(base); idx.push_back(base+1); idx.push_back(base+2);
+    };
