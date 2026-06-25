@@ -4,3 +4,6 @@ out float vY;
 out vec2  vNDC;
 void main() {
     vY   = aPos.y * 0.5 + 0.5;
+    vNDC = aPos;
+    gl_Position = vec4(aPos, 0.999, 1.0);
+}
