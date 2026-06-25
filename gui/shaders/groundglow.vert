@@ -6,3 +6,7 @@ layout(location = 0) in vec2 aCorner;
 uniform vec3  uCenter;
 uniform float uSize;
 uniform mat4  uView;
+uniform mat4  uProj;
+
+out vec2 vUV;
+
