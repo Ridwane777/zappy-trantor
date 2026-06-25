@@ -12,3 +12,10 @@ TECHNOLOGIES.md
 tools/
 
 # Third-party header-only libs (json, tinygltf) are installed like any other
+# library into the include path (~/.local/include) by `make` -> setup_libs.sh,
+# NOT bundled in the repo. Nothing to ignore here anymore.
+
+# Large asset bundles — not versioned (streamed from the CDN at runtime).
+assets/models/
+assets/characters/
+assets/models
