@@ -65,3 +65,37 @@ inline std::string fetchRaw(const std::string &path)
     size_t n;
     while ((n = fread(buf, 1, sizeof buf, p)) > 0)
         out.append(buf, n);
+    if (pclose(p) != 0 || out.empty())
+        std::cerr << "[cdn] WARN: échec du chargement de " << rel << "\n";
+    return out;
+}
+} // namespace detail
+
+// Référence stable vers les octets de `path` (mis en cache RAM la 1re fois).
+// Stable car les références d'éléments d'unordered_map survivent au rehash.
+inline const std::string &assetBytesKept(const std::string &path)
+{
+    auto &st = detail::store();
+    auto &mx = detail::storeMutex();
+    {
+        std::lock_guard<std::mutex> lk(mx);
+        auto it = st.find(path);
+        if (it != st.end()) return it->second;
+    }
+    std::string data = detail::fetchRaw(path);     // hors lock (réseau)
+    if (data.empty()) {                            // NE PAS cacher un échec :
+        static const std::string empty;            // un appel ultérieur réessaiera
+        return empty;
+    }
+    std::lock_guard<std::mutex> lk(mx);
+    return st.emplace(path, std::move(data)).first->second;
+}
+
+// Copie des octets de `path` (local ou CDN, caché en RAM). Vide si introuvable.
+inline std::string assetBytes(const std::string &path)
+{
+    return assetBytesKept(path);
+}
+
+// NON-BLOQUANT : renvoie les octets seulement s'ils sont DÉJÀ en RAM (préfetchés),
+// sinon vide — ne déclenche jamais de téléchargement. Pour le thread principal
