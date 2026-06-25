@@ -12,3 +12,8 @@ struct DayNight {
     glm::vec3 lightCol;   // scene light colour (warm day -> cool moonlight)
     glm::vec3 skyTop;     // sky gradient top colour
     glm::vec3 skyHor;     // sky gradient horizon colour
+};
+
+// elapsed: seconds since start. nightOverride: 0 = auto, 1 = force night,
+// 2 = force day (toggled with the N key).
+DayNight computeDayNight(float elapsed, int nightOverride);
