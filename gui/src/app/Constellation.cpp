@@ -103,3 +103,55 @@ void Constellation::updateMewEnergy(bool adminMode, float dt, const glm::vec3& m
             m.pos = mc + glm::vec3(std::cos(ang) * 0.4f, 0.3f, std::sin(ang) * 0.4f);
             float spd = frnd(10.f, 20.f);
             m.vel = glm::vec3(std::cos(ang) * ce * spd, se * spd, std::sin(ang) * ce * spd);
+            m.maxLife = frnd(1.1f, 2.3f); m.life = m.maxLife;
+            m.size = frnd(0.14f, 0.34f);
+            m.phase = frnd(0.f, 6.28f); m.twFreq = frnd(14.f, 30.f);
+            m.color = glm::mix(pa, pb, frnd(0.f, 1.f)) * frnd(0.95f, 1.35f);
+            _motes.push_back(m);
+        }
+    }
+    _wavePrev = _waveT;
+
+    for (auto& m : _motes) { m.pos += m.vel * dt; m.vel.y -= 1.1f * dt; m.life -= dt; }
+    _motes.erase(std::remove_if(_motes.begin(), _motes.end(),
+        [](const Spark& s) { return s.life <= 0.f; }), _motes.end());
+}
+
+void Constellation::renderNightSky(Shader& star, unsigned vao, const glm::mat4& view,
+                                   const glm::mat4& proj, const glm::vec3& camPos,
+                                   float elapsed, float nightF) const
+{
+    star.use();
+    star.setMat4("uView", glm::value_ptr(view));
+    star.setMat4("uProj", glm::value_ptr(proj));
+    glBlendFunc(GL_ONE, GL_ONE);
+    glBindVertexArray(vao);
+
+    // scattered background stars (little intro-style lights)
+    for (auto& st : _stars) {
+        glm::vec3 wp = camPos + st.dir * 1500.f;
+        float tw = 0.6f + 0.4f * std::sin(elapsed * st.twFreq + st.phase);
+        star.setVec3 ("uCenter", wp.x, wp.y, wp.z);
+        star.setFloat("uSize",   st.size);
+        star.setVec3 ("uColor",  0.75f, 0.82f, 1.0f);
+        star.setFloat("uIntensity", st.bright * tw * nightF * 0.7f);
+        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    }
+
+    float chargeF = glm::clamp(_charge / 5.f, 0.f, 1.f);
+    // 5 s illumination envelope: fade in (1s) -> hold -> fade out (1.5s)
+    float lit = 0.f;
+    if (_active)
+        lit = glm::smoothstep(0.f, 1.0f, _litT)
+            * (1.f - glm::smoothstep(3.5f, 5.0f, _litT));
+    float glowF   = _active ? lit : chargeF;
+    float waveF   = (_waveT >= 0.f && _waveT < 1.6f)
+                  ? (1.f - _waveT / 1.6f) : 0.f;
+    float pulse   = _active ? (0.82f + 0.18f * std::sin(elapsed * 3.f)) : 1.f;
+    glm::vec3 cstColor(0.70f, 0.85f, 1.0f);
+    glm::vec3 dws[7];
+    for (int i = 0; i < 7; ++i) dws[i] = camPos + _dipperDir[i] * 1500.f;  // among the stars
+
+    // links between stars — strong once active, faint while charging
+    float linkF = _active ? lit * pulse : chargeF * 0.35f;
+    if (linkF > 0.02f) {
