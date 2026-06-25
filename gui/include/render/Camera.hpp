@@ -10,3 +10,8 @@ public:
 
     glm::mat4 getView()             const;
     glm::mat4 getProjection(float aspect) const;
+    glm::vec3 getPos()              const;
+
+    void onMouseDrag(float dx, float dy);  // left button drag orbits
+    void onScroll(float dy);               // scroll zooms
+};
