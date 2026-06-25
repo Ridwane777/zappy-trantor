@@ -29,3 +29,14 @@ public:
     void setMuted(bool m) { _muted = m; if (m) stopMusic(); }
     bool muted() const { return _muted; }
 
+private:
+    std::string _dir;
+    bool        _muted = false;
+    std::unordered_map<std::string, sf::SoundBuffer> _buffers;  // SFX clips
+    std::vector<sf::Sound> _voices;                             // playback pool
+    sf::Sound   _loopVoice;                                     // sustained looping sfx
+    sf::Music   _music;
+
+    // Resolve `name` to an existing file (tries .ogg/.wav/.flac). false if none.
+    bool _resolve(const std::string &name, std::string &outPath) const;
+};
