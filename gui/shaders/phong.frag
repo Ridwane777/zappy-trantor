@@ -49,3 +49,28 @@ void main() {
     vec3 baseColor = uColor;
     if      (uUseTexture)     baseColor = texture(uTexture, vTexCoord).rgb;
     else if (uUseVertexColor) baseColor = vVertColor;
+    if (!uUseTexture && !uUseVertexColor && uMultiColor) {
+        if      (vPos.y < uSplit2) baseColor = uColor3;
+        else if (vPos.y < uSplit1) baseColor = uColor2;
+    }
+
+    vec3 N = normalize(vNormal);
+    vec3 L = normalize(-uDirLightDir);
+    vec3 V = normalize(uCamPos - vPos);
+
+    // Lambert diffuse
+    float diff   = max(dot(N, L), 0.0);
+    vec3  diffuse = baseColor * uDirLightColor * diff;
+    vec3  ambient = baseColor * uAmbientStrength;
+    vec3  col     = ambient + diffuse;
+
+    if (uCrystal) {
+        // Blinn-Phong specular
+        vec3  H    = normalize(L + V);
+        float spec = pow(max(dot(N, H), 0.0), uShininess);
+        vec3 specColor = mix(vec3(1.0), baseColor, 0.25);
+        col += specColor * spec * 2.0;
+
+        // Fresnel rim
+        float fresnel = pow(1.0 - max(dot(N, V), 0.0), 2.5);
+        col += baseColor * fresnel * 0.9;
