@@ -78,3 +78,43 @@ void drawCharacters(std::vector<Character>& chars, Shader& skin, Shader& aura,
                 }
                 break;
 
+            case CharState::RISING:
+                drawAnim = ch.fallAnim; loop = false; rev = true;
+                if (ch.animTime >= fallDur) {
+                    ch.state = CharState::IDLE;
+                    ch.animTime = 0.f;
+                    ch.stateTimer = 0.f;
+                }
+                break;
+            }
+        }
+
+        ch.mesh.computeBones(drawAnim, ch.animTime, boneMats, loop, rev);
+        skin.setMat4Array("uBones[0]", MAX_BONES, glm::value_ptr(boneMats[0]));
+
+        glm::mat4 M = glm::translate(glm::mat4(1.f), ch.worldPos);
+        M = glm::rotate(M, glm::radians(ch.rotY), {0.f,1.f,0.f});
+        M = glm::scale(M, glm::vec3(ch.scale));
+        glm::mat3 N3 = glm::mat3(glm::transpose(glm::inverse(M)));
+        skin.setMat4("uModel",      glm::value_ptr(M));
+        skin.setMat3("uNormalMat",  glm::value_ptr(N3));
+        skin.setVec3("uColor2",     ch.color2.r, ch.color2.g, ch.color2.b);
+        skin.setVec3("uColor3",     ch.color3.r, ch.color3.g, ch.color3.b);
+        skin.setFloat("uSplit1",    ch.split1);
+        skin.setFloat("uSplit2",    ch.split2);
+        skin.setBool ("uMultiColor",ch.split1 > 0.f);
+        ch.mesh.draw();
+    }
+
+    // ── full-body glow: redraw character at 1.12× scale, additive blend,
+    // no depth test → green light envelops the whole body
+    bool anyAura = false;
+    for (auto& ch : chars) anyAura |= (ch.auraTimer > 0.f);
+    if (!anyAura) return;
+
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    glDepthMask(GL_FALSE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+
