@@ -854,3 +854,289 @@ bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,
             glBindVertexArray(0);
             glDisable(GL_BLEND);
             glEnable(GL_DEPTH_TEST);
+            glDepthMask(GL_TRUE);
+            glEnable(GL_CULL_FACE);
+        }
+
+        // logo + reflection (once revealing)
+        if (phase == Phase::REVEALING || phase == Phase::READY) {
+            float bob  = std::sin(animT * 1.2f) * 0.06f;
+            float rise = (1.f - logoReveal) * 0.8f;     // settle down into place
+
+            auto logoModel = [&](bool mirrored) {
+                glm::mat4 m(1.f);
+                if (mirrored)                            // reflect across plane y=0
+                    m = glm::scale(glm::mat4(1.f), glm::vec3(1.f, -1.f, 1.f));
+                m = glm::translate(m, LOGO_POS + glm::vec3(0.f, bob - rise, 0.f));
+                m = glm::rotate(m, logoYaw,   glm::vec3(0.f, 1.f, 0.f));   // drag spins the logo
+                m = glm::rotate(m, logoPitch, glm::vec3(1.f, 0.f, 0.f));
+                m = glm::scale(m, glm::vec3(logoScale));
+                m = glm::translate(m, -logoCenter);
+                return m;
+            };
+
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            glDisable(GL_CULL_FACE);                      // draw logo double-sided
+
+            if (useTexLogo) {
+                logoShader.use();
+                logoShader.setMat4("uView", glm::value_ptr(view));
+                logoShader.setMat4("uProj", glm::value_ptr(proj));
+                logoShader.setInt("uTex", 0);
+                logoShader.setVec3("uDirLightDir", -0.4f, -1.0f, -0.5f);
+                logoShader.setVec3("uDirLightColor", 0.85f, 0.85f, 0.95f);
+                logoShader.setVec3("uPointPos", LOGO_POS.x, LOGO_POS.y, LOGO_POS.z);
+                logoShader.setVec3("uPointColor", flashStr * 1.4f, flashStr * 1.9f, flashStr * 2.6f);
+                logoShader.setFloat("uAmbient", 0.45f);
+
+                auto drawLogo = [&](const glm::mat4 &model, float alpha, float bright) {
+                    glm::mat3 nrm = glm::mat3(glm::transpose(glm::inverse(model)));
+                    logoShader.setMat4("uModel", glm::value_ptr(model));
+                    logoShader.setMat3("uNormalMat", glm::value_ptr(nrm));
+                    logoShader.setFloat("uAlpha", alpha);
+                    logoShader.setFloat("uBright", bright);
+                    texLogo->draw();
+                };
+                drawLogo(logoModel(true),  0.30f * logoReveal, 0.45f);   // reflection
+                drawLogo(logoModel(false), logoReveal,         1.0f);    // logo
+            } else {
+                glm::vec3 col(0.55f, 0.62f, 0.85f);
+                drawMesh(*plainLogo, logoModel(true),  col * 0.5f, false, 0.28f * logoReveal);
+                drawMesh(*plainLogo, logoModel(false), col,        false, logoReveal);
+            }
+
+            // water surface at y=0 — the logo ripples in its reflection below
+            if (waterTex) {
+                waterShader.use();
+                waterShader.setMat4 ("uView", glm::value_ptr(view));
+                waterShader.setMat4 ("uProj", glm::value_ptr(proj));
+                waterShader.setFloat("uTime",  animT);
+                waterShader.setFloat("uSize",  7.0f);
+                waterShader.setFloat("uAlpha", 0.5f * logoReveal);
+                glm::vec2 sunXZ = glm::normalize(glm::vec2(sunDir.x, sunDir.z));
+                waterShader.setVec2 ("uSunXZ",  sunXZ.x, sunXZ.y);
+                waterShader.setVec3 ("uSunCol", 1.0f, 0.65f, 0.30f);
+                glActiveTexture(GL_TEXTURE0);
+                glBindTexture(GL_TEXTURE_2D, waterTex);
+                waterShader.setInt("uTex", 0);
+                glDepthMask(GL_FALSE);
+                glBindVertexArray(glowVAO);
+                glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+                glBindVertexArray(0);
+                glDepthMask(GL_TRUE);
+                glBindTexture(GL_TEXTURE_2D, 0);
+            }
+
+            glEnable(GL_CULL_FACE);
+            glCullFace(GL_BACK);
+            glDisable(GL_BLEND);
+        }
+
+        // ── render 2D overlay ─────────────────────────────────────────────────
+        window.resetGLStates();
+
+        // full-screen white-out at the burst that fades over ~4s, revealing the
+        // logo as it clears. The sqrt curve holds it bright (full cover) first.
+        if (flash2D > 0.001f) {
+            sf::RectangleShape flash(sf::Vector2f((float)ws.x, (float)ws.y));
+            float f = std::sqrt(std::min(1.f, flash2D));
+            sf::Uint8 a = (sf::Uint8)(f * 255.f);
+            flash.setFillColor(sf::Color(235, 243, 255, a));
+            window.draw(flash);
+        }
+
+        if (phase == Phase::READY && !showParams) {
+            sf::Vector2i mp = sf::Mouse::getPosition(window);
+            // centered START button
+            startBtn.place(ws.x / 2.f, ws.y - 90.f);
+            startBtn.hovered = startBtn.contains((float)mp.x, (float)mp.y);
+            startBtn.draw(window);
+            // settings gear in the top-left corner
+            if (settingsBtn.valid) {
+                settingsBtn.hovered = settingsBtn.contains((float)mp.x, (float)mp.y);
+                settingsBtn.draw(window);
+            }
+        }
+
+        if (showParams) {
+            // dim panel
+            sf::RectangleShape panel({420.f, 280.f});
+            panel.setPosition(ws.x / 2.f - 210.f, ws.y / 2.f - 130.f);
+            panel.setFillColor(sf::Color(18, 22, 34, 235));
+            panel.setOutlineThickness(2.f);
+            panel.setOutlineColor(sf::Color(90, 110, 150));
+            window.draw(panel);
+
+            auto drawField = [&](const std::string &caption, const std::string &val,
+                                 float y, bool focused) {
+                sf::Text cap(caption, uiFont, 18);
+                cap.setFillColor(sf::Color(150, 165, 200));
+                cap.setPosition(ws.x / 2.f - 150.f, y - 26.f);
+                window.draw(cap);
+                sf::RectangleShape box({300.f, 40.f});
+                box.setPosition(ws.x / 2.f - 150.f, y);
+                box.setFillColor(sf::Color(35, 42, 60));
+                box.setOutlineThickness(2.f);
+                box.setOutlineColor(focused ? sf::Color(150, 200, 255)
+                                            : sf::Color(70, 85, 120));
+                window.draw(box);
+                sf::Text t(val + (focused ? "_" : ""), uiFont, 22);
+                t.setFillColor(sf::Color::White);
+                t.setPosition(ws.x / 2.f - 142.f, y + 6.f);
+                window.draw(t);
+            };
+
+            sf::Text title("PARAMETERS", uiFont, 26);
+            title.setFillColor(sf::Color(210, 220, 245));
+            sf::FloatRect tb = title.getLocalBounds();
+            title.setPosition(ws.x / 2.f - tb.width / 2.f, ws.y / 2.f - 120.f);
+            window.draw(title);
+
+            drawField("Server host", hostStr, ws.y / 2.f - 40.f, focusField == 0);
+            drawField("Server port", portStr, ws.y / 2.f + 30.f, focusField == 1);
+
+            sf::RectangleShape back({180.f, 48.f});
+            back.setPosition(ws.x / 2.f - 90.f, ws.y / 2.f + 100.f);
+            sf::Vector2i mp = sf::Mouse::getPosition(window);
+            bool bh = back.getGlobalBounds().contains((float)mp.x, (float)mp.y);
+            back.setFillColor(bh ? sf::Color(70, 90, 140) : sf::Color(30, 38, 58));
+            back.setOutlineThickness(2.f);
+            back.setOutlineColor(sf::Color(120, 150, 200));
+            window.draw(back);
+            sf::Text bt("DONE", uiFont, 22);
+            sf::FloatRect bb = bt.getLocalBounds();
+            bt.setFillColor(sf::Color::White);
+            bt.setPosition(ws.x / 2.f - bb.width / 2.f, ws.y / 2.f + 112.f);
+            window.draw(bt);
+        }
+
+        // restore GL state for our next 3D frame
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        glCullFace(GL_BACK);
+
+        window.display();
+    }
+    return false;
+}
+
+void drawLoadingScreen(sf::RenderWindow &window, sf::Font &font,
+                       float progress, const std::string &status)
+{
+    // keep the window responsive while we block on asset loading
+    sf::Event ev;
+    while (window.pollEvent(ev))
+        if (ev.type == sf::Event::Closed)
+            window.close();
+
+    if (progress < 0.f) progress = 0.f;
+    if (progress > 1.f) progress = 1.f;
+
+    sf::Vector2u ws = window.getSize();
+    float W = (float)ws.x, H = (float)ws.y;
+
+    glClearColor(0.015f, 0.02f, 0.035f, 1.f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    window.resetGLStates();
+
+    // ── fullscreen background art (streamed once from the CDN, cover-fit) ──
+    static sf::Texture bgTex;
+    static bool bgLoaded = false;
+    if (!bgLoaded) {   // NON-BLOCKING: picks up the image only once the prefetch has
+        std::string b = zappy::assetBytesIfCached("assets/screen/loading_bg.png");
+        if (!b.empty() && bgTex.loadFromMemory(b.data(), b.size())) {
+            bgTex.setSmooth(true);
+            bgLoaded = true;
+        }
+    }
+    if (bgLoaded) {
+        sf::Vector2u ts = bgTex.getSize();
+        float s = std::max(W / (float)ts.x, H / (float)ts.y);   // cover
+        sf::Sprite bg(bgTex);
+        bg.setScale(s, s);
+        bg.setPosition((W - ts.x * s) / 2.f, (H - ts.y * s) / 2.f);
+        window.draw(bg);
+    }
+
+    // ── bottom info band ──
+    float bandH = std::max(64.f, H * 0.12f);
+    sf::RectangleShape band({W, bandH});
+    band.setPosition(0.f, H - bandH);
+    band.setFillColor(sf::Color(8, 7, 16, 205));
+    window.draw(band);
+
+    // ── loading bar: white-outlined rectangle filled with solid white ──
+    float margin = W * 0.045f;
+    float barW = W - 2.f * margin;
+    float barH = 16.f;
+    float bx = margin;
+    float by = H - bandH - 30.f;
+
+    sf::Text lbl("Loading", font, 20);
+    lbl.setFillColor(sf::Color::White);
+    lbl.setPosition(bx, by - 30.f);
+    window.draw(lbl);
+
+    sf::Text pct(std::to_string(int(progress * 100.f + 0.5f)) + "%", font, 20);
+    sf::FloatRect pr = pct.getLocalBounds();
+    pct.setFillColor(sf::Color::White);
+    pct.setPosition(bx + barW - pr.width - pr.left, by - 30.f);
+    window.draw(pct);
+
+    sf::RectangleShape track({barW, barH});            // empty white frame
+    track.setPosition(bx, by);
+    track.setFillColor(sf::Color(255, 255, 255, 28));
+    track.setOutlineThickness(2.f);
+    track.setOutlineColor(sf::Color::White);
+    window.draw(track);
+
+    float fillW = barW * progress;                     // white fill
+    if (fillW > 1.f) {
+        sf::RectangleShape fill({fillW, barH});
+        fill.setPosition(bx, by);
+        fill.setFillColor(sf::Color::White);
+        window.draw(fill);
+    }
+
+    // ── tip / status inside the band ──
+    sf::Text brand("ZAPPY", font, 22);
+    brand.setStyle(sf::Text::Bold);
+    brand.setLetterSpacing(2.f);
+    brand.setFillColor(sf::Color(255, 206, 120));
+    brand.setPosition(margin, H - bandH + 12.f);
+    window.draw(brand);
+
+    sf::Text tip(status, font, 17);
+    tip.setFillColor(sf::Color(214, 214, 228));
+    tip.setPosition(margin, H - bandH + 42.f);
+    window.draw(tip);
+
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_BACK);
+    window.display();
+}
+
+// Displayed bar value, persisted across checkpoints so transitions are smooth.
+static float g_loadShown = 0.f;
+
+void advanceLoadingTo(sf::RenderWindow &window, sf::Font &font,
+                      float target, const std::string &status, float duration)
+{
+    if (target < g_loadShown)        // a new loading sequence — restart from 0
+        g_loadShown = 0.f;
+    if (target > 1.f) target = 1.f;
+
+    float start = g_loadShown;
+    sf::Clock clock;
+    while (window.isOpen()) {
+        float t = (duration > 0.f) ? clock.getElapsedTime().asSeconds() / duration : 1.f;
+        if (t >= 1.f) t = 1.f;
+        float e = t * t * (3.f - 2.f * t);          // smoothstep ease
+        g_loadShown = start + (target - start) * e;
+        drawLoadingScreen(window, font, g_loadShown, status);
+        if (t >= 1.f) break;
+    }
+    g_loadShown = target;
+}
