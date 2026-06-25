@@ -21,10 +21,14 @@ def main():
     args = parse_args()
     # on crée le client et on fait le handshake avec le serveur
     client = Client(args.host, args.port, args.name)
-    client.connect()
-    # on lance la boucle de décision
-    brain = Brain(client)
-    brain.run()
+    try:
+        client.connect()
+        # on lance la boucle de décision
+        brain = Brain(client)
+        brain.run()
+    except (ConnectionError, BrokenPipeError, KeyboardInterrupt):
+        # serveur fermé / partie terminée / interruption : on sort proprement
+        pass
 
 
 if __name__ == "__main__":

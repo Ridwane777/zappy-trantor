@@ -3,6 +3,7 @@ import math
 from network.client import Client
 from logic.player import Player
 from network.parser import parse_look
+from logic.explore import explore
 
 
 def _go_to_tile(client: Client, index: int):
@@ -14,19 +15,17 @@ def _go_to_tile(client: Client, index: int):
     # décalage : négatif = gauche, 0 = centre, positif = droite
     col = index - r * (r + 1)
 
-    # on avance jusqu'à la bonne ligne
-    for _ in range(r):
-        client.send("Forward")
-
-    # on se décale latéralement si nécessaire
+    # on construit la séquence de mouvements pour atteindre la tuile
+    commands = ["Forward"] * r
     if col < 0:
-        client.send("Left")
-        for _ in range(abs(col)):
-            client.send("Forward")
+        commands.append("Left")
+        commands.extend(["Forward"] * abs(col))
     elif col > 0:
-        client.send("Right")
-        for _ in range(col):
-            client.send("Forward")
+        commands.append("Right")
+        commands.extend(["Forward"] * col)
+
+    # on envoie tout le trajet en une seule salve (pipeline)
+    client.send_batch(commands)
 
 
 def survive(client: Client, player: Player):
@@ -42,5 +41,5 @@ def survive(client: Client, player: Player):
             client.send("Take food")
             return
 
-    # aucune food en vue : on avance et on repassera au prochain tour
-    client.send("Forward")
+    # aucune food en vue : exploration intelligente pour couvrir la carte
+    explore(client, player)

@@ -12,14 +12,25 @@ ELEVATION_REQ = {
 
 
 class Player:
-    # seuil de food en dessous duquel le joueur doit aller chercher à manger en priorité
-    FOOD_THRESHOLD = 20
+    # seuil de food en dessous duquel le joueur doit aller chercher à manger en
+    # priorité. On garde une marge de survie mais sans tout monopoliser : sinon,
+    # à plusieurs joueurs, la nourriture se raréfie et personne ne s'élève jamais.
+    FOOD_THRESHOLD = 12
 
     def __init__(self):
         # niveau actuel du joueur — démarre à 1, objectif 8
         self.level = 1
         # inventaire : toutes les ressources à 0 au départ
         self.inventory = {resource: 0 for resource in RESOURCES}
+        # compteur d'errance, sert à n'émettre l'appel au rassemblement
+        # que périodiquement plutôt qu'à chaque tour
+        self.wander_tick = 0
+        # compteur de pas sans trouver de ressource — utilisé par explore()
+        self.explore_steps = 0
+        # cooldown entre deux forks pour ne pas spammer (décrémenté dans brain.run)
+        self.fork_cooldown = 0
+        # nb de coéquipiers ayant confirmé leur arrivée (HERE) avant l'incantation
+        self.here_count = 0
 
     def update_inventory(self, raw: str):
         # on enlève les crochets et les espaces autour

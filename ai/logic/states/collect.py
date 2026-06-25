@@ -2,6 +2,7 @@ from network.client import Client
 from logic.player import Player
 from network.parser import parse_look
 from logic.states.survive import _go_to_tile
+from logic.explore import explore
 
 
 def collect(client: Client, player: Player):
@@ -12,14 +13,16 @@ def collect(client: Client, player: Player):
     raw = client.send("Look")
     tiles = parse_look(raw)
 
-    # pour chaque ressource manquante, on cherche une tuile qui la contient
-    for resource in missing:
-        for index, tile in enumerate(tiles):
-            if resource in tile:
-                # on s'y déplace et on ramasse
-                _go_to_tile(client, index)
+    # on cherche la première tuile qui contient au moins une ressource manquante
+    for index, tile in enumerate(tiles):
+        resources_here = [r for r in missing if r in tile]
+        if resources_here:
+            # on se déplace une seule fois vers cette tuile
+            _go_to_tile(client, index)
+            # on ramasse toutes les ressources manquantes présentes sur cette tuile
+            for resource in resources_here:
                 client.send(f"Take {resource}")
-                return
+            return
 
-    # aucune ressource en vue : on avance et on repassera au prochain tour
-    client.send("Forward")
+    # aucune ressource en vue : exploration intelligente pour couvrir la carte
+    explore(client, player)
