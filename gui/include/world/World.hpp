@@ -43,3 +43,19 @@ struct MapData {
 // OBJ mesh cache (loads on first use, prints once).
 Mesh     &getMesh(const std::string &model);
 glm::vec3 colorFor(const std::string &n);
+MapData   loadMap(const std::string &path);
+time_t    fileMtime(const std::string &p);
+
+Mesh buildShoreMesh(const std::vector<Tile> &tiles, int dist);
+Mesh buildGroundMesh(const std::vector<Tile> &tiles, const std::string &groundType,
+                     bool cliffOnly = false);
+Mesh buildGemMesh();
+Mesh buildDashedRingMesh(int segs = 8, float fill = 0.55f);
+Mesh buildVQuadMesh();
+Mesh buildRingMesh();
+float frnd(float a, float b);
+
+void drawMesh(Shader &toon, Shader &unused, Mesh &mesh,
+              const glm::mat4 &model, const glm::mat3 &normalMat, const glm::vec3 &color,
+              const glm::mat4 &view, const glm::mat4 &proj,
+              float elapsed = 0.f, bool sway = false);
