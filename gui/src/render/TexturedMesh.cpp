@@ -155,3 +155,56 @@ TexturedMesh TexturedMesh::load(const std::string &objPath, const std::string &t
     for (auto &p : positions) {
         glm::vec3 v(p[0], p[1], p[2]);
         lo = glm::min(lo, v); hi = glm::max(hi, v); sum += v;
+    }
+    m._centroid = positions.empty() ? glm::vec3(0.f) : sum / float(positions.size());
+    m._radius   = glm::length(hi - lo) * 0.5f;
+    if (m._radius < 1e-4f) m._radius = 1.f;
+
+    // GL buffers
+    glGenVertexArrays(1, &m._vao);
+    glGenBuffers(1, &m._vbo);
+    glGenBuffers(1, &m._ebo);
+    glBindVertexArray(m._vao);
+    glBindBuffer(GL_ARRAY_BUFFER, m._vbo);
+    glBufferData(GL_ARRAY_BUFFER, verts.size() * sizeof(float), verts.data(), GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m._ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, indices.size() * sizeof(unsigned int),
+                 indices.data(), GL_STATIC_DRAW);
+    const int stride = 8 * sizeof(float);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void *)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void *)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void *)(6 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    glBindVertexArray(0);
+
+    // texture (SFML loads to top-left origin; flip to GL bottom-left)
+    sf::Image img;
+    std::string texBytes = zappy::assetBytes(texPath);   // local or streamed from CDN
+    if (!texBytes.empty() && img.loadFromMemory(texBytes.data(), texBytes.size())) {
+        img.flipVertically();
+        glGenTextures(1, &m._texId);
+        glBindTexture(GL_TEXTURE_2D, m._texId);
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, img.getSize().x, img.getSize().y,
+                     0, GL_RGBA, GL_UNSIGNED_BYTE, img.getPixelsPtr());
+        glGenerateMipmap(GL_TEXTURE_2D);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+        glBindTexture(GL_TEXTURE_2D, 0);
+    }
+    return m;
+}
+
+void TexturedMesh::draw() const
+{
+    if (_texId) {
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, _texId);
+    }
+    glBindVertexArray(_vao);
+    glDrawElements(GL_TRIANGLES, _indexCount, GL_UNSIGNED_INT, nullptr);
+    glBindVertexArray(0);
+}
