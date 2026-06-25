@@ -223,3 +223,228 @@ bool tryLoadCache(const std::string& glbPath, SkinnedMesh& sm,
     return f.good();
 }
 
+void saveCache(const std::string& glbPath, const SkinnedMesh& sm,
+               const std::vector<float>& verts,
+               const std::vector<unsigned int>& indices)
+{
+    return;   // streaming mode : on n'écrit RIEN sur le disque (assets en RAM only)
+    std::ofstream f(cachePath(glbPath), std::ios::binary);
+    if (!f) return;
+    cw(f, CACHE_MAGIC);
+    cw(f, CACHE_VERSION);
+    cw(f, sm.bmin_.x); cw(f, sm.bmin_.y); cw(f, sm.bmin_.z);
+    cw(f, sm.bmax_.x); cw(f, sm.bmax_.y); cw(f, sm.bmax_.z);
+    cwv(f, verts);
+    cwv(f, indices);
+    uint32_t nj = (uint32_t)sm.invBindMats_.size();
+    cw(f, nj);
+    for (auto& m : sm.invBindMats_)
+        f.write(reinterpret_cast<const char*>(glm::value_ptr(m)), 64);
+    cwv(f, sm.parentOf_);
+    saveAnimsToCache(f, sm.animations_);
+    // bone names
+    uint32_t nb = (uint32_t)sm.boneNames_.size();
+    cw(f, nb);
+    for (auto& name : sm.boneNames_) {
+        uint32_t nl = (uint32_t)name.size();
+        cw(f, nl);
+        f.write(name.c_str(), nl);
+    }
+}
+
+static bool tryLoadAnimCache(const std::string& glbPath, std::vector<Animation>& anims)
+{
+    auto cp = cachePath(glbPath);
+    struct stat gs{}, cs{};
+    if (stat(glbPath.c_str(), &gs) != 0) return false;
+    if (stat(cp.c_str(), &cs) != 0) return false;
+    if (cs.st_mtime < gs.st_mtime) return false;
+
+    std::ifstream f(cp, std::ios::binary);
+    if (!f) return false;
+    uint32_t magic = 0, version = 0;
+    cr(f, magic); cr(f, version);
+    if (magic != CACHE_MAGIC || version != CACHE_VERSION) return false;
+    // skip bounds, verts, indices, skin
+    glm::vec3 dummy3;
+    f.read(reinterpret_cast<char*>(&dummy3), 12); // bmin
+    f.read(reinterpret_cast<char*>(&dummy3), 12); // bmax
+    uint32_t n = 0;
+    cr(f, n); f.seekg(n * 4 * sizeof(float), std::ios::cur); // verts
+    cr(f, n); f.seekg(n * sizeof(uint32_t), std::ios::cur);  // indices
+    uint32_t nj = 0; cr(f, nj);
+    f.seekg(nj * 64, std::ios::cur);              // invBindMats
+    cr(f, n); f.seekg(n * sizeof(int32_t), std::ios::cur);   // parents
+    return loadAnimsFromCache(f, anims) && f.good();
+}
+
+static void saveAnimCache(const std::string& glbPath, const std::vector<Animation>& anims)
+{
+    // anim-only cache: just magic + version + single animation block
+    // For simplicity, use a separate .glbca file
+    auto cp = glbPath + ".glbca";
+    std::ofstream f(cp, std::ios::binary);
+    if (!f) return;
+    cw(f, CACHE_MAGIC);
+    uint32_t ver2 = CACHE_VERSION + 100; // different tag for anim-only
+    cw(f, ver2);
+    saveAnimsToCache(f, anims);
+}
+
+static bool tryLoadAnimOnlyCache(const std::string& glbPath, std::vector<Animation>& out)
+{
+    auto cp = glbPath + ".glbca";
+    struct stat gs{}, cs{};
+    if (stat(glbPath.c_str(), &gs) != 0) return false;
+    if (stat(cp.c_str(), &cs) != 0) return false;
+    if (cs.st_mtime < gs.st_mtime) return false;
+    std::ifstream f(cp, std::ios::binary);
+    if (!f) return false;
+    uint32_t magic = 0, version = 0;
+    cr(f, magic); cr(f, version);
+    if (magic != CACHE_MAGIC || version != CACHE_VERSION + 100) return false;
+    return loadAnimsFromCache(f, out) && f.good();
+}
+
+// ── SkinnedMesh::load ──────────────────────────────────────────────────────────
+
+// tinygltf reads a .gltf's external companions (the .bin buffer, image textures)
+// through these callbacks — we route them to the CDN/memory so nothing touches
+// the disk. A .gltf is just an index file; the geometry/pixels live in sidecars.
+// Base directory of the glTF currently being parsed (e.g. "assets/screen/phoenix/").
+// tinygltf may hand the FsCallbacks a *relative* URI ("scene.bin"); we resolve it
+// against this. thread_local: each load runs the callbacks on its own thread.
+static thread_local std::string g_gltfBaseDir;
+
+static void setCdnFs(tinygltf::TinyGLTF& loader)
+{
+    tinygltf::FsCallbacks fs;
+    fs.FileExists     = [](const std::string&, void*) { return true; };
+    fs.ExpandFilePath = [](const std::string& p, void*) { return p; };
+    fs.ReadWholeFile  = [](std::vector<unsigned char>* out, std::string* err,
+                           const std::string& fp, void*) {
+        std::string b = zappy::assetBytes(fp);          // try as given (may be absolute)
+        if (b.empty() && fp.rfind("assets/", 0) != 0)   // relative URI -> prepend base dir
+            b = zappy::assetBytes(g_gltfBaseDir + fp);
+        if (b.empty()) { if (err) *err = "cdn read failed: " + fp; return false; }
+        out->assign(b.begin(), b.end());
+        return true;
+    };
+    fs.WriteWholeFile = [](std::string*, const std::string&,
+                           const std::vector<unsigned char>&, void*) { return false; };
+    loader.SetFsCallbacks(fs);
+}
+
+static std::string base64(const std::string& in)
+{
+    static const char* T = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    std::string out;
+    out.reserve((in.size() + 2) / 3 * 4);
+    size_t i = 0;
+    for (; i + 2 < in.size(); i += 3) {
+        unsigned n = (unsigned char)in[i] << 16 | (unsigned char)in[i+1] << 8 | (unsigned char)in[i+2];
+        out += T[(n>>18)&63]; out += T[(n>>12)&63]; out += T[(n>>6)&63]; out += T[n&63];
+    }
+    if (i < in.size()) {
+        unsigned n = (unsigned char)in[i] << 16;
+        if (i + 1 < in.size()) n |= (unsigned char)in[i+1] << 8;
+        out += T[(n>>18)&63]; out += T[(n>>12)&63];
+        out += (i + 1 < in.size()) ? T[(n>>6)&63] : '=';
+        out += '=';
+    }
+    return out;
+}
+
+// For an ASCII .gltf, inline its external buffers/images as base64 data URIs so
+// the model is fully self-contained — tinygltf then needs zero external file
+// access (its base_dir handling for streamed memory is unreliable). The sidecar
+// bytes are fetched from the CDN/RAM store.
+static std::string embedGltfExternals(const std::string& gltf, const std::string& dir)
+{
+    json j = json::parse(gltf, nullptr, false);
+    if (j.is_discarded()) return gltf;
+    auto embed = [&](const char* key) {
+        if (!j.contains(key) || !j[key].is_array()) return;
+        for (auto& e : j[key]) {
+            if (!e.contains("uri") || !e["uri"].is_string()) continue;
+            std::string uri = e["uri"].get<std::string>();
+            if (uri.empty() || uri.rfind("data:", 0) == 0) continue;
+            std::string bytes = zappy::assetBytes(dir + uri);
+            if (bytes.empty()) continue;
+            e["uri"] = "data:application/octet-stream;base64," + base64(bytes);
+        }
+    };
+    embed("buffers");
+    embed("images");
+    return j.dump();
+}
+
+// Parse a glTF (.glb binary or .gltf ASCII) straight from its bytes — fetched
+// in memory, never written to disk. For ASCII, external sidecars are inlined.
+static bool loadGltfModel(const std::string& path, tinygltf::Model& model,
+                          std::string& err, std::string& warn)
+{
+    std::string bytes = zappy::assetBytes(path);
+    if (bytes.empty()) return false;
+    std::string dir = path.substr(0, path.find_last_of('/') + 1);
+    g_gltfBaseDir = dir;                            // fallback for FsCallbacks
+    tinygltf::TinyGLTF loader;
+    loader.SetImageLoader([](tinygltf::Image*, const int, std::string*, std::string*,
+                             int, int, const unsigned char*, int, void*) { return true; }, nullptr);
+    setCdnFs(loader);
+    bool glb = path.size() > 4 && path.substr(path.size() - 4) == ".glb";
+    if (glb)
+        return loader.LoadBinaryFromMemory(&model, &err, &warn,
+                   reinterpret_cast<const unsigned char*>(bytes.data()),
+                   (unsigned int)bytes.size(), dir);
+    std::string ascii = embedGltfExternals(bytes, dir);
+    return loader.LoadASCIIFromString(&model, &err, &warn,
+               ascii.data(), (unsigned int)ascii.size(), dir);
+}
+
+SkinnedMesh SkinnedMesh::load(const std::string& path)
+{
+    SkinnedMesh sm;
+
+    // ── fast path: binary cache ───────────────────────────────────────────────
+    {
+        std::vector<float>        verts;
+        std::vector<unsigned int> indices;
+        if (tryLoadCache(path, sm, verts, indices)) {
+            sm.upload(verts, indices);
+            std::cout << "SkinnedMesh (cache) " << path
+                      << "  v=" << verts.size()/16
+                      << "  f=" << indices.size()/3
+                      << "  joints=" << sm.invBindMats_.size() << "\n";
+            for (auto& a : sm.animations_)
+                std::cout << "  + anim '" << a.name << "' dur=" << a.duration << "s\n";
+            return sm;
+        }
+    }
+
+    tinygltf::Model model;
+    std::string err, warn;
+    bool ok = loadGltfModel(path, model, err, warn);
+
+    if (!ok) throw GUIException("tinygltf: " + err);
+    if (!warn.empty()) std::cerr << "tinygltf warn: " << warn << "\n";
+
+    // ── skin ──────────────────────────────────────────────────────────────────
+    int numJoints = 0;
+    if (!model.skins.empty()) {
+        auto& skin = model.skins[0];
+        numJoints  = (int)skin.joints.size();
+        sm.parentOf_.resize(numJoints, -1);
+
+        // inverse bind matrices
+        if (skin.inverseBindMatrices >= 0) {
+            const float* ibm = floatPtr(model, skin.inverseBindMatrices);
+            sm.invBindMats_.resize(numJoints);
+            for (int i = 0; i < numJoints; ++i)
+                memcpy(glm::value_ptr(sm.invBindMats_[i]), ibm + i*16, 64);
+        } else {
+            sm.invBindMats_.assign(numJoints, glm::mat4(1.f));
+        }
+
+        // parent lookup via node children + store bone names
+        sm.boneNames_.resize(numJoints);
