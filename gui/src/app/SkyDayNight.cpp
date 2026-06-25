@@ -25,3 +25,13 @@ DayNight computeDayNight(float elapsed, int nightOverride)
     glm::vec3 lightCol  = glm::mix(glm::vec3(1.0f, 0.80f, 0.55f),          // warm day
                                    glm::vec3(0.55f, 0.66f, 0.98f), nightF); // moonlight
     float ambScale = 1.f - 0.28f * nightF;                                 // moonlit floor
+    glm::vec3 skyTop = glm::mix(glm::vec3(0.20f,0.38f,0.72f), glm::vec3(0.03f,0.05f,0.16f), nightF);
+    glm::vec3 skyHor = glm::mix(glm::vec3(0.78f,0.38f,0.10f), glm::vec3(0.09f,0.12f,0.28f), nightF);
+
+    // warm dusk/dawn glow that peaks mid-transition
+    float duskF = glm::clamp(nightF * (1.f - nightF) * 4.f, 0.f, 1.f);
+    skyHor = glm::mix(skyHor, glm::vec3(0.98f,0.42f,0.12f), duskF * 0.6f);
+    skyTop = glm::mix(skyTop, glm::vec3(0.45f,0.32f,0.42f), duskF * 0.3f);
+
+    return { nightF, ambScale, skySunDir, moonDir, sunDir, lightCol, skyTop, skyHor };
+}
