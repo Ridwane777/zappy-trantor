@@ -37,3 +37,22 @@ SRCS = src/render/Shader.cpp \
        src/app/WorldRender.cpp \
        src/app/CharacterRender.cpp \
        src/app/PlayerRender.cpp \
+       src/app/GuiApp.cpp \
+       src/main.cpp
+
+OBJS = $(SRCS:.cpp=.o)
+DEPS = $(OBJS:.o=.d)
+
+all: $(NAME)
+
+$(NAME): $(OBJS)
+	$(CXX) $(CXXFLAGS) $^ -o $@ $(LDFLAGS)
+
+%.o: %.cpp
+	$(CXX) $(CXXFLAGS) -c $< -o $@
+
+# Header-only deps installed like a real library (into ~/.local/include), never
+# bundled in the repo. The stamp is one of the installed headers; if it's
+# missing, `make` runs setup_libs.sh once before compiling (zero manual setup).
+DEPS_STAMP := $(HOME)/.local/include/tiny_gltf.h
+
