@@ -6,6 +6,7 @@
 #include <stdexcept>
 #include <iostream>
 #include <cstring>
+#include <sstream>
 
 Server::Server(const ServerConfig &config) : _fd(-1), _config(config), _world(_config)
 {
@@ -23,6 +24,24 @@ Server::Server(const ServerConfig &config) : _fd(-1), _config(config), _world(_c
     };
 
     _lastTick = std::chrono::steady_clock::now();
+    _initGuiRequests();
+}
+
+void Server::_initGuiRequests()
+{
+}
+
+void Server::_processGuiRequest(Client &client, const std::string &line)
+{
+    std::istringstream iss(line);
+    std::string cmd;
+    iss >> cmd;
+    std::string arg;
+    std::getline(iss >> std::ws, arg);
+
+    auto it = _guiRequests.find(cmd);
+    if (it != _guiRequests.end())
+        it->second(client, arg);
 }
 
 void Server::_broadcastToGui(const std::string &msg)
