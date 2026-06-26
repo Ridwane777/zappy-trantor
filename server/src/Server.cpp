@@ -20,7 +20,17 @@ Server::Server(const ServerConfig &config) : _fd(-1), _config(config), _world(_c
         _broadcastToGui(msg);
     };
     _world.onPlayerEvent = [this](int fd, const std::string &msg) {
-        _sendToPlayer(fd, msg);
+        if (msg == "dead\n") {
+            for (auto &c : _clients) {
+                if (c.getFd() == fd) {
+                    c.queueWrite(msg);
+                    c.setState(ClientState::CLOSING);
+                    break;
+                }
+            }
+        } else {
+            _sendToPlayer(fd, msg);
+        }
     };
 
     _lastTick = std::chrono::steady_clock::now();
