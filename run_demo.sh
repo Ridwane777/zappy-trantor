@@ -39,7 +39,8 @@ echo "[run_demo] IA : $((${#TEAMS[@]} * PLAYERS_PER_TEAM)) clients (délai=${AI_
 for team in "${TEAMS[@]}"; do
     for _ in $(seq "$PLAYERS_PER_TEAM"); do
         ( cd "$ROOT/ai" && ZAPPY_AI_DELAY="$AI_DELAY" \
-            python3 zappy_ai -p "$PORT" -n "$team" -h localhost ) &
+            python3 zappy_ai -p "$PORT" -n "$team" -h localhost \
+            --team-size "$PLAYERS_PER_TEAM" ) &
         pids+=($!)
     done
 done
