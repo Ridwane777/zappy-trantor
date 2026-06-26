@@ -179,6 +179,16 @@ void Server::run()
                 _fds[i].events |= POLLOUT;
         }
 
+        double tickDuration = 1.0 / _config.freq;
+        double elapsed = std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - _lastTick).count();
+        int ticks = static_cast<int>(elapsed / tickDuration);
+        if (ticks > 0) {
+            _world.update(ticks);
+            _lastTick += std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                std::chrono::duration<double>(ticks * tickDuration));
+        }
+
         if (poll(_fds.data(), _fds.size(), -1) == -1)
             throw std::runtime_error("poll() failed");
 
