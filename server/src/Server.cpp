@@ -21,6 +21,8 @@ Server::Server(const ServerConfig &config) : _fd(-1), _config(config), _world(_c
     _world.onPlayerEvent = [this](int fd, const std::string &msg) {
         _sendToPlayer(fd, msg);
     };
+
+    _lastTick = std::chrono::steady_clock::now();
 }
 
 void Server::_broadcastToGui(const std::string &msg)
