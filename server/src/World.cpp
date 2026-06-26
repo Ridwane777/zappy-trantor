@@ -18,6 +18,24 @@ static const char *RESOURCE_NAMES[RESOURCE_COUNT] = {
     "food", "linemate", "deraumere", "sibur", "mendiane", "phiras", "thystame"
 };
 
+static int resourceFromName(const std::string &name)
+{
+    for (int i = 0; i < RESOURCE_COUNT; i++)
+        if (name == RESOURCE_NAMES[i])
+            return i;
+    return -1;
+}
+
+static std::string bctMsg(int x, int y, const Tile &t)
+{
+    std::ostringstream oss;
+    oss << "bct " << x << " " << y;
+    for (int i = 0; i < RESOURCE_COUNT; i++)
+        oss << " " << t.get(static_cast<Resource>(i));
+    oss << "\n";
+    return oss.str();
+}
+
 
 World::World(const ServerConfig &config) : _map(config.width, config.height), _config(config)
 {
@@ -92,18 +110,106 @@ Player *World::_getPlayer(int fd)
 
 void World::update(int ticks)
 {
-    _spawnTimer += ticks;
-    if (_spawnTimer >= 20) {
-        _map.spawnResources();
-        _spawnTimer = 0;
+    for (int t = 0; t < ticks; t++) {
+        _spawnTimer++;
+        if (_spawnTimer >= 20) {
+            _map.spawnResources();
+            _spawnTimer = 0;
+            if (onGuiEvent) {
+                for (int y = 0; y < _map.getHeight(); y++)
+                    for (int x = 0; x < _map.getWidth(); x++)
+                        onGuiEvent(bctMsg(x, y, _map.getTile(x, y)));
+            }
+        }
+
+        for (auto it = _players.begin(); it != _players.end(); ) {
+            Player &p = *it;
+            
+            p.foodTimer--;
+            if (p.foodTimer <= 0) {
+                if (p.inventory[FOOD] > 0) {
+                    p.inventory[FOOD]--;
+                    p.foodTimer = 126;
+                    if (onGuiEvent) onGuiEvent(guiPlayerInventory(p.id));
+                } else {
+                    p.isDead = true;
+                    if (onPlayerEvent) onPlayerEvent(p.fd, "dead\n");
+                    if (onGuiEvent) onGuiEvent("pdi #" + std::to_string(p.id) + "\n");
+                    ++it;
+                    continue;
+                }
+            }
+
+            if (p.isDead) {
+                ++it;
+                continue;
+            }
+
+            if (p.isIncanting) {
+                if (!p.actionQueue.empty() && p.actionQueue.front().name == "Incantation") {
+                    // It's the initiator, proceed to decrement its timer
+                } else {
+                    ++it;
+                    continue;
+                }
+            }
+
+            if (!p.actionQueue.empty()) {
+                Action &action = p.actionQueue.front();
+                if (!action.isStarted) {
+                    action.isStarted = true;
+                    if (action.name == "Incantation") {
+                        if (!_checkIncantationStart(p)) {
+                            if (onPlayerEvent) onPlayerEvent(p.fd, "ko\n");
+                            p.actionQueue.pop_front();
+                            ++it;
+                            continue;
+                        }
+                    }
+                }
+
+                if (action.remainingTicks > 0) {
+                    action.remainingTicks--;
+                }
+
+                if (action.remainingTicks <= 0) {
+                    std::string resp;
+                    if (action.name == "Incantation") {
+                        resp = _cmdIncantationEnd(p);
+                    } else {
+                        auto handler = _handlers.find(action.name);
+                        if (handler != _handlers.end())
+                            resp = handler->second(p, action.arg);
+                    }
+                    if (!resp.empty() && onPlayerEvent)
+                        onPlayerEvent(p.fd, resp + "\n");
+                    
+                    p.actionQueue.pop_front();
+                }
+            }
+            ++it;
+        }
     }
 }
 
-std::string World::executeCommand(int playerFd, const std::string &cmd)
+static int getCommandCost(const std::string &name) {
+    if (name == "Forward" || name == "Right" || name == "Left" ||
+        name == "Look" || name == "Broadcast" || name == "Eject" ||
+        name == "Take" || name == "Set") return 7;
+    if (name == "Inventory") return 1;
+    if (name == "Fork") return 42;
+    if (name == "Incantation") return 300;
+    return 0; // Connect_nbr
+}
+
+bool World::queueCommand(int playerFd, const std::string &cmd)
 {
     Player *p = _getPlayer(playerFd);
     if (!p)
-        return "ko";
+        return false;
+
+    if (p->actionQueue.size() >= 10)
+        return false;
 
     std::istringstream iss(cmd);
     std::string name;
@@ -112,29 +218,23 @@ std::string World::executeCommand(int playerFd, const std::string &cmd)
     std::getline(iss >> std::ws, arg);
 
     auto it = _handlers.find(name);
-    if (it == _handlers.end())
-        return "suc";
+    if (it == _handlers.end()) {
+        if (onPlayerEvent) onPlayerEvent(playerFd, "suc\n");
+        return true; // Unknown command is still "queued" and processed instantly as suc
+    }
 
-    return it->second(*p, arg);
+    Action action;
+    action.command = cmd;
+    action.name = name;
+    action.arg = arg;
+    action.remainingTicks = getCommandCost(name);
+    action.isStarted = false;
+
+    p->actionQueue.push_back(action);
+    return true;
 }
 
-static int resourceFromName(const std::string &name)
-{
-    for (int i = 0; i < RESOURCE_COUNT; i++)
-        if (name == RESOURCE_NAMES[i])
-            return i;
-    return -1;
-}
 
-static std::string bctMsg(int x, int y, const Tile &t)
-{
-    std::ostringstream oss;
-    oss << "bct " << x << " " << y;
-    for (int i = 0; i < RESOURCE_COUNT; i++)
-        oss << " " << t.get(static_cast<Resource>(i));
-    oss << "\n";
-    return oss.str();
-}
 
 std::vector<std::string> World::getGuiSnapshot() const
 {
@@ -156,14 +256,7 @@ std::vector<std::string> World::getGuiSnapshot() const
     return msgs;
 }
 
-void World::respawnAndBroadcast()
-{
-    _map.spawnResources();
-    if (onGuiEvent)
-        for (int y = 0; y < _map.getHeight(); y++)
-            for (int x = 0; x < _map.getWidth(); x++)
-                onGuiEvent(bctMsg(x, y, _map.getTile(x, y)));
-}
+
 
 std::string World::guiPlayerInventory(int id) const
 {
@@ -425,6 +518,11 @@ std::string World::_cmdEject(Player &p)
             case EAST:  other.x = _map.wrapX(other.x + 1); break;
             case WEST:  other.x = _map.wrapX(other.x - 1); break;
         }
+
+        // If the ejected player was in an incantation, unfreeze them
+        if (other.isIncanting)
+            other.isIncanting = false;
+
         int k = broadcastDirection(p.x, p.y, other.x, other.y,
                                    _config.width, _config.height, other.orientation);
         if (onPlayerEvent)
@@ -451,79 +549,102 @@ std::string World::_cmdEject(Player &p)
     return ejected ? "ok" : "ko";
 }
 
-std::string World::_cmdIncantation(Player &p)
+std::string World::_cmdIncantation(Player &/*p*/)
 {
-    if (p.level < 1 || p.level > 7)
-        return "ko";
+    return "";
+}
+
+bool World::_checkIncantationStart(Player &p)
+{
+    if (p.level < 1 || p.level > 7) return false;
+    int lvlIdx = p.level - 1;
+    const int *req = ELEVATION[lvlIdx];
+
+    int playersOnTile = 0;
+    for (const auto &other : _players)
+        if (other.x == p.x && other.y == p.y && other.level == p.level)
+            playersOnTile++;
+
+    if (playersOnTile < req[0]) return false;
+
+    const Tile &tile = _map.getTile(p.x, p.y);
+    for (int r = 0; r < RESOURCE_COUNT - 1; r++)
+        if (tile.get(static_cast<Resource>(r + 1)) < req[r + 1]) return false;
+
+    std::ostringstream picMsg;
+    picMsg << "pic " << p.x << " " << p.y << " " << p.level;
+    for (auto &other : _players) {
+        if (other.x == p.x && other.y == p.y && other.level == p.level) {
+            other.isIncanting = true;
+            picMsg << " #" << other.id;
+            if (onPlayerEvent) onPlayerEvent(other.fd, "Elevation underway\n");
+        }
+    }
+    if (onGuiEvent) onGuiEvent(picMsg.str() + "\n");
+    return true;
+}
+
+std::string World::_cmdIncantationEnd(Player &p)
+{
+    auto unfreeze = [this, &p]() {
+        for (auto &other : _players)
+            if (other.x == p.x && other.y == p.y && other.level == p.level)
+                other.isIncanting = false;
+        if (onGuiEvent) onGuiEvent("pie " + std::to_string(p.x) + " " + std::to_string(p.y) + " 0\n");
+    };
+
+    if (p.level < 1 || p.level > 7) {
+        unfreeze(); return "ko";
+    }
 
     int lvlIdx = p.level - 1;
     const int *req = ELEVATION[lvlIdx];
 
-    // Compte les joueurs de la même équipe sur la même tile (tout niveau confondu) :
-    // un coéquipier de niveau supérieur peut contribuer sans être élevé lui-même.
     int playersOnTile = 0;
     for (const auto &other : _players)
-        if (other.x == p.x && other.y == p.y && other.team == p.team)
+        if (other.x == p.x && other.y == p.y && other.level == p.level)
             playersOnTile++;
 
-    if (playersOnTile < req[0])
-        return "ko";
+    if (playersOnTile < req[0]) {
+        unfreeze(); return "ko";
+    }
 
-    // Vérifie les ressources sur la tile
     const Tile &tile = _map.getTile(p.x, p.y);
-    for (int r = 0; r < RESOURCE_COUNT - 1; r++) // -1 : food non concernée
-        if (tile.get(static_cast<Resource>(r + 1)) < req[r + 1])
-            return "ko";
+    for (int r = 0; r < RESOURCE_COUNT - 1; r++)
+        if (tile.get(static_cast<Resource>(r + 1)) < req[r + 1]) {
+            unfreeze(); return "ko";
+        }
 
-    // Consomme les ressources
     Tile &t = _map.getTile(p.x, p.y);
     for (int r = 0; r < RESOURCE_COUNT - 1; r++)
         for (int q = 0; q < req[r + 1]; q++)
             t.remove(static_cast<Resource>(r + 1));
 
-    // The AI expects "Elevation underway" immediately, then "Current level: k".
-    if (onPlayerEvent)
-        onPlayerEvent(p.fd, "Elevation underway\n");
-
-    // Monte le niveau de tous les joueurs participants
     int startLevel = p.level;
-    std::ostringstream picMsg;
-    picMsg << "pic " << p.x << " " << p.y << " " << startLevel;
     for (auto &other : _players) {
         if (other.x == p.x && other.y == p.y && other.level == startLevel) {
             other.level++;
             other.isIncanting = false;
-            picMsg << " #" << other.id;
             if (onGuiEvent)
-                onGuiEvent("plv #" + std::to_string(other.id) + " " +
-                           std::to_string(other.level) + "\n");
-            // Every participant is told its new level. Non-initiators receive it
-            // unsolicited, so the AI buffers "Current level" out-of-band (like a
-            // broadcast) to avoid desyncing its request/response stream.
-            if (onPlayerEvent)
-                onPlayerEvent(other.fd, "Current level: " +
-                              std::to_string(other.level) + "\n");
+                onGuiEvent("plv #" + std::to_string(other.id) + " " + std::to_string(other.level) + "\n");
+            if (other.fd != p.fd && onPlayerEvent)
+                onPlayerEvent(other.fd, "Current level: " + std::to_string(other.level) + "\n");
         }
     }
 
     if (onGuiEvent) {
-        onGuiEvent(picMsg.str() + "\n");
-        onGuiEvent("pie " + std::to_string(p.x) + " " +
-                   std::to_string(p.y) + " 1\n");
+        onGuiEvent("pie " + std::to_string(p.x) + " " + std::to_string(p.y) + " 1\n");
         onGuiEvent(bctMsg(p.x, p.y, _map.getTile(p.x, p.y)));
     }
 
-    // Vérifie la condition de victoire (6 joueurs niveau 8)
     for (const auto &team : _config.teams) {
         int count = 0;
         for (const auto &pl : _players)
             if (pl.team == team && pl.level == 8)
                 count++;
         if (count >= 6) {
-            if (onGuiEvent)
-                onGuiEvent("seg " + team + "\n");
+            if (onGuiEvent) onGuiEvent("seg " + team + "\n");
         }
     }
-
-    return "";   // replies (Elevation underway + Current level) already sent above
+    return "Current level: " + std::to_string(p.level);
 }
