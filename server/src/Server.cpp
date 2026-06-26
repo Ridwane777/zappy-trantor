@@ -44,6 +44,27 @@ void Server::_initGuiRequests()
         if (iss >> x >> y)
             c.queueWrite(_world.guiTileContent(x, y));
     };
+    _guiRequests["ppo"] = [this](Client &c, const std::string &arg) {
+        if (!arg.empty() && arg[0] == '#') {
+            std::string resp = _world.guiPlayerPosition(std::stoi(arg.substr(1)));
+            if (!resp.empty())
+                c.queueWrite(resp);
+        }
+    };
+    _guiRequests["plv"] = [this](Client &c, const std::string &arg) {
+        if (!arg.empty() && arg[0] == '#') {
+            std::string resp = _world.guiPlayerLevel(std::stoi(arg.substr(1)));
+            if (!resp.empty())
+                c.queueWrite(resp);
+        }
+    };
+    _guiRequests["pin"] = [this](Client &c, const std::string &arg) {
+        if (!arg.empty() && arg[0] == '#') {
+            std::string resp = _world.guiPlayerInventory(std::stoi(arg.substr(1)));
+            if (!resp.empty())
+                c.queueWrite(resp);
+        }
+    };
 }
 
 void Server::_processGuiRequest(Client &client, const std::string &line)
@@ -55,8 +76,13 @@ void Server::_processGuiRequest(Client &client, const std::string &line)
     std::getline(iss >> std::ws, arg);
 
     auto it = _guiRequests.find(cmd);
-    if (it != _guiRequests.end())
-        it->second(client, arg);
+    if (it != _guiRequests.end()) {
+        try {
+            it->second(client, arg);
+        } catch (const std::exception &) {
+            // malformed argument (e.g. "#abc"): ignore the request
+        }
+    }
 }
 
 void Server::_broadcastToGui(const std::string &msg)
