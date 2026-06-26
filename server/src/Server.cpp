@@ -20,22 +20,20 @@ Server::Server(const ServerConfig &config) : _fd(-1), _config(config), _world(_c
         _broadcastToGui(msg);
     };
     _world.onPlayerEvent = [this](int fd, const std::string &msg) {
-        _sendToPlayer(fd, msg);
+        if (msg == "dead\n") {
+            // Find the client and mark it closing so it flushes and disconnects
+            for (auto &c : _clients) {
+                if (c.getFd() == fd) {
+                    c.queueWrite(msg);
+                    c.setState(ClientState::CLOSING);
+                    break;
+                }
+            }
+        } else {
+            _sendToPlayer(fd, msg);
+        }
     };
-    _lastReset = std::chrono::steady_clock::now();
-    if (const char *env = std::getenv("ZAPPY_RESET_INTERVAL")) {
-        double v = std::atof(env);
-        if (v > 0.0)
-            _resetInterval = v;
-    }
-}
-
-double Server::_secondsToNextReset() const
-{
-    double elapsed = std::chrono::duration<double>(
-        std::chrono::steady_clock::now() - _lastReset).count();
-    double remaining = _resetInterval - elapsed;
-    return remaining > 0.0 ? remaining : 0.0;
+    _lastTickTime = std::chrono::steady_clock::now();
 }
 
 void Server::_broadcastToGui(const std::string &msg)
@@ -61,8 +59,6 @@ void Server::_sendGuiBootstrap(Client &client)
     for (const auto &msg : _world.getGuiSnapshot())
         client.queueWrite(msg);
     client.queueWrite("sgt " + std::to_string(_config.freq) + "\n");
-    // Custom GUI-only line: seconds until the next resource reset (for countdown).
-    client.queueWrite("sst " + std::to_string((int)_secondsToNextReset()) + "\n");
 }
 
 void Server::_bindAndListen()
@@ -171,9 +167,7 @@ bool Server::_handleClient(std::size_t index)
         if (client.getState() == ClientState::WAITING_TEAM_NAME) {
             _processHandshake(index, line);
         } else if (client.getState() == ClientState::AI) {
-            std::string resp = _world.executeCommand(client.getFd(), line);
-            if (!resp.empty())                 // empty = command sent its own reply
-                client.queueWrite(resp + "\n");
+            _world.queueCommand(client.getFd(), line);
         } else if (client.getState() == ClientState::GUI) {
             // GUI requests: "pin #id" → reply with that player's inventory
             std::size_t h = line.find('#');
@@ -220,19 +214,28 @@ void Server::run()
                 _fds[i].events |= POLLOUT;
         }
 
-        // Wake at least every 500 ms so the resource-reset cycle fires on time
-        // even when no client is sending anything.
-        int timeoutMs = static_cast<int>(_secondsToNextReset() * 1000.0);
-        if (timeoutMs < 0 || timeoutMs > 500)
-            timeoutMs = 500;
+        auto now = std::chrono::steady_clock::now();
+        double elapsedSeconds = std::chrono::duration<double>(now - _lastTickTime).count();
+        double tickDuration = 1.0 / _config.freq;
+
+        int ticksToProcess = 0;
+        if (elapsedSeconds >= tickDuration) {
+            ticksToProcess = static_cast<int>(elapsedSeconds / tickDuration);
+            _lastTickTime += std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                std::chrono::duration<double>(ticksToProcess * tickDuration));
+        }
+
+        if (ticksToProcess > 0) {
+            _world.update(ticksToProcess);
+        }
+
+        double secondsToNextTick = tickDuration - std::chrono::duration<double>(std::chrono::steady_clock::now() - _lastTickTime).count();
+        int timeoutMs = static_cast<int>(secondsToNextTick * 1000.0);
+        if (timeoutMs < 0) timeoutMs = 0;
+        if (timeoutMs > 500) timeoutMs = 500;
+
         if (poll(_fds.data(), _fds.size(), timeoutMs) == -1)
             throw std::runtime_error("poll() failed");
-
-        if (_secondsToNextReset() <= 0.0) {            // resource reset due
-            _world.respawnAndBroadcast();
-            _lastReset = std::chrono::steady_clock::now();
-            _broadcastToGui("sst " + std::to_string((int)_resetInterval) + "\n");
-        }
 
         if (_fds[0].revents & POLLIN)
             _acceptClient();
