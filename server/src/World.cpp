@@ -459,10 +459,11 @@ std::string World::_cmdIncantation(Player &p)
     int lvlIdx = p.level - 1;
     const int *req = ELEVATION[lvlIdx];
 
-    // Compte les joueurs du bon niveau sur la même tile
+    // Compte les joueurs de la même équipe sur la même tile (tout niveau confondu) :
+    // un coéquipier de niveau supérieur peut contribuer sans être élevé lui-même.
     int playersOnTile = 0;
     for (const auto &other : _players)
-        if (other.x == p.x && other.y == p.y && other.level == p.level)
+        if (other.x == p.x && other.y == p.y && other.team == p.team)
             playersOnTile++;
 
     if (playersOnTile < req[0])
