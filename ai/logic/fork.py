@@ -23,10 +23,6 @@ def should_fork(client: Client, player: Player) -> bool:
     # il aurait déjà répondu aux broadcasts NEED émis toutes les 5 itérations
     if player.wander_tick < WANDER_FORK_THRESHOLD:
         return False
-    # pas d'œuf déjà en attente d'éclosion
-    available = int(client.send("Connect_nbr"))
-    if available > 0:
-        return False
     return True
 
 
