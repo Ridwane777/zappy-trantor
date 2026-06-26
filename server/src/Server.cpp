@@ -65,6 +65,15 @@ void Server::_initGuiRequests()
                 c.queueWrite(resp);
         }
     };
+    _guiRequests["sgt"] = [this](Client &c, const std::string &) {
+        c.queueWrite("sgt " + std::to_string(_config.freq) + "\n");
+    };
+    _guiRequests["sst"] = [this](Client &c, const std::string &arg) {
+        int freq = std::stoi(arg);
+        if (freq > 0)
+            _config.freq = freq;
+        c.queueWrite("sst " + std::to_string(_config.freq) + "\n");
+    };
 }
 
 void Server::_processGuiRequest(Client &client, const std::string &line)
