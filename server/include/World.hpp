@@ -26,6 +26,12 @@ public:
     // Used by Server::_processHandshake to let forked children hatch.
     bool        hatchEgg(const std::string &team);
     std::vector<std::string> getGuiSnapshot() const;
+    std::string guiMapSize() const;
+    std::string guiTileContent(int x, int y) const;
+    std::string guiMapContent() const;
+    std::string guiTeamNames() const;
+    std::string guiPlayerPosition(int id) const;
+    std::string guiPlayerLevel(int id) const;
     // GUI inventory request: "pin #id X Y q0..q6\n", or "" if no such player.
     std::string guiPlayerInventory(int id) const;
 

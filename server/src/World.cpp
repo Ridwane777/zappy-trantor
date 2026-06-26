@@ -256,6 +256,52 @@ std::vector<std::string> World::getGuiSnapshot() const
     return msgs;
 }
 
+std::string World::guiMapSize() const
+{
+    return "msz " + std::to_string(_config.width) + " " + std::to_string(_config.height) + "\n";
+}
+
+std::string World::guiTileContent(int x, int y) const
+{
+    if (x < 0 || x >= _map.getWidth() || y < 0 || y >= _map.getHeight()) return "";
+    return bctMsg(x, y, _map.getTile(x, y));
+}
+
+std::string World::guiMapContent() const
+{
+    std::ostringstream oss;
+    for (int y = 0; y < _map.getHeight(); y++)
+        for (int x = 0; x < _map.getWidth(); x++)
+            oss << bctMsg(x, y, _map.getTile(x, y));
+    return oss.str();
+}
+
+std::string World::guiTeamNames() const
+{
+    std::ostringstream oss;
+    for (const auto &team : _config.teams)
+        oss << "tna " << team << "\n";
+    return oss.str();
+}
+
+std::string World::guiPlayerPosition(int id) const
+{
+    for (const auto &p : _players) {
+        if (p.id == id)
+            return "ppo #" + std::to_string(p.id) + " " + std::to_string(p.x) + " " + std::to_string(p.y) + " " + std::to_string(p.orientation) + "\n";
+    }
+    return "";
+}
+
+std::string World::guiPlayerLevel(int id) const
+{
+    for (const auto &p : _players) {
+        if (p.id == id)
+            return "plv #" + std::to_string(p.id) + " " + std::to_string(p.level) + "\n";
+    }
+    return "";
+}
+
 
 
 std::string World::guiPlayerInventory(int id) const
