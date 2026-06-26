@@ -213,6 +213,8 @@ bool Server::_handleClient(std::size_t index)
             _processHandshake(index, line);
         else if (client.getState() == ClientState::AI)
             _world.queueCommand(client.getFd(), line);
+        else if (client.getState() == ClientState::GUI)
+            _processGuiRequest(client, line);
     }
 
     return false;
