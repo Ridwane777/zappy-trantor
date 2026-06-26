@@ -22,6 +22,11 @@ def collect(client: Client, player: Player):
             # on ramasse toutes les ressources manquantes présentes sur cette tuile
             for resource in resources_here:
                 client.send(f"Take {resource}")
+            # bonus opportuniste : tant qu'on est déjà sur place, on ramasse
+            # aussi la food qui s'y trouve (sinon elle ne monte jamais au-delà
+            # du strict seuil de survie, et le fork ne se déclenche jamais)
+            for _ in range(tile.count("food")):
+                client.send("Take food")
             return
 
     # aucune ressource en vue : exploration intelligente pour couvrir la carte

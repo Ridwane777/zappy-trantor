@@ -1,4 +1,5 @@
 #include "app/WorldRender.hpp"
+#include "app/Islands.hpp"
 #include "render/Shader.hpp"
 #include "render/Mesh.hpp"
 #include "render/TexturedMesh.hpp"
@@ -11,59 +12,62 @@
 #include <cmath>
 #include <string>
 
-void drawGround(Shader& toon, Mesh& land, Mesh& ocean, Mesh& water,
-                const MapData& map, float cx, float cz)
+void drawGround(Shader& toon, Shader& waterShader, unsigned int waterTex,
+                const glm::mat4& view, const glm::mat4& proj, float elapsed,
+                const glm::vec2& sunXZ, Mesh& land, Mesh& ocean, Mesh& water,
+                const MapData& map, float cx, float cz, int teamCount)
 {
-    glm::mat4 I(1.f); glm::mat3 N3(1.f);
+    (void)waterShader; (void)waterTex; (void)view; (void)proj; (void)elapsed; (void)sunXZ;
     toon.use();
-    toon.setMat4("uModel",     glm::value_ptr(I));
-    toon.setMat3("uNormalMat", glm::value_ptr(N3));
-    toon.setBool("uEmissive",  false);
+    toon.setBool("uEmissive",   false);
+    toon.setBool("uCircleClip", false);
+    toon.setBool("uShoreBlend", false);
 
     glDisable(GL_CULL_FACE);
     toon.setFloat("uAlpha", 1.0f);
-    toon.setBool ("uCircleClip", false);
-
-    // Circular clip so land has smooth round edges, no square corners
-    float islandR = map.w * TILE * 0.455f;
-    toon.setBool ("uCircleClip", true);
-    toon.setVec2 ("uClipCenter", cx, cz);
-    toon.setFloat("uClipRadius", islandR);
-    toon.setVec3("uColor", 0.52f, 0.70f, 0.28f);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    land.draw();
-    glDisable(GL_BLEND);
-    toon.setBool("uCircleClip", false);
-
-    // Ocean + shore — continuous radial gradient, smooth circular fade
-    float shoreInnerR = islandR * 0.88f;
-    float shoreWidth  = TILE * 5.0f;
-    toon.setVec2 ("uClipCenter",   cx, cz);
-    toon.setBool ("uShoreBlend",   true);
-    toon.setFloat("uShoreInnerR",  shoreInnerR);
-    toon.setFloat("uShoreWidth",   shoreWidth);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
-    // Static deep ocean background
+    const float baseR = map.w * TILE * 0.455f;
+    const int   n     = std::max(1, teamCount);
+
+    // ── océan profond global (une fois) ──
+    glm::mat4 I(1.f); glm::mat3 N3(1.f);
+    toon.setMat4("uModel",     glm::value_ptr(I));
+    toon.setMat3("uNormalMat", glm::value_ptr(N3));
     toon.setBool("uWave", false);
     toon.setVec3("uColor", 0.06f, 0.22f, 0.55f);
     ocean.draw();
 
-    // Animated near-shore water
-    toon.setBool("uWave", true);
-    water.draw();
-    toon.setBool("uWave", false);
+    // ── une copie PLEINE TAILLE de la même île (terre + eau de rive) par
+    // équipe, simplement translatée — même maillage, même mer, même soleil,
+    // juste répété à un autre endroit de l'anneau ──
+    for (int i = 0; i < n; ++i) {
+        glm::vec2 c   = islandCenter(i, n, cx, cz, baseR);
+        glm::vec2 off = c - glm::vec2(cx, cz);
+        glm::mat4 M  = glm::translate(glm::mat4(1.f), {off.x, 0.f, off.y});
+        glm::mat3 NM = glm::mat3(1.f);   // pure translation: normals unchanged
+        toon.setMat4("uModel",     glm::value_ptr(M));
+        toon.setMat3("uNormalMat", glm::value_ptr(NM));
+
+        toon.setVec3("uColor", 0.52f, 0.70f, 0.28f);
+        toon.setBool("uWave",  false);
+        land.draw();
+
+        toon.setVec3("uColor", 0.10f, 0.40f, 0.68f);   // shore water, lighter than the deep ocean
+        toon.setBool("uWave",  true);
+        water.draw();
+        toon.setBool("uWave", false);
+    }
 
     glDisable(GL_BLEND);
-    toon.setBool("uShoreBlend", false);
     glEnable(GL_CULL_FACE);
 }
 
 void drawProps(Shader& toon, Shader& outline, const MapData& map,
                const glm::mat4& view, const glm::mat4& proj,
-               float elapsed, float ambScale, float treeGlow)
+               float elapsed, float ambScale, float treeGlow,
+               float cx, float cz, int teamCount)
 {
     static const std::string kSwayModels[] = {
         "normaltree_1","mapletree_1","palmtree_1","plant_1",
@@ -74,9 +78,13 @@ void drawProps(Shader& toon, Shader& outline, const MapData& map,
         return false;
     };
 
+    const float baseR = map.w * TILE * 0.455f;
+    const int   n     = std::max(1, teamCount);
+    for (int isl = 0; isl < n; ++isl) {
+    glm::vec2 ioff = islandCenter(isl, n, cx, cz, baseR) - glm::vec2(cx, cz);
     for (auto& t : map.tiles) {
-        float wx = t.x * TILE;
-        float wz = t.y * TILE;
+        float wx = t.x * TILE + ioff.x;
+        float wz = t.y * TILE + ioff.y;
         for (auto& p : t.props) {
             Mesh& pm = getMesh(p.model);
             float r  = pm.boundingRadius();
@@ -125,13 +133,15 @@ void drawProps(Shader& toon, Shader& outline, const MapData& map,
             }
         }
     }
+    }
     toon.setBool("uSway", false);
 }
 
 void drawResources(Shader& egg, const std::unique_ptr<TexturedMesh>* gemTex,
                    const MapData& map, const glm::vec3& sunDir,
                    const glm::vec3& lightCol, float ambScale,
-                   const glm::mat4& view, const glm::mat4& proj, float elapsed)
+                   const glm::mat4& view, const glm::mat4& proj, float elapsed,
+                   float cx, float cz, int teamCount)
 {
     bool anyGem = false;
     for (int i = 1; i < 7; ++i) anyGem |= (bool)gemTex[i];
@@ -151,13 +161,17 @@ void drawResources(Shader& egg, const std::unique_ptr<TexturedMesh>* gemTex,
     glDisable(GL_CULL_FACE);
 
     const float spreadR = 0.30f;
+    const float baseR = map.w * TILE * 0.455f;
+    const int   n     = std::max(1, teamCount);
+    for (int isl = 0; isl < n; ++isl) {
+    glm::vec2 ioff = islandCenter(isl, n, cx, cz, baseR) - glm::vec2(cx, cz);
     for (auto& tile : map.tiles) {
         bool anyRes = false;
         for (int i = 1; i < 7; ++i) anyRes |= (tile.res[i] > 0 && gemTex[i]);
         if (!anyRes) continue;
 
-        float wx = tile.x * TILE + TILE * 0.5f;
-        float wz = tile.y * TILE + TILE * 0.5f;
+        float wx = tile.x * TILE + TILE * 0.5f + ioff.x;
+        float wz = tile.y * TILE + TILE * 0.5f + ioff.y;
         float tileHash = float(tile.x * 17 + tile.y * 31);
 
         int slot = 0;
@@ -185,13 +199,15 @@ void drawResources(Shader& egg, const std::unique_ptr<TexturedMesh>* gemTex,
             ++slot;
         }
     }
+    }
     glEnable(GL_CULL_FACE);
 }
 
 void drawFood(Shader& egg, const std::unique_ptr<TexturedMesh>* foodMesh,
               const MapData& map, const glm::vec3& sunDir,
               const glm::vec3& lightCol, float ambScale,
-              const glm::mat4& view, const glm::mat4& proj, float elapsed)
+              const glm::mat4& view, const glm::mat4& proj, float elapsed,
+              float cx, float cz, int teamCount)
 {
     if (!(foodMesh[0] || foodMesh[1] || foodMesh[2])) return;
     egg.use();
@@ -206,6 +222,10 @@ void drawFood(Shader& egg, const std::unique_ptr<TexturedMesh>* foodMesh,
     egg.setFloat("uAlpha",   1.f);
     egg.setFloat("uBright",  1.f);
     glDisable(GL_CULL_FACE);
+    const float baseR = map.w * TILE * 0.455f;
+    const int   n     = std::max(1, teamCount);
+    for (int isl = 0; isl < n; ++isl) {
+    glm::vec2 ioff = islandCenter(isl, n, cx, cz, baseR) - glm::vec2(cx, cz);
     for (auto& tile : map.tiles) {
         if (tile.res[0] <= 0) continue;
         int v = ((tile.x * 7 + tile.y * 13) % 3 + 3) % 3;
@@ -215,8 +235,8 @@ void drawFood(Shader& egg, const std::unique_ptr<TexturedMesh>* foodMesh,
         if (!fm) continue;
         float r  = fm->boundingRadius();
         float s  = (r > 1e-4f) ? 0.175f / r : 0.175f;   // x2.5
-        float wx = tile.x * TILE + TILE * 0.5f;
-        float wz = tile.y * TILE + TILE * 0.5f;
+        float wx = tile.x * TILE + TILE * 0.5f + ioff.x;
+        float wz = tile.y * TILE + TILE * 0.5f + ioff.y;
         float bob = 0.30f + 0.05f * std::sin(elapsed * 1.5f + (tile.x * 17 + tile.y * 31) * 0.1f);
         glm::mat4 M = glm::translate(glm::mat4(1.f), {wx, bob, wz});
         M = glm::rotate(M, elapsed * 0.5f, {0.f, 1.f, 0.f});
@@ -226,6 +246,7 @@ void drawFood(Shader& egg, const std::unique_ptr<TexturedMesh>* foodMesh,
         egg.setMat4("uModel",     glm::value_ptr(M));
         egg.setMat3("uNormalMat", glm::value_ptr(N3));
         fm->draw();
+    }
     }
     glEnable(GL_CULL_FACE);
 }

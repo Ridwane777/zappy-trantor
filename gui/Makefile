@@ -15,7 +15,7 @@ CXX      = g++
 # et PAS versionnées dans le repo. -I système (/usr/local/include) marche aussi.
 # -MMD -MP : dépendances (.d) pour recompiler les .cpp quand un header change.
 CXXFLAGS = -std=c++17 -O2 -Wall -Iinclude -I$(HOME)/.local/include -pthread -MMD -MP
-LDFLAGS  = -lGL -lGLEW -lsfml-graphics -lsfml-window -lsfml-system -lsfml-audio -pthread
+LDFLAGS  = -lGL -lGLEW -lsfml-graphics -lsfml-window -lsfml-system -lsfml-audio -lX11 -pthread
 
 NAME = zappy_gui
 
@@ -35,8 +35,10 @@ SRCS = src/render/Shader.cpp \
        src/app/TreeMotes.cpp \
        src/app/IncantationFx.cpp \
        src/app/WorldRender.cpp \
+       src/app/Islands.cpp \
        src/app/CharacterRender.cpp \
        src/app/PlayerRender.cpp \
+       src/app/Fullscreen.cpp \
        src/app/GuiApp.cpp \
        src/main.cpp
 

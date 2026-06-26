@@ -37,3 +37,11 @@ def do_fork(client: Client, player: Player):
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
+
+    # on lance un nouvel AI qui va éclore à la position de l'œuf
+    entry = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "zappy_ai")
+    subprocess.Popen(
+        [sys.executable, entry, "-p", str(client.port), "-n", client.team, "-h", client.host],
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )

@@ -1,5 +1,6 @@
 #include <GL/glew.h>
 #include "app/PlayerRender.hpp"
+#include "app/Islands.hpp"
 #include "render/Shader.hpp"
 #include "render/Mesh.hpp"
 #include "render/TexturedMesh.hpp"
@@ -33,18 +34,29 @@ static float frand(float a, float b) {
     return a + (b - a) * ((float)std::rand() / (float)RAND_MAX);
 }
 
-// raw cell->world mapping (demo: island tiles; live: spread on land)
+// cell->world mapping : chaque joueur est placé sur la copie pleine taille de
+// la carte qui appartient à SON équipe (même mapping carré inset que
+// GuiApp.cpp pour les ressources), juste translatée vers l'île de cette
+// équipe dans l'anneau — exactement le même monde, répété.
 static glm::vec2 worldRaw(PlayerRenderCtx& ctx, const GuiPlayer& p) {
     if (ctx.testMode)
         return { p.x * TILE + TILE * 0.5f, p.y * TILE + TILE * 0.5f };
     const GuiState& gs = ctx.netClient.state();
     int W = gs.sizeKnown ? gs.width : ctx.map.w;
     int H = gs.sizeKnown ? gs.height : ctx.map.h;
+    int count = (int)gs.teams.size();
+    int idx = 0;
+    for (int i = 0; i < count; ++i) if (gs.teams[i] == p.team) { idx = i; break; }
+    float cx = ctx.map.w * TILE * 0.5f, cz = ctx.map.h * TILE * 0.5f;
+    float baseR = ctx.map.w * TILE * 0.455f;
+    glm::vec2 off = islandCenter(idx, count, cx, cz, baseR) - glm::vec2(cx, cz);
+
     const float insetT = 7.f;
     float landX = std::max(1.f, ctx.map.w - 2.f * insetT);
     float landY = std::max(1.f, ctx.map.h - 2.f * insetT);
-    return { (insetT + (p.x + 0.5f) * landX / W) * TILE,
-             (insetT + (p.y + 0.5f) * landY / H) * TILE };
+    float wx = (insetT + (p.x + 0.5f) * landX / W) * TILE;
+    float wz = (insetT + (p.y + 0.5f) * landY / H) * TILE;
+    return { wx + off.x, wz + off.y };
 }
 
 // smaller overall, and grows with level (lvl1 ~0.44x -> lvl8 ~0.80x)
@@ -313,6 +325,38 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
             eggShader.setMat4("uModel",     glm::value_ptr(M));
             eggShader.setMat3("uNormalMat", glm::value_ptr(N3));
             ctx.eggMeshTex->draw();
+        }
+
+        // Fork-laid eggs (server "enw"): a real egg slot, not a player yet —
+        // sits on the forking parent's own team island until it hatches
+        // ("edi") into a new player.
+        if (!ctx.testMode) {
+            const GuiState& gs = ctx.netClient.state();
+            int W = gs.sizeKnown ? gs.width : ctx.map.w;
+            int H = gs.sizeKnown ? gs.height : ctx.map.h;
+            int count = (int)gs.teams.size();
+            float icx = ctx.map.w * TILE * 0.5f, icz = ctx.map.h * TILE * 0.5f;
+            float baseR = ctx.map.w * TILE * 0.455f;
+            const float insetT = 7.f;
+            float landX = std::max(1.f, ctx.map.w - 2.f * insetT);
+            float landY = std::max(1.f, ctx.map.h - 2.f * insetT);
+            for (const auto& kv : gs.eggs) {
+                const GuiEgg& egg = kv.second;
+                int idx = 0;
+                for (int i = 0; i < count; ++i) if (gs.teams[i] == egg.team) { idx = i; break; }
+                glm::vec2 off = islandCenter(idx, count, icx, icz, baseR) - glm::vec2(icx, icz);
+                float wx = (insetT + (egg.x + 0.5f) * landX / W) * TILE + off.x;
+                float wz = (insetT + (egg.y + 0.5f) * landY / H) * TILE + off.y;
+                float wob = std::sin(elapsed * 3.f + egg.id) * 0.06f;
+                glm::mat4 M = glm::translate(glm::mat4(1.f), {wx, es * r, wz});
+                M = glm::rotate(M, wob, {0.f, 0.f, 1.f});
+                M = glm::scale(M, glm::vec3(es));
+                M = glm::translate(M, -ec);
+                glm::mat3 N3 = glm::mat3(glm::transpose(glm::inverse(M)));
+                eggShader.setMat4("uModel",     glm::value_ptr(M));
+                eggShader.setMat3("uNormalMat", glm::value_ptr(N3));
+                ctx.eggMeshTex->draw();
+            }
         }
         glEnable(GL_CULL_FACE);
     }

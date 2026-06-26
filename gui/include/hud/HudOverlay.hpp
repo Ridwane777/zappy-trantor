@@ -33,6 +33,10 @@ public:
     // 0.33s (else -1) so the caller can request its inventory ("pin #id").
     int inventoryPollTarget(float dt);
 
+    // True once if the top-left fullscreen icon was clicked since the last
+    // call (consumes the flag). The caller owns the actual WM toggle.
+    bool consumeFullscreenClick();
+
     // Draw the whole overlay; rebuilds the hit regions for the next frame.
     // `state` is null when offline. `mapW/mapH` feed the offline status line.
     void draw(sf::RenderWindow &win, const GuiState *state,
@@ -44,7 +48,8 @@ public:
     static glm::vec3 teamColor3(int i);
 
 private:
-    // kind: 0=team header, 1=player row, 2=toggle tab, 3=panel background
+    // kind: 0=team header, 1=player row, 2=toggle tab, 3=panel background,
+    // 4=fullscreen icon
     struct Hit { sf::FloatRect rect; int kind; std::string team; int pid; };
 
     static sf::Color teamColorU(int i);
@@ -55,6 +60,7 @@ private:
     std::string       _selTeam;           // "" = none → no team glow
     int               _selPlayer = -1;    // -1 = none → no inventory popup
     float             _invPollT  = 0.f;
+    bool              _fullscreenClicked = false;
     std::vector<Hit>  _hits;
     float             _scroll    = 0.f;   // team/player list scroll offset (px)
     float             _maxScroll = 0.f;   // set during draw, clamps _scroll

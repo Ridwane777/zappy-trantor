@@ -57,6 +57,18 @@ void World::addPlayer(int fd, const std::string &team)
                    p.team + "\n");
 }
 
+bool World::hatchEgg(const std::string &team)
+{
+    auto it = std::find_if(_eggs.begin(), _eggs.end(),
+        [&team](const Egg &e) { return e.team == team; });
+    if (it == _eggs.end())
+        return false;
+    if (onGuiEvent)
+        onGuiEvent("edi #" + std::to_string(it->id) + "\n");
+    _eggs.erase(it);
+    return true;
+}
+
 void World::removePlayer(int fd)
 {
     Player *p = _getPlayer(fd);

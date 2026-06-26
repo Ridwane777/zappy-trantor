@@ -1,4 +1,5 @@
 #include "menu/MenuScene.hpp"
+#include "app/Fullscreen.hpp"
 #include "AssetCache.hpp"
 #include "render/Shader.hpp"
 #include "render/Mesh.hpp"
@@ -209,6 +210,31 @@ struct IconButton {
     }
 };
 
+// Plain square ("carreau") maximize toggle — no texture, same look as a
+// window manager's maximize/restore control.
+struct SquareIconButton {
+    sf::Vector2f pos;
+    float size = 16.f;
+    bool hovered = false;
+
+    void setup(float px, float py, float sz) { pos = {px, py}; size = sz; }
+    bool contains(float mx, float my) const
+    {
+        return mx >= pos.x - 4.f && my >= pos.y - 4.f &&
+               mx <= pos.x + size + 4.f && my <= pos.y + size + 4.f;
+    }
+    void draw(sf::RenderWindow &w)
+    {
+        sf::RectangleShape sq(sf::Vector2f(size, size));
+        sq.setPosition(pos);
+        sq.setFillColor(sf::Color::Transparent);
+        sq.setOutlineColor(hovered ? sf::Color(190, 220, 255, 230)
+                                   : sf::Color(150, 170, 205, 200));
+        sq.setOutlineThickness(1.6f);
+        w.draw(sq);
+    }
+};
+
 // Common phong uniform defaults so the shader's branches are all initialised.
 void setPhongDefaults(Shader &sh)
 {
@@ -402,6 +428,11 @@ bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,
         settingsBtn.setup(gearTex, 24.f, 24.f, 48.f);
     }
 
+    // Fullscreen toggle, just below the gear icon.
+    SquareIconButton fullscreenBtn;
+    fullscreenBtn.setup(24.f, 84.f, 16.f);
+    bool fullscreen = false;
+
     bool showParams = false;
     int  focusField = -1;          // 0 = host, 1 = port
     // orbit camera around the fixed logo (3rd-person style)
@@ -471,8 +502,14 @@ bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,
                 out.port = portStr.empty() ? 4242 : std::atoi(portStr.c_str());
                 return true;
             }
-            if (ev.type == sf::Event::Resized)
+            if (ev.type == sf::Event::Resized) {
                 glViewport(0, 0, ev.size.width, ev.size.height);
+                // SFML's 2D view doesn't auto-follow a WM-driven resize
+                // (maximize toggle); without this the gear/fullscreen icons
+                // and START button drift off the new window bounds.
+                window.setView(sf::View(sf::FloatRect(0.f, 0.f,
+                    (float)ev.size.width, (float)ev.size.height)));
+            }
 
             sf::Vector2u ws = window.getSize();
 
@@ -504,6 +541,9 @@ bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,
                            settingsBtn.contains(mx, my)) {
                     showParams = true;
                     focusField = 0;
+                } else if (fullscreenBtn.contains(mx, my)) {
+                    fullscreen = !fullscreen;
+                    setWindowFullscreen(window.getSystemHandle(), fullscreen);
                 } else {
                     // click anywhere else starts orbiting the camera around the logo
                     orbiting = true;
@@ -957,6 +997,9 @@ bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,
                 settingsBtn.hovered = settingsBtn.contains((float)mp.x, (float)mp.y);
                 settingsBtn.draw(window);
             }
+            // maximize toggle, just below the gear
+            fullscreenBtn.hovered = fullscreenBtn.contains((float)mp.x, (float)mp.y);
+            fullscreenBtn.draw(window);
         }
 
         if (showParams) {
@@ -1026,9 +1069,18 @@ void drawLoadingScreen(sf::RenderWindow &window, sf::Font &font,
 {
     // keep the window responsive while we block on asset loading
     sf::Event ev;
-    while (window.pollEvent(ev))
+    while (window.pollEvent(ev)) {
         if (ev.type == sf::Event::Closed)
             window.close();
+        // Without this, a WM-driven resize (maximize toggle) leaves the 2D
+        // view mapped to the old size, so the progress bar/text render off
+        // the visible area instead of tracking the new window bounds.
+        if (ev.type == sf::Event::Resized) {
+            glViewport(0, 0, ev.size.width, ev.size.height);
+            window.setView(sf::View(sf::FloatRect(0.f, 0.f,
+                (float)ev.size.width, (float)ev.size.height)));
+        }
+    }
 
     if (progress < 0.f) progress = 0.f;
     if (progress > 1.f) progress = 1.f;

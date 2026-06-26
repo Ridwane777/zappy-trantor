@@ -35,10 +35,14 @@ def survive(client: Client, player: Player):
 
     # on cherche la tuile la plus proche qui contient de la food
     for index, tile in enumerate(tiles):
-        if "food" in tile:
-            # on s'y déplace puis on ramasse
+        count = tile.count("food")
+        if count:
+            # on s'y déplace puis on ramasse TOUTE la food présente (pas juste
+            # une unité) : sinon le stock plafonne juste au-dessus du seuil de
+            # survie et n'atteint jamais le seuil de fork (16)
             _go_to_tile(client, index)
-            client.send("Take food")
+            for _ in range(count):
+                client.send("Take food")
             return
 
     # aucune food en vue : exploration intelligente pour couvrir la carte

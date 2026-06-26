@@ -77,6 +77,7 @@ class Brain:
                 self.player.fork_cooldown -= 1
             if should_fork(self.player):
                 do_fork(self.client, self.player)
+                do_fork(self.client, self.player)
 
             # priorité 1 : survie — si peu de food, on va manger
             if self.player.needs_food():

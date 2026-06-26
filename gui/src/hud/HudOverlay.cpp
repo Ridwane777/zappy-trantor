@@ -19,6 +19,10 @@ bool HudOverlay::handleClick(sf::Vector2i mouse)
 {
     for (const auto &h : _hits) {
         if (!h.rect.contains((float)mouse.x, (float)mouse.y)) continue;
+        if (h.kind == 4) {                                // fullscreen icon
+            _fullscreenClicked = true;
+            return true;
+        }
         if (h.kind == 2)                                  // toggle tab
             _open = !_open;
         else if (h.kind == 0) {                           // team header
@@ -29,6 +33,13 @@ bool HudOverlay::handleClick(sf::Vector2i mouse)
         return true;                                      // kind 3 (panel) also consumes
     }
     return false;
+}
+
+bool HudOverlay::consumeFullscreenClick()
+{
+    bool c = _fullscreenClicked;
+    _fullscreenClicked = false;
+    return c;
 }
 
 int HudOverlay::inventoryPollTarget(float dt)
@@ -55,12 +66,28 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
     sf::Vector2u ws = win.getSize();
     const sf::Font &font = *_font;
 
+    _hits.clear();
+
+    // ── maximize toggle: a plain square ("carreau") in the top-left
+    // corner, same look as a window manager's maximize/restore control ──
+    {
+        const float fsSize = 16.f, fsPad = 12.f;
+        sf::RectangleShape fsIcon(sf::Vector2f(fsSize, fsSize));
+        fsIcon.setPosition(fsPad, fsPad);
+        fsIcon.setFillColor(sf::Color::Transparent);
+        fsIcon.setOutlineColor(sf::Color(220, 228, 240, 210));
+        fsIcon.setOutlineThickness(1.6f);
+        win.draw(fsIcon);
+        _hits.push_back({sf::FloatRect(fsPad - 4.f, fsPad - 4.f, fsSize + 8.f, fsSize + 8.f),
+                         4, "", -1});
+    }
+
     sf::Text hint;
     hint.setFont(font);
     hint.setString("Drag: orbit   Scroll: zoom   R: reset");
     hint.setCharacterSize(18);
     hint.setFillColor(sf::Color(220, 220, 220, 160));
-    hint.setPosition(14.f, 14.f);
+    hint.setPosition(14.f, 38.f);
     win.draw(hint);
 
     sf::Text info;
@@ -86,7 +113,6 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
     win.draw(info);
 
     // ── retractable sidebar (teams / players / levels) ──────────────────────
-    _hits.clear();
     const float pad = 14.f;
     float panelX = ws.x - WIDTH * _anim;
     float tabW = 26.f, tabH = 60.f, tabX = panelX - tabW, tabY = 96.f;

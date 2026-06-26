@@ -22,6 +22,9 @@ public:
     std::string executeCommand(int playerFd, const std::string &cmd);
     void        addPlayer(int fd, const std::string &team);
     void        removePlayer(int fd);
+    // Returns true and consumes one egg for this team (emitting edi to GUI).
+    // Used by Server::_processHandshake to let forked children hatch.
+    bool        hatchEgg(const std::string &team);
     std::vector<std::string> getGuiSnapshot() const;
     // GUI inventory request: "pin #id X Y q0..q6\n", or "" if no such player.
     std::string guiPlayerInventory(int id) const;

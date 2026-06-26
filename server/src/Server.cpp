@@ -130,6 +130,17 @@ void Server::_processHandshake(std::size_t index, const std::string &line)
         _world.addPlayer(client.getFd(), line);
         return;
     }
+    // No initial slot left — check if a Fork egg exists for this team.
+    // If so, hatch it: the child process spawned by do_fork() becomes a player.
+    if (it != _slots.end() && _world.hatchEgg(line)) {
+        client.setState(ClientState::AI);
+        client.setTeam(line);
+        client.queueWrite("0\n");
+        client.queueWrite(std::to_string(_config.width) + " " +
+                           std::to_string(_config.height) + "\n");
+        _world.addPlayer(client.getFd(), line);
+        return;
+    }
 
     client.queueWrite("ko\n");
     client.setState(ClientState::CLOSING);

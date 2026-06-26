@@ -272,6 +272,9 @@ void GuiClient::_processLine(const std::string &line)
         std::string eggTok, playerTok;
         if (iss >> eggTok >> playerTok >> e.x >> e.y) {
             e.id = parseId(eggTok);
+            auto pit = _state.players.find(parseId(playerTok));
+            if (pit != _state.players.end())
+                e.team = pit->second.team;
             _state.eggs[e.id] = e;
         }
 
