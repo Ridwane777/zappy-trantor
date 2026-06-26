@@ -104,5 +104,11 @@ class Client:
                     self._pending_level = int(line.split(":")[1].strip())
                 except (IndexError, ValueError):
                     pass
+            elif line.startswith("Elevation underway"):
+                pass  # Async message from incantation, ignore as command response
+            elif line.startswith("eject:"):
+                pass  # Async message from being pushed, ignore as command response
+            elif line == "dead":
+                raise ConnectionError("Mort de faim ou fin de partie")
             else:
                 return line
