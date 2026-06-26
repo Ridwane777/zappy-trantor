@@ -137,8 +137,10 @@ bool Server::_handleClient(std::size_t index)
     client.appendToReadBuffer(buf, n);
 
     std::string line;
-    if (client.getState() == ClientState::WAITING_TEAM_NAME && client.extractLine(line))
-        _processHandshake(index, line);
+    while (client.extractLine(line)) {
+        if (client.getState() == ClientState::WAITING_TEAM_NAME)
+            _processHandshake(index, line);
+    }
 
     return false;
 }
