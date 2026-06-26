@@ -185,6 +185,18 @@ void Server::_processHandshake(std::size_t index, const std::string &line)
         return;
     }
 
+    // No initial slot left for this team: try hatching one of its Fork eggs
+    // instead of rejecting the connection outright.
+    if (it != _slots.end() && _world.hatchEgg(line)) {
+        client.setState(ClientState::AI);
+        client.setTeam(line);
+        client.queueWrite("0\n");
+        client.queueWrite(std::to_string(_config.width) + " " +
+                           std::to_string(_config.height) + "\n");
+        _world.addPlayer(client.getFd(), line);
+        return;
+    }
+
     client.queueWrite("ko\n");
     client.setState(ClientState::CLOSING);
 }
