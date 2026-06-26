@@ -189,7 +189,13 @@ void Server::run()
                 std::chrono::duration<double>(ticks * tickDuration));
         }
 
-        if (poll(_fds.data(), _fds.size(), -1) == -1)
+        double remaining = tickDuration - std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - _lastTick).count();
+        int timeoutMs = static_cast<int>(remaining * 1000.0);
+        if (timeoutMs < 0)
+            timeoutMs = 0;
+
+        if (poll(_fds.data(), _fds.size(), timeoutMs) == -1)
             throw std::runtime_error("poll() failed");
 
         if (_fds[0].revents & POLLIN)
