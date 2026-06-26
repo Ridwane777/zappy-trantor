@@ -6,6 +6,7 @@
 #include <vector>
 #include <unordered_map>
 #include <poll.h>
+#include <chrono>
 
 class Server {
 public:
@@ -21,6 +22,7 @@ private:
     std::vector<Client> _clients;
     std::unordered_map<std::string, int> _slots;
     World _world;
+    std::chrono::steady_clock::time_point _lastTick;
 
     void _createSocket();
     void _bindAndListen();
