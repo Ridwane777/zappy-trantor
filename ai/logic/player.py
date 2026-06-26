@@ -17,7 +17,7 @@ class Player:
     # à plusieurs joueurs, la nourriture se raréfie et personne ne s'élève jamais.
     FOOD_THRESHOLD = 12
 
-    def __init__(self):
+    def __init__(self, initial_team_size: int = 1):
         # niveau actuel du joueur — démarre à 1, objectif 8
         self.level = 1
         # inventaire : toutes les ressources à 0 au départ
@@ -27,10 +27,12 @@ class Player:
         self.wander_tick = 0
         # compteur de pas sans trouver de ressource — utilisé par explore()
         self.explore_steps = 0
-        # cooldown entre deux forks pour ne pas spammer (décrémenté dans brain.run)
-        self.fork_cooldown = 0
+        # timestamp jusqu'auquel on ne peut pas forker (cooldown temps-réel)
+        self.fork_until = 0.0
         # nb de coéquipiers ayant confirmé leur arrivée (HERE) avant l'incantation
         self.here_count = 0
+        # estimation du nombre de joueurs dans la team (transmis via --team-size au fork)
+        self.known_team_size = initial_team_size
 
     def update_inventory(self, raw: str):
         # on enlève les crochets et les espaces autour
