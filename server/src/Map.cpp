@@ -3,13 +3,13 @@
 #include <stdexcept>
  
 static const double DENSITIES[RESOURCE_COUNT] = {
-    0.5,   // FOOD
-    0.3,   // LINEMATE
-    0.15,  // DERAUMERE
-    0.1,   // SIBUR
-    0.1,   // MENDIANE
-    0.08,  // PHIRAS
-    0.05,  // THYSTAME
+    1.5,   // FOOD
+    0.9,   // LINEMATE
+    0.45,  // DERAUMERE
+    0.3,   // SIBUR
+    0.3,   // MENDIANE
+    0.24,  // PHIRAS
+    0.15,  // THYSTAME
 };
  
 Map::Map(int width, int height) : _width(width), _height(height), _tiles(height, std::vector<Tile>(width))
