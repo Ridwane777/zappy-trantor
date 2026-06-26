@@ -29,6 +29,21 @@ Server::Server(const ServerConfig &config) : _fd(-1), _config(config), _world(_c
 
 void Server::_initGuiRequests()
 {
+    _guiRequests["msz"] = [this](Client &c, const std::string &) {
+        c.queueWrite(_world.guiMapSize());
+    };
+    _guiRequests["tna"] = [this](Client &c, const std::string &) {
+        c.queueWrite(_world.guiTeamNames());
+    };
+    _guiRequests["mct"] = [this](Client &c, const std::string &) {
+        c.queueWrite(_world.guiMapContent());
+    };
+    _guiRequests["bct"] = [this](Client &c, const std::string &arg) {
+        std::istringstream iss(arg);
+        int x, y;
+        if (iss >> x >> y)
+            c.queueWrite(_world.guiTileContent(x, y));
+    };
 }
 
 void Server::_processGuiRequest(Client &client, const std::string &line)
