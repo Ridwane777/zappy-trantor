@@ -23,12 +23,7 @@ private:
     std::unordered_map<std::string, int> _slots;
     World _world;
 
-    // Resource-reset cycle: every _resetInterval seconds the map respawns and the
-    // GUI is told (custom "sst" line) so it can count down + pulse the tree of life.
-    // Default 5 min; overridable via env ZAPPY_RESET_INTERVAL (seconds) for testing.
-    double _resetInterval = 30.0;
-    std::chrono::steady_clock::time_point _lastReset;
-    double _secondsToNextReset() const;
+    std::chrono::steady_clock::time_point _lastTickTime;
 
     void _createSocket();
     void _bindAndListen();
