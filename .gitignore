@@ -13,3 +13,6 @@ __pycache__/
 .push_files
 .push_backup/
 progressive_push.sh
+
+# Assets GUI locaux (trop lourds pour git, servis par le CDN)
+gui/assets/
