@@ -140,6 +140,8 @@ bool Server::_handleClient(std::size_t index)
     while (client.extractLine(line)) {
         if (client.getState() == ClientState::WAITING_TEAM_NAME)
             _processHandshake(index, line);
+        else if (client.getState() == ClientState::AI)
+            _world.queueCommand(client.getFd(), line);
     }
 
     return false;
