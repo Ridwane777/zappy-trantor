@@ -7,6 +7,7 @@
 #include <iostream>
 #include <cstring>
 #include <cstdlib>
+#include <sstream>
 
 Server::Server(const ServerConfig &config) : _fd(-1), _config(config), _world(_config)
 {
@@ -34,6 +35,52 @@ Server::Server(const ServerConfig &config) : _fd(-1), _config(config), _world(_c
         }
     };
     _lastTickTime = std::chrono::steady_clock::now();
+    _initGuiHandlers();
+}
+
+void Server::_initGuiHandlers()
+{
+    _guiHandlers["msz"] = [this](Client &c, const std::string &) {
+        c.queueWrite(_world.guiMapSize());
+    };
+    _guiHandlers["bct"] = [this](Client &c, const std::string &arg) {
+        std::istringstream iss(arg); int x, y;
+        if (iss >> x >> y) c.queueWrite(_world.guiTileContent(x, y));
+    };
+    _guiHandlers["mct"] = [this](Client &c, const std::string &) {
+        c.queueWrite(_world.guiMapContent());
+    };
+    _guiHandlers["tna"] = [this](Client &c, const std::string &) {
+        c.queueWrite(_world.guiTeamNames());
+    };
+    _guiHandlers["ppo"] = [this](Client &c, const std::string &arg) {
+        if (!arg.empty() && arg[0] == '#') {
+            std::string resp = _world.guiPlayerPosition(std::stoi(arg.substr(1)));
+            if (!resp.empty()) c.queueWrite(resp);
+        }
+    };
+    _guiHandlers["plv"] = [this](Client &c, const std::string &arg) {
+        if (!arg.empty() && arg[0] == '#') {
+            std::string resp = _world.guiPlayerLevel(std::stoi(arg.substr(1)));
+            if (!resp.empty()) c.queueWrite(resp);
+        }
+    };
+    _guiHandlers["pin"] = [this](Client &c, const std::string &arg) {
+        if (!arg.empty() && arg[0] == '#') {
+            std::string resp = _world.guiPlayerInventory(std::stoi(arg.substr(1)));
+            if (!resp.empty()) c.queueWrite(resp);
+        }
+    };
+    _guiHandlers["sgt"] = [this](Client &c, const std::string &) {
+        c.queueWrite("sgt " + std::to_string(_config.freq) + "\n");
+    };
+    _guiHandlers["sst"] = [this](Client &c, const std::string &arg) {
+        try {
+            int t = std::stoi(arg);
+            if (t > 0) _config.freq = t;
+            c.queueWrite("sst " + std::to_string(_config.freq) + "\n");
+        } catch (...) {}
+    };
 }
 
 void Server::_broadcastToGui(const std::string &msg)
@@ -169,15 +216,15 @@ bool Server::_handleClient(std::size_t index)
         } else if (client.getState() == ClientState::AI) {
             _world.queueCommand(client.getFd(), line);
         } else if (client.getState() == ClientState::GUI) {
-            // GUI requests: "pin #id" → reply with that player's inventory
-            std::size_t h = line.find('#');
-            if (line.rfind("pin", 0) == 0 && h != std::string::npos) {
-                try {
-                    std::string resp = _world.guiPlayerInventory(std::stoi(line.substr(h + 1)));
-                    if (!resp.empty())
-                        client.queueWrite(resp);
-                } catch (...) {}
-            }
+            std::istringstream iss(line);
+            std::string cmd;
+            iss >> cmd;
+            std::string arg;
+            std::getline(iss >> std::ws, arg);
+            
+            auto it = _guiHandlers.find(cmd);
+            if (it != _guiHandlers.end())
+                it->second(client, arg);
         }
     }
 

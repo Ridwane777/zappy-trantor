@@ -23,6 +23,9 @@ private:
     std::unordered_map<std::string, int> _slots;
     World _world;
 
+    std::unordered_map<std::string, std::function<void(Client &, const std::string &)>> _guiHandlers;
+    void _initGuiHandlers();
+
     std::chrono::steady_clock::time_point _lastTickTime;
 
     void _createSocket();
