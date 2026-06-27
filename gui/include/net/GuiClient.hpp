@@ -45,3 +45,13 @@ public:
     // Transient incantation flashes since last drain (renderer consumes these).
     std::deque<GuiIncantation> &incantationEvents() { return _incantations; }
 
+private:
+    int       _fd = -1;
+    GuiState  _state;
+    std::string _readBuf;                 // accumulates partial lines
+    std::deque<GuiIncantation> _incantations;
+
+    void _processLine(const std::string &line);
+    // Append an action-feed entry (looks up the player's team for coloring).
+    void _logEvent(int id, const std::string &action, int kind);
+};
