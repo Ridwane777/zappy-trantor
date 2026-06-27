@@ -254,3 +254,15 @@ Mesh buildDashedRingMesh(int segs, float fill)
 }
 
 Mesh buildVQuadMesh()
+{
+    std::vector<float> v = {
+        -0.5f, 0.f, 0.f, 0.f, 0.f, 1.f,
+         0.5f, 0.f, 0.f, 0.f, 0.f, 1.f,
+         0.5f, 1.f, 0.f, 0.f, 0.f, 1.f,
+        -0.5f, 1.f, 0.f, 0.f, 0.f, 1.f,
+    };
+    std::vector<unsigned int> idx = {0,1,2, 0,2,3};
+    return Mesh(v, idx);
+}
+
+float frnd(float a, float b)
