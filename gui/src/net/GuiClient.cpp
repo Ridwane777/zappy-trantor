@@ -24,3 +24,17 @@ static const char *resName(int i)
     return (i >= 0 && i < 7) ? N[i] : "?";
 }
 
+void GuiClient::_logEvent(int id, const std::string &action, int kind)
+{
+    std::string team;
+    auto it = _state.players.find(id);
+    if (it != _state.players.end())
+        team = it->second.team;
+    _state.log.push_back({id, team, action, kind});
+    _state.logTotal++;
+    if (_state.log.size() > 100)
+        _state.log.pop_front();
+}
+
+GuiClient::~GuiClient()
+{
