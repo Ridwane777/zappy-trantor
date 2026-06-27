@@ -189,10 +189,10 @@ void GuiClient::_processLine(const std::string &line)
             _state.timeUnit = t;
 
     } else if (cmd == "sst") {
-        // custom: seconds until next resource reset (resyncs the GUI countdown)
-        int s;
-        if (iss >> s)
-            _state.secondsToReset = static_cast<float>(s);
+        // server broadcasts ticks until next resource reset → convert to seconds
+        int ticks;
+        if (iss >> ticks && _state.timeUnit > 0)
+            _state.secondsToReset = (float)ticks / (float)_state.timeUnit;
 
     } else if (cmd == "tna") {
         std::string team;

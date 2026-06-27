@@ -249,9 +249,9 @@ int GuiApp::run(int argc, char** argv)
     Shader skinShader("shaders/skinned.vert",      "shaders/phong.frag");
     Shader auraShader  ("shaders/skinned_aura.vert", "shaders/aura.frag");
     Shader incantShader("shaders/incant.vert",       "shaders/incant.frag");
-    Shader starShader  ("shaders/star.vert",          "shaders/star.frag");
-    Shader eggShader   ("shaders/logo.vert",          "shaders/logo.frag");
-    Shader waterMapShader("shaders/water_map.vert",   "shaders/water_map.frag");
+    Shader starShader    ("shaders/star.vert",          "shaders/star.frag");
+    Shader eggShader     ("shaders/logo.vert",          "shaders/logo.frag");
+    Shader waterMapShader("shaders/water_map.vert",     "shaders/water_map.frag");
 
     // Shore water on the map reuses the same rippling water texture as the
     // intro screen's lagoon (assets/screen/water.png), instead of a flat tint.
@@ -552,6 +552,7 @@ int GuiApp::run(int argc, char** argv)
     Constellation constellation;
     // third-person camera offset around Mew (mouse look), reset with R
     float admCamYaw = 0.f, admCamPitch = 0.32f;
+
 
     // ── in-game audio: ambient bed + event SFX (missing clips are silent) ───────
     AudioManager gameAudio;
@@ -1024,7 +1025,7 @@ int GuiApp::run(int argc, char** argv)
         toon.setVec3("uPointLight1Pos",    0.f, 10.f, 0.f);
         toon.setVec3("uPointLight1Color",  0.f, 0.f, 0.f);
         toon.setFloat("uShininess",        32.f);
-        toon.setFloat("uAmbientStrength",  0.22f * ambScale);
+        toon.setFloat("uAmbientStrength",  0.10f * ambScale);
         toon.setFloat("uAlpha",       1.0f);
         toon.setFloat("uTime",        elapsed);
         toon.setBool ("uWave",           false);

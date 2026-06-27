@@ -61,8 +61,11 @@ void main() {
     // Lambert diffuse
     float diff   = max(dot(N, L), 0.0);
     vec3  diffuse = baseColor * uDirLightColor * diff;
-    vec3  ambient = baseColor * uAmbientStrength;
+    vec3  ambient = baseColor * uAmbientStrength * vec3(1.10, 0.88, 0.65); // warm shadow tint
     vec3  col     = ambient + diffuse;
+    // Contrast + slight saturation boost
+    col = pow(clamp(col, 0.0, 1.0), vec3(0.88));
+    col = mix(vec3(dot(col, vec3(0.299, 0.587, 0.114))), col, 1.25);
 
     if (uCrystal) {
         // Blinn-Phong specular

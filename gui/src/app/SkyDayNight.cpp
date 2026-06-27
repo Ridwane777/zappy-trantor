@@ -19,14 +19,15 @@ DayNight computeDayNight(float elapsed, int nightOverride)
 
     // DAY stays exactly as before: low warm sun + orange horizon. The sun disc
     // simply fades out at night; the moon (low, toward the default view) fades in.
-    glm::vec3 skySunDir = glm::normalize(glm::vec3(0.680f, 0.08f, 0.680f));
+    // Sun at ~25° elevation — visible from isometric camera, warm side light
+    glm::vec3 skySunDir = glm::normalize(glm::vec3(0.62f, 0.28f, 0.62f));
     glm::vec3 moonDir   = glm::normalize(glm::vec3(-0.593f, 0.545f, -0.593f));
     glm::vec3 sunDir    = glm::normalize(glm::mix(skySunDir, moonDir, nightF));
-    glm::vec3 lightCol  = glm::mix(glm::vec3(1.0f, 0.80f, 0.55f),          // warm day
+    glm::vec3 lightCol  = glm::mix(glm::vec3(1.2f, 0.85f, 0.50f),          // warm golden day
                                    glm::vec3(0.55f, 0.66f, 0.98f), nightF); // moonlight
     float ambScale = 1.f - 0.28f * nightF;                                 // moonlit floor
-    glm::vec3 skyTop = glm::mix(glm::vec3(0.20f,0.38f,0.72f), glm::vec3(0.03f,0.05f,0.16f), nightF);
-    glm::vec3 skyHor = glm::mix(glm::vec3(0.78f,0.38f,0.10f), glm::vec3(0.09f,0.12f,0.28f), nightF);
+    glm::vec3 skyTop = glm::mix(glm::vec3(0.03f,0.05f,0.16f), glm::vec3(0.02f,0.04f,0.14f), nightF);
+    glm::vec3 skyHor = glm::mix(glm::vec3(0.55f,0.22f,0.04f), glm::vec3(0.05f,0.08f,0.20f), nightF);
 
     // warm dusk/dawn glow that peaks mid-transition
     float duskF = glm::clamp(nightF * (1.f - nightF) * 4.f, 0.f, 1.f);
