@@ -6,9 +6,14 @@ import subprocess
 from network.client import Client
 from logic.player import Player
 
-FORK_COOLDOWN_SEC      = 10.0   # cooldown des autres après réception d'un FORK
-FORK_SELF_COOLDOWN_SEC = 20.0   # cooldown du forkeur lui-même
-WANDER_FORK_THRESHOLD  = 30     # tours d'attente avant de créer un nouveau joueur
+FORK_COOLDOWN_SEC        = 60.0  # cooldown des autres après réception d'un FORK
+FORK_SELF_COOLDOWN_SEC   = 90.0  # cooldown du forkeur lui-même après do_fork
+INITIAL_FORK_COOLDOWN    = 5.0   # cooldown court pour les forks d'initialisation
+WANDER_FORK_THRESHOLD    = 30    # tours d'attente avant de créer un nouveau joueur
+EMERGENCY_FORK_THRESHOLD = 400   # fork d'urgence si bloqué trop longtemps
+
+# Seuil en tours sans partenaire avant de déclencher le mécanisme de rescue.
+RESCUE_FORK_THRESHOLD = 80
 
 
 def should_fork(client: Client, player: Player) -> bool:
@@ -16,30 +21,22 @@ def should_fork(client: Client, player: Player) -> bool:
         return False
     if time.time() < player.fork_until:
         return False
-    # plafond absolu : le jeu ne nécessite jamais plus de 6 joueurs par team
-    if player.known_team_size >= 6:
-        return False
-    # on attend assez longtemps : si un coéquipier allait répondre,
-    # il aurait déjà répondu aux broadcasts NEED émis toutes les 5 itérations
     if player.wander_tick < WANDER_FORK_THRESHOLD:
         return False
-    return True
+    # La team n'est pas encore à 6 : on crée un nouveau joueur.
+    # Le backoff aléatoire stagger l'éligibilité : le 1er joueur forke et son
+    # broadcast FORK met les autres en cooldown (évite le thundering herd).
+    if player.known_team_size < 6:
+        return player.wander_tick >= WANDER_FORK_THRESHOLD + player.fork_backoff
+    # Fork d'urgence : bloqué seul trop longtemps (deadlock inter-niveaux)
+    return player.wander_tick >= EMERGENCY_FORK_THRESHOLD
 
 
-def do_fork(client: Client, player: Player):
+def _spawn(client: Client, player: Player):
+    """Envoie la commande Fork et lance le subprocess AI."""
     from network.broadcast import encode
-
-    player.known_team_size += 1
-    player.wander_tick = 0
-
-    # broadcast avec le nom de l'équipe pour que seuls les coéquipiers
-    # mettent à jour leur compteur (évite la contamination cross-team)
     client.send(f"Broadcast {encode('FORK', f'{client.team}:{player.known_team_size}')}")
     client.send("Fork")
-    player.fork_until = time.time() + FORK_SELF_COOLDOWN_SEC
-
-    # le subprocess hérite de known_team_size via --team-size
-    # → il ne forkera pas immédiatement si la team est déjà assez grande
     entry = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "zappy_ai")
     subprocess.Popen(
         [
@@ -52,3 +49,31 @@ def do_fork(client: Client, player: Player):
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
+
+
+def do_fork(client: Client, player: Player):
+    """Fork normal : crée 1 enfant et applique le cooldown long."""
+    player.known_team_size += 1
+    player.wander_tick = 0
+    _spawn(client, player)
+    player.fork_until = time.time() + FORK_SELF_COOLDOWN_SEC
+
+
+def do_initial_fork(client: Client, player: Player):
+    """Fork d'initialisation : cooldown court pour atteindre 6 rapidement."""
+    player.known_team_size += 1
+    _spawn(client, player)
+    player.fork_until = time.time() + INITIAL_FORK_COOLDOWN
+
+
+def rescue_fork(client: Client, player: Player, n: int):
+    """Fork n enfants immédiatement pour débloquer un deadlock inter-niveaux.
+
+    Les enfants vont s'entraider entre eux pour remonter jusqu'au niveau du
+    joueur bloqué, lui fournir les partenaires dont il a besoin pour incanter,
+    et lui permettre de rejoindre le reste de la team.
+    """
+    for _ in range(n):
+        player.known_team_size += 1
+        _spawn(client, player)
+    player.fork_until = time.time() + FORK_SELF_COOLDOWN_SEC
