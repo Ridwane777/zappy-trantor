@@ -263,3 +263,23 @@ void GuiClient::_processLine(const std::string &line)
             _state.eggs[e.id] = e;
         }
 
+    } else if (cmd == "edi") {
+        std::string eggTok;
+        if (iss >> eggTok)
+            _state.eggs.erase(parseId(eggTok));
+
+    } else if (cmd == "pic") {
+        GuiIncantation fx;
+        int lvl;
+        if (iss >> fx.x >> fx.y >> lvl) {
+            fx.resolved = false;
+            _incantations.push_back(fx);
+            std::string idTok;
+            int firstId = -1;
+            while (iss >> idTok) {
+                int id = parseId(idTok);
+                if (firstId < 0) firstId = id;
+                auto it = _state.players.find(id);
+                if (it != _state.players.end())
+                    it->second.incanting = true;
+            }
