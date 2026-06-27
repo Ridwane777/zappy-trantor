@@ -101,3 +101,8 @@ MapData loadMap(const std::string &path)
 }
 
 time_t fileMtime(const std::string &p)
+{
+    struct stat s; return (stat(p.c_str(), &s) == 0) ? s.st_mtime : 0;
+}
+
+Mesh buildShoreMesh(const std::vector<Tile> &tiles, int dist)
