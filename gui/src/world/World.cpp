@@ -266,3 +266,28 @@ Mesh buildVQuadMesh()
 }
 
 float frnd(float a, float b)
+{
+    return a + (b - a) * ((float)std::rand() / (float)RAND_MAX);
+}
+
+Mesh buildRingMesh()
+{
+    const int   SEG   = 64;
+    const float PI2   = 6.28318f;
+    const float INNER = 0.6f;
+    std::vector<float>        v;
+    std::vector<unsigned int> idx;
+    for (int i = 0; i < SEG; ++i) {
+        float a = PI2 * i / SEG;
+        float ca = std::cos(a), sa = std::sin(a);
+        v.insert(v.end(), {INNER*ca, 0.f, INNER*sa, 0.f, 1.f, 0.f});
+        v.insert(v.end(), {       ca, 0.f,        sa, 0.f, 1.f, 0.f});
+    }
+    for (unsigned int i = 0; i < (unsigned int)SEG; ++i) {
+        unsigned int a = i*2, b = a+1;
+        unsigned int c = ((i+1)%(unsigned int)SEG)*2, d = c+1;
+        idx.insert(idx.end(), {a,c,b});
+        idx.insert(idx.end(), {c,d,b});
+    }
+    return Mesh(v, idx);
+}
