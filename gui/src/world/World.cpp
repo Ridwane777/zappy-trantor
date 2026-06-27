@@ -65,3 +65,39 @@ glm::vec3 colorFor(const std::string &n)
 }
 
 MapData loadMap(const std::string &path)
+{
+    std::ifstream f(path);
+    if (!f.is_open()) throw GUIException("Cannot open " + path);
+    json doc = json::parse(f);
+
+    MapData m;
+    m.w = doc["meta"]["width"];
+    m.h = doc["meta"]["height"];
+
+    auto &sc = doc["atmosphere"]["sky_color"];
+    m.skyColor = {sc[0], sc[1], sc[2]};
+    auto &fc = doc["atmosphere"]["fog_color"];
+    m.fogColor = {fc[0], fc[1], fc[2]};
+
+    for (auto &t : doc["tiles"]) {
+        Tile tile;
+        tile.x = t["x"]; tile.y = t["y"];
+        tile.ground = t["ground"];
+        for (auto &p : t["props"])
+            tile.props.push_back({p["model"], p["dx"], p["dz"], p["rot_y"], p["scale"]});
+        if (t.contains("resources")) {
+            for (int i = 0; i < 7; ++i)
+                if (t["resources"].contains(RES_NAMES[i]))
+                    tile.res[i] = t["resources"][RES_NAMES[i]];
+        }
+        m.tiles.push_back(tile);
+    }
+    for (auto &c : doc["atmosphere"]["clouds"]) {
+        float dx = c.contains("drift_x") ? (float)c["drift_x"] : (float)c["drift_speed"];
+        float dz = c.contains("drift_z") ? (float)c["drift_z"] : 0.f;
+        m.clouds.push_back({c["x"], c["y"], c["z"], c["scale"], dx, dz});
+    }
+    return m;
+}
+
+time_t fileMtime(const std::string &p)
