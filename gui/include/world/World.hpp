@@ -28,3 +28,21 @@ inline const glm::vec3 RES_COLORS[7] = {
     {1.00f, 0.20f, 0.62f},  // thystame  — pink
 };
 
+struct Prop  { std::string model; float dx, dz, rot_y, scale; };
+struct Tile  { int x, y; std::string ground; std::vector<Prop> props; int res[7] = {}; };
+struct Cloud { float x, y, z, scale, drift_x, drift_z; };
+
+struct MapData {
+    int w = 0, h = 0;
+    std::vector<Tile>  tiles;
+    std::vector<Cloud> clouds;
+    glm::vec3 skyColor {0.44f, 0.70f, 0.94f};
+    glm::vec3 fogColor {0.60f, 0.82f, 0.95f};
+};
+
+// OBJ mesh cache (loads on first use, prints once).
+Mesh     &getMesh(const std::string &model);
+glm::vec3 colorFor(const std::string &n);
+MapData   loadMap(const std::string &path);
+time_t    fileMtime(const std::string &p);
+
