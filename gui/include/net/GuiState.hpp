@@ -51,3 +51,33 @@ struct GuiIncantation {
     bool success  = false;
 };
 
+struct GuiState {
+    int width    = 0;
+    int height   = 0;
+    int timeUnit = 100;        // server tick frequency (sgt)
+    bool sizeKnown = false;
+    float secondsToReset = -1.f;   // countdown to next resource reset (sst); <0 = unknown
+
+    std::vector<std::string>          teams;
+    std::vector<GuiTile>              tiles;     // size width*height, index y*width + x
+    std::unordered_map<int, GuiPlayer> players;  // keyed by player id
+    std::unordered_map<int, GuiEgg>    eggs;     // keyed by egg id
+
+    std::string winner;        // non-empty once a team wins (seg)
+    std::deque<GuiLogEntry> log;   // recent player actions (capped); newest at back
+    unsigned long logTotal = 0;    // total actions ever logged (for audio event draining)
+
+    GuiTile &tileAt(int x, int y) { return tiles[y * width + x]; }
+    const GuiTile &tileAt(int x, int y) const { return tiles[y * width + x]; }
+
+    bool inBounds(int x, int y) const {
+        return x >= 0 && y >= 0 && x < width && y < height;
+    }
+
+    void resizeGrid(int w, int h) {
+        width = w;
+        height = h;
+        tiles.assign(static_cast<std::size_t>(w) * h, GuiTile{});
+        sizeKnown = true;
+    }
+};
