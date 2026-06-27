@@ -24,3 +24,30 @@ struct GuiLogEntry {
     int         kind = 0;        // 0=grab 1=levelup 2=death (action-text tint)
 };
 
+struct GuiPlayer {
+    int         id          = 0;
+    int         x           = 0;
+    int         y           = 0;
+    int         orientation = 1;   // 1=N 2=E 3=S 4=W (server convention)
+    int         level       = 1;
+    std::string team;
+    bool        incanting   = false;
+    std::array<int, GUI_RES_COUNT> inv{};   // last-known inventory (from pin)
+    bool        invKnown    = false;
+};
+
+struct GuiEgg {
+    int         id   = 0;
+    int         x    = 0;
+    int         y    = 0;
+    std::string team;   // resolved from the forking parent at "enw" time
+};
+
+// A transient incantation flash, consumed by the renderer for FX.
+struct GuiIncantation {
+    int  x       = 0;
+    int  y       = 0;
+    bool resolved = false;   // false=ongoing, true=finished (set by pie)
+    bool success  = false;
+};
+
