@@ -283,3 +283,25 @@ void GuiClient::_processLine(const std::string &line)
                 if (it != _state.players.end())
                     it->second.incanting = true;
             }
+            if (firstId >= 0)
+                _logEvent(firstId, "begins an incantation", 3);
+        }
+
+    } else if (cmd == "pie") {
+        GuiIncantation fx;
+        int result = 0;
+        if (iss >> fx.x >> fx.y >> result) {
+            fx.resolved = true;
+            fx.success  = (result != 0);
+            _incantations.push_back(fx);
+        }
+        for (auto &kv : _state.players)
+            if (kv.second.x == fx.x && kv.second.y == fx.y)
+                kv.second.incanting = false;
+
+    } else if (cmd == "seg") {
+        std::string team;
+        if (iss >> team)
+            _state.winner = team;
+    }
+}
