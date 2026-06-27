@@ -159,3 +159,32 @@ void GuiClient::poll()
             _processLine(line);
     }
 }
+
+void GuiClient::_processLine(const std::string &line)
+{
+    std::istringstream iss(line);
+    std::string cmd;
+    iss >> cmd;
+
+    if (cmd == "msz") {
+        int w, h;
+        if (iss >> w >> h)
+            _state.resizeGrid(w, h);
+
+    } else if (cmd == "sgt") {
+        int t;
+        if (iss >> t)
+            _state.timeUnit = t;
+
+    } else if (cmd == "sst") {
+        int ticks;
+        if (iss >> ticks && _state.timeUnit > 0)
+            _state.secondsToReset = (float)ticks / (float)_state.timeUnit;
+
+    } else if (cmd == "tna") {
+        std::string team;
+        if (iss >> team)
+            _state.teams.push_back(team);
+
+    } else if (cmd == "bct") {
+        int x, y;
