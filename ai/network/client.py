@@ -47,12 +47,12 @@ class Client:
         self.map_x = int(dims[0])
         self.map_y = int(dims[1])
 
-    def send(self, command: str) -> str:
+    def send(self, command: str, is_incantation: bool = False) -> str:
         self._write(command)
-        return self._read_response()
+        return self._read_response(is_incantation)
 
-    def receive(self) -> str:
-        return self._read_response()
+    def receive(self, is_incantation: bool = False) -> str:
+        return self._read_response(is_incantation)
 
     def send_incantation(self) -> str:
         """Two-phase send for Incantation.
@@ -157,12 +157,14 @@ class Client:
         self._log("<<", line)
         return line
 
-    def _read_response(self) -> str:
+    def _read_response(self, is_incantation: bool = False) -> str:
         while True:
             line = self._read_line()
             if line.startswith("message "):
                 self._broadcasts.append(line)
             elif line.startswith("Current level"):
+                if is_incantation:
+                    return line
                 # incantation result — peut arriver non sollicité (joueur participant
                 # qui n'a pas envoyé Incantation) : on le met de côté pour le brain
                 try:
@@ -170,6 +172,8 @@ class Client:
                 except (IndexError, ValueError):
                     pass
             elif line.startswith("Elevation underway"):
+                if is_incantation:
+                    return line
                 pass  # Async message from incantation, ignore as command response
             elif line.startswith("eject:"):
                 pass  # Async message from being pushed, ignore as command response

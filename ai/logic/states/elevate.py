@@ -16,10 +16,15 @@ def _do_incantation(client: Client, player: Player):
     for stone in STONES:
         for _ in range(req.get(stone, 0)):
             client.send(f"Set {stone}")
-    result = client.send_incantation()
-    if result.startswith("Current level"):
+            
+    start_msg = client.send("Incantation", is_incantation=True)
+    if start_msg == "ko":
+        return
+        
+    end_msg = client.receive(is_incantation=True)
+    if end_msg.startswith("Current level"):
         try:
-            player.level = int(result.split(":")[1].strip())
+            player.level = int(end_msg.split(":")[1].strip())
             client.send(f"Broadcast {encode('RESUME', f'{client.team}:{player.level}')}")
         except (IndexError, ValueError):
             pass
