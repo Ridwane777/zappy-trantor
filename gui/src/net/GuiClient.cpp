@@ -124,3 +124,38 @@ bool GuiClient::connect(const std::string &host, int port, std::string &err)
     _state = GuiState{};
     return true;
 }
+
+void GuiClient::poll()
+{
+    if (_fd < 0)
+        return;
+
+    char buf[8192];
+    while (true) {
+        ssize_t n = read(_fd, buf, sizeof(buf));
+        if (n > 0) {
+            _readBuf.append(buf, static_cast<std::size_t>(n));
+            continue;
+        }
+        if (n == 0) {
+            disconnect();
+            return;
+        }
+        if (errno == EAGAIN || errno == EWOULDBLOCK)
+            break;
+        if (errno == EINTR)
+            continue;
+        disconnect();
+        return;
+    }
+
+    std::size_t nl;
+    while ((nl = _readBuf.find('\n')) != std::string::npos) {
+        std::string line = _readBuf.substr(0, nl);
+        _readBuf.erase(0, nl + 1);
+        if (!line.empty() && line.back() == '\r')
+            line.pop_back();
+        if (!line.empty())
+            _processLine(line);
+    }
+}
