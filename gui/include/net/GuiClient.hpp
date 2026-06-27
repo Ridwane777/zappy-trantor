@@ -38,3 +38,10 @@ public:
     // No-op if not connected. Best-effort (non-blocking socket).
     void send(const std::string &line);
 
+    bool connected() const { return _fd >= 0; }
+    const GuiState &state() const { return _state; }
+    GuiState &state() { return _state; }
+
+    // Transient incantation flashes since last drain (renderer consumes these).
+    std::deque<GuiIncantation> &incantationEvents() { return _incantations; }
+
