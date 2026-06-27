@@ -155,3 +155,38 @@ Mesh buildShoreMesh(const std::vector<Tile> &tiles, int dist)
 }
 
 Mesh buildGroundMesh(const std::vector<Tile> &tiles, const std::string &groundType,
+                     bool cliffOnly)
+{
+    std::vector<float>        verts;
+    std::vector<unsigned int> idx;
+    unsigned int base = 0;
+
+    const float LAND_Y  =  0.00f;
+    const float WATER_Y = -1.80f;
+
+    for (auto &t : tiles) {
+        if (t.ground != groundType) continue;
+        float x0 = t.x * TILE - TILE * 0.501f;
+        float x1 = t.x * TILE + TILE * 0.501f;
+        float z0 = t.y * TILE - TILE * 0.501f;
+        float z1 = t.y * TILE + TILE * 0.501f;
+        float y  = (groundType == "water") ? WATER_Y : LAND_Y;
+
+        if (!cliffOnly) {
+            verts.insert(verts.end(), {x0,y,z0, 0,1,0});
+            verts.insert(verts.end(), {x1,y,z0, 0,1,0});
+            verts.insert(verts.end(), {x1,y,z1, 0,1,0});
+            verts.insert(verts.end(), {x0,y,z1, 0,1,0});
+            idx.insert(idx.end(), {base,base+1,base+2, base,base+2,base+3});
+            base += 4;
+        }
+        (void)cliffOnly;
+    }
+    if (verts.empty()) {
+        verts = {0,0,0, 0,1,0, 0,0,0, 0,1,0, 0,0,0, 0,1,0};
+        idx   = {0,1,2};
+    }
+    return Mesh(verts, idx);
+}
+
+void drawMesh(Shader &toon, Shader & /*unused*/, Mesh &mesh,
