@@ -16,3 +16,25 @@
 #include <string>
 #include <deque>
 
+class GuiClient {
+public:
+    GuiClient() = default;
+    ~GuiClient();
+
+    GuiClient(const GuiClient &) = delete;
+    GuiClient &operator=(const GuiClient &) = delete;
+
+    // Establish the connection and send "GRAPHIC". On failure returns false and
+    // fills `err`. On success the socket is left non-blocking.
+    bool connect(const std::string &host, int port, std::string &err);
+
+    // Drain whatever the server has sent and apply it to the state.
+    // Sets connected() to false if the peer closes or errors.
+    void poll();
+
+    void disconnect();
+
+    // Send a request line to the server (e.g. "pin #3"). A newline is appended.
+    // No-op if not connected. Best-effort (non-blocking socket).
+    void send(const std::string &line);
+
