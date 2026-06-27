@@ -6,7 +6,6 @@
 #include <stdexcept>
 #include <iostream>
 #include <cstring>
-#include <cstdlib>
 #include <sstream>
 
 Server::Server(const ServerConfig &config) : _fd(-1), _config(config), _world(_config)
@@ -22,7 +21,6 @@ Server::Server(const ServerConfig &config) : _fd(-1), _config(config), _world(_c
     };
     _world.onPlayerEvent = [this](int fd, const std::string &msg) {
         if (msg == "dead\n") {
-            // Find the client and mark it closing so it flushes and disconnects
             for (auto &c : _clients) {
                 if (c.getFd() == fd) {
                     c.queueWrite(msg);
@@ -34,53 +32,76 @@ Server::Server(const ServerConfig &config) : _fd(-1), _config(config), _world(_c
             _sendToPlayer(fd, msg);
         }
     };
-    _lastTickTime = std::chrono::steady_clock::now();
-    _initGuiHandlers();
+
+    _lastTick = std::chrono::steady_clock::now();
+    _initGuiRequests();
 }
 
-void Server::_initGuiHandlers()
+void Server::_initGuiRequests()
 {
-    _guiHandlers["msz"] = [this](Client &c, const std::string &) {
+    _guiRequests["msz"] = [this](Client &c, const std::string &) {
         c.queueWrite(_world.guiMapSize());
     };
-    _guiHandlers["bct"] = [this](Client &c, const std::string &arg) {
-        std::istringstream iss(arg); int x, y;
-        if (iss >> x >> y) c.queueWrite(_world.guiTileContent(x, y));
-    };
-    _guiHandlers["mct"] = [this](Client &c, const std::string &) {
-        c.queueWrite(_world.guiMapContent());
-    };
-    _guiHandlers["tna"] = [this](Client &c, const std::string &) {
+    _guiRequests["tna"] = [this](Client &c, const std::string &) {
         c.queueWrite(_world.guiTeamNames());
     };
-    _guiHandlers["ppo"] = [this](Client &c, const std::string &arg) {
+    _guiRequests["mct"] = [this](Client &c, const std::string &) {
+        c.queueWrite(_world.guiMapContent());
+    };
+    _guiRequests["bct"] = [this](Client &c, const std::string &arg) {
+        std::istringstream iss(arg);
+        int x, y;
+        if (iss >> x >> y)
+            c.queueWrite(_world.guiTileContent(x, y));
+    };
+    _guiRequests["ppo"] = [this](Client &c, const std::string &arg) {
         if (!arg.empty() && arg[0] == '#') {
             std::string resp = _world.guiPlayerPosition(std::stoi(arg.substr(1)));
-            if (!resp.empty()) c.queueWrite(resp);
+            if (!resp.empty())
+                c.queueWrite(resp);
         }
     };
-    _guiHandlers["plv"] = [this](Client &c, const std::string &arg) {
+    _guiRequests["plv"] = [this](Client &c, const std::string &arg) {
         if (!arg.empty() && arg[0] == '#') {
             std::string resp = _world.guiPlayerLevel(std::stoi(arg.substr(1)));
-            if (!resp.empty()) c.queueWrite(resp);
+            if (!resp.empty())
+                c.queueWrite(resp);
         }
     };
-    _guiHandlers["pin"] = [this](Client &c, const std::string &arg) {
+    _guiRequests["pin"] = [this](Client &c, const std::string &arg) {
         if (!arg.empty() && arg[0] == '#') {
             std::string resp = _world.guiPlayerInventory(std::stoi(arg.substr(1)));
-            if (!resp.empty()) c.queueWrite(resp);
+            if (!resp.empty())
+                c.queueWrite(resp);
         }
     };
-    _guiHandlers["sgt"] = [this](Client &c, const std::string &) {
+    _guiRequests["sgt"] = [this](Client &c, const std::string &) {
         c.queueWrite("sgt " + std::to_string(_config.freq) + "\n");
     };
-    _guiHandlers["sst"] = [this](Client &c, const std::string &arg) {
-        try {
-            int t = std::stoi(arg);
-            if (t > 0) _config.freq = t;
-            c.queueWrite("sst " + std::to_string(_config.freq) + "\n");
-        } catch (...) {}
+    _guiRequests["sst"] = [this](Client &c, const std::string &arg) {
+        int freq = std::stoi(arg);
+        if (freq > 0)
+            _config.freq = freq;
+        c.queueWrite("sst " + std::to_string(_config.freq) + "\n");
     };
+}
+
+void Server::_processGuiRequest(Client &client, const std::string &line)
+{
+    std::istringstream iss(line);
+    std::string cmd;
+    iss >> cmd;
+    std::string arg;
+    std::getline(iss >> std::ws, arg);
+
+    auto it = _guiRequests.find(cmd);
+    if (it != _guiRequests.end()) {
+        try {
+            it->second(client, arg);
+        } catch (const std::exception &) {
+            // malformed argument (e.g. "#abc"): ignore the request
+        }
+    }
 }
 
 void Server::_broadcastToGui(const std::string &msg)
@@ -173,8 +194,9 @@ void Server::_processHandshake(std::size_t index, const std::string &line)
         _world.addPlayer(client.getFd(), line);
         return;
     }
-    // No initial slot left — check if a Fork egg exists for this team.
-    // If so, hatch it: the child process spawned by do_fork() becomes a player.
+
+    // No initial slot left for this team: try hatching one of its Fork eggs
+    // instead of rejecting the connection outright.
     if (it != _slots.end() && _world.hatchEgg(line)) {
         client.setState(ClientState::AI);
         client.setTeam(line);
@@ -207,25 +229,14 @@ bool Server::_handleClient(std::size_t index)
     Client &client = _clients[clientIndex];
     client.appendToReadBuffer(buf, n);
 
-    // Process every complete line: the first is the team handshake, the rest are
-    // gameplay commands from AI clients (GUI clients don't send commands).
     std::string line;
     while (client.extractLine(line)) {
-        if (client.getState() == ClientState::WAITING_TEAM_NAME) {
+        if (client.getState() == ClientState::WAITING_TEAM_NAME)
             _processHandshake(index, line);
-        } else if (client.getState() == ClientState::AI) {
+        else if (client.getState() == ClientState::AI)
             _world.queueCommand(client.getFd(), line);
-        } else if (client.getState() == ClientState::GUI) {
-            std::istringstream iss(line);
-            std::string cmd;
-            iss >> cmd;
-            std::string arg;
-            std::getline(iss >> std::ws, arg);
-            
-            auto it = _guiHandlers.find(cmd);
-            if (it != _guiHandlers.end())
-                it->second(client, arg);
-        }
+        else if (client.getState() == ClientState::GUI)
+            _processGuiRequest(client, line);
     }
 
     return false;
@@ -261,25 +272,21 @@ void Server::run()
                 _fds[i].events |= POLLOUT;
         }
 
-        auto now = std::chrono::steady_clock::now();
-        double elapsedSeconds = std::chrono::duration<double>(now - _lastTickTime).count();
         double tickDuration = 1.0 / _config.freq;
-
-        int ticksToProcess = 0;
-        if (elapsedSeconds >= tickDuration) {
-            ticksToProcess = static_cast<int>(elapsedSeconds / tickDuration);
-            _lastTickTime += std::chrono::duration_cast<std::chrono::steady_clock::duration>(
-                std::chrono::duration<double>(ticksToProcess * tickDuration));
+        double elapsed = std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - _lastTick).count();
+        int ticks = static_cast<int>(elapsed / tickDuration);
+        if (ticks > 0) {
+            _world.update(ticks);
+            _lastTick += std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+                std::chrono::duration<double>(ticks * tickDuration));
         }
 
-        if (ticksToProcess > 0) {
-            _world.update(ticksToProcess);
-        }
-
-        double secondsToNextTick = tickDuration - std::chrono::duration<double>(std::chrono::steady_clock::now() - _lastTickTime).count();
-        int timeoutMs = static_cast<int>(secondsToNextTick * 1000.0);
-        if (timeoutMs < 0) timeoutMs = 0;
-        if (timeoutMs > 500) timeoutMs = 500;
+        double remaining = tickDuration - std::chrono::duration<double>(
+            std::chrono::steady_clock::now() - _lastTick).count();
+        int timeoutMs = static_cast<int>(remaining * 1000.0);
+        if (timeoutMs < 0)
+            timeoutMs = 0;
 
         if (poll(_fds.data(), _fds.size(), timeoutMs) == -1)
             throw std::runtime_error("poll() failed");
