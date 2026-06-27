@@ -21,6 +21,7 @@ class Client:
         self.sock = None
         self.map_x = 0
         self.map_y = 0
+        self.free_slots = 0
         self._broadcasts = []
         self._pending_level = None   # niveau reçu via "Current level" (incantation)
         self._next_move = 0.0
@@ -34,7 +35,13 @@ class Client:
             raise ConnectionError(f"Handshake raté : attendu WELCOME, reçu '{welcome}'")
 
         self._write(self.team)
-        self._read_line()  # CLIENT-NUM
+        # CLIENT-NUM = nombre de slots initiaux encore libres dans la team.
+        # 0 → on a pris le dernier slot (cas c=1 : on est seul, il faut forker).
+        # >0 → d'autres connexions sont encore possibles (cas c=N, test à N instances).
+        try:
+            self.free_slots = int(self._read_line())
+        except ValueError:
+            self.free_slots = 0
 
         dims = self._read_line().split()
         self.map_x = int(dims[0])
@@ -46,6 +53,55 @@ class Client:
 
     def receive(self) -> str:
         return self._read_response()
+
+    def send_incantation(self) -> str:
+        """Two-phase send for Incantation.
+
+        Phase 1 reads until 'Elevation underway' (start OK) or 'ko' (immediate fail).
+        Phase 2 reads until 'Current level: N' (success) or 'ko' (fail after 300 ticks).
+        Keeps routing broadcasts/eject/dead normally so participants are not affected.
+        """
+        self._write("Incantation")
+
+        # Phase 1 — expect "Elevation underway" or "ko"
+        # "Current level" peut arriver ici si on était participant d'une
+        # incantation concurrente qui vient de se terminer : on le stocke
+        # et on continue à lire (notre propre Incantation n'est pas encore traitée)
+        while True:
+            line = self._read_line()
+            if line.startswith("message "):
+                self._broadcasts.append(line)
+            elif line.startswith("Current level"):
+                try:
+                    self._pending_level = int(line.split(":")[1].strip())
+                except (IndexError, ValueError):
+                    pass
+            elif line.startswith("eject:"):
+                pass
+            elif line == "dead":
+                raise ConnectionError("Mort de faim ou fin de partie")
+            elif line == "ko":
+                return "ko"
+            else:
+                break  # "Elevation underway"
+
+        # Phase 2 — wait for final result (300 ticks later)
+        while True:
+            line = self._read_line()
+            if line.startswith("message "):
+                self._broadcasts.append(line)
+            elif line.startswith("eject:"):
+                pass
+            elif line == "dead":
+                raise ConnectionError("Mort de faim ou fin de partie")
+            elif line == "ko":
+                return "ko"
+            elif line.startswith("Current level"):
+                try:
+                    self._pending_level = int(line.split(":")[1].strip())
+                except (IndexError, ValueError):
+                    pass
+                return line
 
     def send_batch(self, commands: list) -> list:
         # envoie les commandes par chunks de 10 (limite du serveur) sans attendre
@@ -72,6 +128,12 @@ class Client:
         self._pending_level = None
         return lvl
 
+    _DEBUG = os.getenv("ZAPPY_DEBUG") == "1"
+
+    def _log(self, direction: str, text: str):
+        if self._DEBUG:
+            print(f"[{direction}] {text}", flush=True)
+
     def _write(self, message: str):
         # cadençage des déplacements uniquement : un Forward/Left/Right ne part
         # qu'après MOVE_INTERVAL, ce qui borne la vitesse visible (2 tuiles/s à
@@ -81,6 +143,7 @@ class Client:
             if wait > 0:
                 time.sleep(wait)
             self._next_move = time.monotonic() + self.MOVE_INTERVAL
+        self._log(">>", message)
         self.sock.sendall((message + "\n").encode())
 
     def _read_line(self) -> str:
@@ -90,7 +153,9 @@ class Client:
             if not chunk:
                 raise ConnectionError("Connexion fermée par le serveur")
             buf += chunk
-        return buf.decode().strip()
+        line = buf.decode().strip()
+        self._log("<<", line)
+        return line
 
     def _read_response(self) -> str:
         while True:
