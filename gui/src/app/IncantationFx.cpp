@@ -40,7 +40,6 @@ void drawIncantations(const std::vector<IncantationEffect>& fx, Shader& incant,
         float fade    = fadeIn * fadeOut;
         float ringRot = elapsed * 0.20f;
 
-        // ── dashed ring with Fresnel + radial glow ────────────────
         incant.setBool("uPillarMode", false);
         incant.setVec3("uRingCenter", ix.pos.x, ix.pos.y, ix.pos.z);
         incant.setFloat("uRingInnerR", INNER_R);
@@ -57,7 +56,6 @@ void drawIncantations(const std::vector<IncantationEffect>& fx, Shader& incant,
             dashedRing.draw();
         }
 
-        // ── pillars: Gaussian beam (diff+spec) + Fresnel ──────────
         incant.setBool("uPillarMode", true);
         incant.setVec3("uColor", 0.30f, 1.0f, 0.92f);
         for (int i = 0; i < N_PILLARS; ++i) {

@@ -69,7 +69,6 @@ void drawCharacters(std::vector<Character>& chars, Shader& skin, Shader& aura,
                 break;
 
             case CharState::GROUNDED:
-                // hold last frame
                 drawAnim = ch.fallAnim; loop = false; rev = false;
                 ch.animTime = fallDur;
                 if (ch.stateTimer >= 30.f) {
@@ -106,8 +105,6 @@ void drawCharacters(std::vector<Character>& chars, Shader& skin, Shader& aura,
         ch.mesh.draw();
     }
 
-    // ── full-body glow: redraw character at 1.12× scale, additive blend,
-    // no depth test → green light envelops the whole body
     bool anyAura = false;
     for (auto& ch : chars) anyAura |= (ch.auraTimer > 0.f);
     if (!anyAura) return;

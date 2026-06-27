@@ -68,8 +68,6 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
 
     _hits.clear();
 
-    // ── maximize toggle: a plain square ("carreau") in the top-left
-    // corner, same look as a window manager's maximize/restore control ──
     {
         const float fsSize = 16.f, fsPad = 12.f;
         sf::RectangleShape fsIcon(sf::Vector2f(fsSize, fsSize));
@@ -112,7 +110,6 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
     info.setPosition(ws.x - b.width - 14.f, 14.f);
     win.draw(info);
 
-    // ── retractable sidebar (teams / players / levels) ──────────────────────
     const float pad = 14.f;
     float panelX = ws.x - WIDTH * _anim;
     float tabW = 26.f, tabH = 60.f, tabX = panelX - tabW, tabY = 96.f;
@@ -137,7 +134,6 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
 
         float x = panelX + pad, y = 46.f;
 
-        // events: countdown to the next resource reset (fixed header)
         {
             sf::Text eh; eh.setFont(font); eh.setString("EVENTS");
             eh.setCharacterSize(18); eh.setFillColor(sf::Color(185, 205, 240));
@@ -170,7 +166,6 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
         title.setCharacterSize(20); title.setFillColor(sf::Color(200, 220, 255));
         title.setPosition(x, y); win.draw(title); y += 34.f;
 
-        // ── scrollable team/player list (clipped to its own view) ────────────
         const float listTop = y;
         bool popupOpen = (_selPlayer >= 0 && state->players.count(_selPlayer));
         const float popupH = popupOpen ? 234.f : 0.f;
@@ -183,8 +178,8 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
         lv.setViewport(sf::FloatRect(panelX / ws.x, listTop / ws.y, WIDTH / ws.x, listH / ws.y));
         win.setView(lv);
 
-        float cy = listTop;   // content y (rows are drawn here; the view applies _scroll)
-        auto rowOnScreen = [&](float ry, float rh) {     // is row (content ry) inside the band?
+        float cy = listTop;
+        auto rowOnScreen = [&](float ry, float rh) {
             float sy = ry - _scroll;
             return sy + rh > listTop && sy < listTop + listH;
         };
@@ -235,7 +230,6 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
         _maxScroll = std::max(0.f, (cy - listTop) - listH);
         if (_scroll > _maxScroll) _scroll = _maxScroll;
 
-        // ── inventory popup for the selected player (pinned at the bottom) ────
         if (popupOpen) {
             const GuiPlayer &sp = state->players.at(_selPlayer);
             float pw = WIDTH - 2 * pad;
@@ -270,13 +264,12 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
                 ry += 25.f;
             }
         } else if (_selPlayer >= 0) {
-            _selPlayer = -1;                              // selected player gone (died)
+            _selPlayer = -1;
         }
-        // panel background catch-all (last → row hits take priority): no orbit
+        // panel background catch-all (last so row hits take priority)
         _hits.push_back({sf::FloatRect(panelX, 0.f, WIDTH, (float)ws.y), 3, "", -1});
     }
 
-    // ── action feed (bottom-left): grabs, level-ups, deaths, incantations ────
     if (state) {
         auto teamCol = [&](const std::string &tn) -> sf::Color {
             for (int k = 0; k < (int)state->teams.size(); ++k)
@@ -295,7 +288,7 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
             win.draw(bg);
         }
         for (int k = 0; k < shown; ++k) {
-            const GuiLogEntry &e = state->log[n - 1 - k];   // newest first
+            const GuiLogEntry &e = state->log[n - 1 - k];
             float ly = baseY - k * lineH;
             int alpha = (int)(255.f * (1.f - 0.55f * (float)k / maxLines));
             sf::Text nm; nm.setFont(font);
@@ -304,10 +297,10 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
             sf::Color nc = teamCol(e.team); nc.a = (sf::Uint8)alpha;
             nm.setFillColor(nc);
             nm.setPosition(14.f, ly); win.draw(nm);
-            sf::Color ac = e.kind == 1 ? sf::Color(150, 240, 160)    // level up
-                         : e.kind == 2 ? sf::Color(245, 120, 110)    // death
-                         : e.kind == 3 ? sf::Color(190, 160, 255)    // incantation
-                         :               sf::Color(208, 211, 220);   // grab
+            sf::Color ac = e.kind == 1 ? sf::Color(150, 240, 160)
+                         : e.kind == 2 ? sf::Color(245, 120, 110)
+                         : e.kind == 3 ? sf::Color(190, 160, 255)
+                         :               sf::Color(208, 211, 220);
             ac.a = (sf::Uint8)alpha;
             sf::Text at; at.setFont(font);
             at.setString(" " + e.action);

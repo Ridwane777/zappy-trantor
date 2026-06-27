@@ -15,7 +15,6 @@ void drawTreeMotes(std::vector<Spark>& motes, bool charging, float chargeT,
 {
     const float baseR = (16.6667f / 1.381f) * 0.8f;
 
-    // ── CHARGING: motes gather and spiral up the trunk (energy building) ─
     if (charging) {
         int n = (int)(chargeT * chargeT * 7.f) + (frnd(0.f, 1.f) < chargeT ? 1 : 0);
         for (int i = 0; i < n; ++i) {
@@ -30,14 +29,13 @@ void drawTreeMotes(std::vector<Spark>& motes, bool charging, float chargeT,
                               inward.z * frnd(0.4f, 1.3f));
             m.maxLife = frnd(1.0f, 2.0f); m.life = m.maxLife;
             m.size  = frnd(0.12f, 0.30f);
-            m.phase = frnd(0.f, 6.28f); m.twFreq = frnd(16.f, 36.f);  // fast uncanny flicker
-            m.color = glm::mix(glm::vec3(0.85f, 0.95f, 0.30f),        // sickly yellow-green
-                               glm::vec3(0.25f, 1.0f, 0.40f), chargeT) // -> eerie green
+            m.phase = frnd(0.f, 6.28f); m.twFreq = frnd(16.f, 36.f);
+            m.color = glm::mix(glm::vec3(0.85f, 0.95f, 0.30f),
+                               glm::vec3(0.25f, 1.0f, 0.40f), chargeT)
                       * frnd(0.8f, 1.2f);
             motes.push_back(m);
         }
     }
-    // ── RELEASING: a ring of motes bursts outward across the island ──────
     if (justReleased) {
         const int n = 150;
         for (int i = 0; i < n; ++i) {
@@ -56,7 +54,6 @@ void drawTreeMotes(std::vector<Spark>& motes, bool charging, float chargeT,
         }
     }
 
-    // update: integrate + a slow uncanny swirl around the tree axis
     for (auto& m : motes) {
         glm::vec2 rel(m.pos.x - treePos.x, m.pos.z - treePos.z);
         float a = 0.9f * dt, c = std::cos(a), s = std::sin(a);
@@ -68,7 +65,6 @@ void drawTreeMotes(std::vector<Spark>& motes, bool charging, float chargeT,
     motes.erase(std::remove_if(motes.begin(), motes.end(),
         [](const Spark& s) { return s.life <= 0.f; }), motes.end());
 
-    // render: additive glowing twinkling billboards (the star-particle kit)
     if (motes.empty()) return;
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE);
@@ -80,7 +76,7 @@ void drawTreeMotes(std::vector<Spark>& motes, bool charging, float chargeT,
     glBindVertexArray(vao);
     for (auto& m : motes) {
         float k  = m.life / m.maxLife;
-        float tw = 0.5f + 0.5f * std::sin(elapsed * m.twFreq + m.phase);  // erratic flicker
+        float tw = 0.5f + 0.5f * std::sin(elapsed * m.twFreq + m.phase);
         star.setVec3 ("uCenter", m.pos.x, m.pos.y, m.pos.z);
         star.setFloat("uSize",   m.size);
         star.setVec3 ("uColor",  m.color.r, m.color.g, m.color.b);

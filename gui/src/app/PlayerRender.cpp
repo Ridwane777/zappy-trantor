@@ -23,7 +23,6 @@ int tierOf(const PlayerTier tiers[4], int level) {
     return t;
 }
 
-// Map a server orientation (1=N 2=E 3=S 4=W) to a model yaw in degrees.
 static float orientationYaw(int o) {
     switch (o) { case 1: return 180.f; case 2: return 90.f;
                  case 3: return 0.f;   case 4: return 270.f; }
@@ -34,10 +33,6 @@ static float frand(float a, float b) {
     return a + (b - a) * ((float)std::rand() / (float)RAND_MAX);
 }
 
-// cell->world mapping : chaque joueur est placé sur la copie pleine taille de
-// la carte qui appartient à SON équipe (même mapping carré inset que
-// GuiApp.cpp pour les ressources), juste translatée vers l'île de cette
-// équipe dans l'anneau — exactement le même monde, répété.
 static glm::vec2 worldRaw(PlayerRenderCtx& ctx, const GuiPlayer& p) {
     if (ctx.testMode)
         return { p.x * TILE + TILE * 0.5f, p.y * TILE + TILE * 0.5f };
@@ -59,7 +54,6 @@ static glm::vec2 worldRaw(PlayerRenderCtx& ctx, const GuiPlayer& p) {
     return { wx + off.x, wz + off.y };
 }
 
-// smaller overall, and grows with level (lvl1 ~0.44x -> lvl8 ~0.80x)
 static float scaleOf(PlayerRenderCtx& ctx, int level) {
     int L = level < 1 ? 1 : (level > 8 ? 8 : level);
     return ctx.tiers[tierOf(ctx.tiers, level)].scale * (0.44f + 0.051f * (L - 1));
@@ -73,14 +67,11 @@ static glm::mat4 playerModel(PlayerRenderCtx& ctx, const GuiPlayer& p) {
     return M;
 }
 
-// Advances every player's smooth walk interpolation, turn blend, and
-// evolution/level-up timers; spawns the level-up sparks burst.
 static void updatePlayerStates(PlayerRenderCtx& ctx,
                                const std::vector<const GuiPlayer*>& drawList,
                                float dt) {
-    const float MOVE_DUR = 0.50f;                     // seconds to glide a tile (≈2 tiles/s)
-    // World distance covered by one full walk cycle (foot-slide tuning):
-    // smaller = legs cycle faster / more steps per tile. Override via env.
+    const float MOVE_DUR = 0.50f;
+    // smaller WALK_CYCLE_DIST = legs cycle faster / more steps per tile; override via env
     static const float WALK_CYCLE_DIST = std::getenv("ZAPPY_STRIDE")
         ? std::max(0.2f, (float)std::atof(std::getenv("ZAPPY_STRIDE"))) : TILE;
     for (const GuiPlayer* pp : drawList) {
@@ -89,32 +80,30 @@ static void updatePlayerStates(PlayerRenderCtx& ctx,
         glm::vec2 target = worldRaw(ctx, p);
         if (!pa.posInit) { pa.curWorld = pa.prevWorld = target; pa.posInit = true; }
         pa.freezeT = std::max(0.f, pa.freezeT - dt);
-        bool frozen = pa.freezeT > 0.f;               // hold still during a level-up
-        if (!frozen && (p.x != pa.px || p.y != pa.py)) {   // moved (skipped while frozen)
+        bool frozen = pa.freezeT > 0.f;
+        if (!frozen && (p.x != pa.px || p.y != pa.py)) {
             const GuiState& gs2 = ctx.netClient.state();
             int W = gs2.sizeKnown ? gs2.width : ctx.map.w;
             int H = gs2.sizeKnown ? gs2.height : ctx.map.h;
-            // The map is a torus: stepping off an edge wraps the grid coord
-            // to the far side. Don't glide across the whole island for that —
-            // snap instantly, like the player really did at the edge.
+            // torus map: large coord delta means wrapping — snap rather than glide
             bool wrap = std::abs(p.x - pa.px) > W / 2 ||
                         std::abs(p.y - pa.py) > H / 2;
             if (wrap) {
                 pa.prevWorld = target; pa.curWorld = target; pa.moveLerp = 1.f;
-            } else {                                  // normal step -> glide there
+            } else {
                 pa.prevWorld = pa.curWorld; pa.moveLerp = 0.f; pa.moveT = 0.5f;
             }
             pa.px = p.x; pa.py = p.y;
         }
-        if (!frozen && p.orientation != pa.po) {      // turned (skipped while frozen)
+        if (!frozen && p.orientation != pa.po) {
             if (pa.po != -1) {
                 int diff = (p.orientation - pa.po + 4) % 4;
-                pa.turnAnim = (diff == 3) ? 3 : 4;    // CCW=left else right
+                pa.turnAnim = (diff == 3) ? 3 : 4;   // CCW=left, else right
                 pa.turnT = 0.4f;
             }
             pa.po = p.orientation;
         }
-        glm::vec2 beforeC = pa.curWorld;              // for ground-distance sync
+        glm::vec2 beforeC = pa.curWorld;
         if (!frozen) {
             pa.moveLerp = std::min(1.f, pa.moveLerp + dt / MOVE_DUR);
             float sm = pa.moveLerp * pa.moveLerp * (3.f - 2.f * pa.moveLerp);  // smoothstep
@@ -122,15 +111,13 @@ static void updatePlayerStates(PlayerRenderCtx& ctx,
         }
         pa.moveT = std::max(0.f, pa.moveT - dt);
         pa.turnT = std::max(0.f, pa.turnT - dt);
-        int a = 0;                                    // idle
-        if (frozen)                 a = 0;            // stand still for the level-up
-        else if (pa.moveLerp < 1.f) a = 1;            // walk while gliding
-        else if (pa.turnT > 0.f)    a = pa.turnAnim;  // turn
+        int a = 0;
+        if (frozen)                 a = 0;
+        else if (pa.moveLerp < 1.f) a = 1;
+        else if (pa.turnT > 0.f)    a = pa.turnAnim;
         if (a >= ctx.tiers[tierOf(ctx.tiers, p.level)].mesh.animCount()) a = 0;
         pa.anim = a;
-        // Advance the animation clock. While walking, sync the stride to the
-        // actual ground distance moved this frame so the feet don't slide
-        // (one walk cycle == WALK_CYCLE_DIST world units). Idle/turn: real time.
+        // sync walk animation to ground distance to prevent foot sliding
         if (a == 1) {
             float frameDist = glm::length(pa.curWorld - beforeC);
             float cyc = ctx.tiers[tierOf(ctx.tiers, p.level)].mesh.animDuration(1);
@@ -138,11 +125,10 @@ static void updatePlayerStates(PlayerRenderCtx& ctx,
         } else {
             pa.animTime += dt;
         }
-        // evolution on level-up (hatch 0->1 or any +level)
         if (p.level != pa.prevLevel) {
             if (pa.prevLevel >= 0 && p.level >= 1) {
                 pa.evoT = ctx.evoDur;
-                pa.freezeT = ctx.evoDur;                // hold still for the level-up moment
+                pa.freezeT = ctx.evoDur;   // hold still for the level-up anim
                 ctx.gameAudio.play(pa.prevLevel == 0 ? "hatch" : "levelup", 90.f);
                 float wx = pa.curWorld.x, wz = pa.curWorld.y;
                 for (int i = 0; i < 30; ++i) {
@@ -164,10 +150,6 @@ static void updatePlayerStates(PlayerRenderCtx& ctx,
     }
 }
 
-// Runs every draw pass that depends on the player list: solid skinned
-// characters, Mew (admin mount), the night moon, team-selection aura glow,
-// eggs, ground level rings, evolution glow + sparkles, and the night-sky
-// overlay.
 static void drawPlayerPasses(PlayerRenderCtx& ctx,
                              const std::vector<const GuiPlayer*>& drawList,
                              Shader& skinShader, Shader& auraShader,
@@ -179,7 +161,6 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
                              float nightF, float elapsed, float dt) {
     glm::mat4 pBones[MAX_BONES];
 
-    // solid character pass
     skinShader.use();
     skinShader.setMat4("uView", glm::value_ptr(view));
     skinShader.setMat4("uProj", glm::value_ptr(proj));
@@ -206,7 +187,7 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
     skinShader.setBool ("uMultiColor",     false);
     for (const GuiPlayer* pp : drawList) {
         const GuiPlayer& p = *pp;
-        if (p.level == 0) continue;              // unhatched egg — drawn below
+        if (p.level == 0) continue;   // unhatched egg drawn separately below
         SkinnedMesh& m = ctx.tiers[tierOf(ctx.tiers, p.level)].mesh;
         int a = ctx.playerAnims[p.id].anim;
         m.computeBones(a, ctx.playerAnims[p.id].animTime, pBones, true, false);
@@ -218,14 +199,12 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
         m.draw();
     }
 
-    // ── admin: draw Mew (the 3rd-person mount) ──
     if (ctx.adminMode && ctx.haveMew) {
         ctx.mewMesh.computeBones(0, ctx.mewAnimTime, pBones, true, false);
         skinShader.setMat4Array("uBones[0]", MAX_BONES, glm::value_ptr(pBones[0]));
-        // gentle float: bigger bounce when idle (hovering in place), softened
-        // while moving so it doesn't fight the travel motion
+        // bigger bounce when idle, reduced while moving to avoid fighting the travel motion
         float bobAmp = ctx.mewMoving ? 0.12f : 0.32f;
-        float by = ctx.mewPos.y + std::sin(elapsed * 2.2f) * bobAmp;   // float / bounce in the air
+        float by = ctx.mewPos.y + std::sin(elapsed * 2.2f) * bobAmp;
         glm::mat4 M = glm::translate(glm::mat4(1.f), glm::vec3(ctx.mewPos.x, by, ctx.mewPos.z));
         M = glm::rotate(M, ctx.mewYaw, glm::vec3(0, 1, 0));
         M = glm::scale(M, glm::vec3(ctx.mewScale));
@@ -235,11 +214,9 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
         ctx.mewMesh.draw();
     }
 
-    // ── night moon: textured, self-lit, low over the sky, fades in at night ──
     if (ctx.haveMoon && nightF > 0.01f) {
         ctx.moonMesh.computeBones(0, 0.f, pBones, true, false);
         skinShader.setMat4Array("uBones[0]", MAX_BONES, glm::value_ptr(pBones[0]));
-        // mesh radius ~50 in local space; sky moon ≈ radius 250 at 1600 units
         glm::vec3 mp = camPos + ctx.moonDir * 1600.f;
         glm::mat4 M  = glm::translate(glm::mat4(1.f), mp);
         M = glm::scale(M, glm::vec3(5.0f));
@@ -247,7 +224,7 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
         skinShader.setMat4 ("uModel",           glm::value_ptr(M));
         skinShader.setMat3 ("uNormalMat",       glm::value_ptr(N3));
         skinShader.setBool ("uUseTexture",      true);
-        skinShader.setFloat("uAmbientStrength", 1.5f);     // self-lit, bright
+        skinShader.setFloat("uAmbientStrength", 1.5f);   // self-lit moon
         skinShader.setVec3 ("uDirLightColor",   0.f, 0.f, 0.f);
         skinShader.setFloat("uAlpha",           nightF);
         glEnable(GL_BLEND);
@@ -256,16 +233,15 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
         ctx.moonMesh.draw();
         glEnable(GL_CULL_FACE);
         glDisable(GL_BLEND);
-        skinShader.setFloat("uAlpha", 1.0f);               // restore
+        skinShader.setFloat("uAlpha", 1.0f);
     }
 
-    // ── team-selection glow: selected team's characters glow team color ──
     const std::string& selTeam = ctx.hud.selectedTeam();
     if (!selTeam.empty()) {
         glDisable(GL_CULL_FACE);
         glDepthMask(GL_FALSE);
         glEnable(GL_BLEND);
-        glBlendFunc(GL_SRC_ALPHA, GL_ONE);             // additive
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE);
         auraShader.use();
         auraShader.setMat4("uView", glm::value_ptr(view));
         auraShader.setMat4("uProj", glm::value_ptr(proj));
@@ -274,7 +250,7 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
           for (int k = 0; k < (int)gs.teams.size(); ++k)
               if (gs.teams[k] == selTeam) ti = k; }
         glm::vec3 tc = HudOverlay::teamColor3(ti);
-        float gp = 0.55f + 0.45f * std::sin(elapsed * 4.f);  // steady pulse
+        float gp = 0.55f + 0.45f * std::sin(elapsed * 4.f);
         for (const GuiPlayer* pp : drawList) {
             const GuiPlayer& p = *pp;
             if (p.team != selTeam || p.level < 1) continue;
@@ -293,10 +269,9 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
         glDisable(GL_BLEND);
     }
 
-    // eggs: level-0 players are unhatched eggs (textured)
     if (ctx.eggMeshTex) {
         float r  = ctx.eggMeshTex->boundingRadius();
-        float es = (r > 1e-4f) ? 0.15f / r : 0.15f;   // small, fits lvl-1 char
+        float es = (r > 1e-4f) ? 0.15f / r : 0.15f;
         glm::vec3 ec = ctx.eggMeshTex->centroid();
         eggShader.use();
         eggShader.setMat4 ("uView", glm::value_ptr(view));
@@ -316,7 +291,7 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
             glm::vec2 ew = ctx.playerAnims[p.id].curWorld;
             float wx  = ew.x;
             float wz  = ew.y;
-            float wob = std::sin(elapsed * 3.f + p.id) * 0.06f;   // gentle wobble
+            float wob = std::sin(elapsed * 3.f + p.id) * 0.06f;
             glm::mat4 M = glm::translate(glm::mat4(1.f), {wx, es * r, wz});
             M = glm::rotate(M, wob, {0.f, 0.f, 1.f});
             M = glm::scale(M, glm::vec3(es));
@@ -327,9 +302,6 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
             ctx.eggMeshTex->draw();
         }
 
-        // Fork-laid eggs (server "enw"): a real egg slot, not a player yet —
-        // sits on the forking parent's own team island until it hatches
-        // ("edi") into a new player.
         if (!ctx.testMode) {
             const GuiState& gs = ctx.netClient.state();
             int W = gs.sizeKnown ? gs.width : ctx.map.w;
@@ -361,12 +333,11 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
         glEnable(GL_CULL_FACE);
     }
 
-    // level ring on the ground: purple for odd levels, white for even
-    static Mesh levelRing = buildRingMesh();      // flat annulus, radius 1
+    static Mesh levelRing = buildRingMesh();
     glDisable(GL_CULL_FACE);
     glDepthMask(GL_FALSE);
     glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE);            // additive glow
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE);
     toon.use();
     toon.setBool ("uEmissive", true);
     toon.setBool ("uCircleClip", false);
@@ -374,9 +345,9 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
     float ringPulse = 0.70f + 0.30f * std::sin(elapsed * 3.f);
     for (const GuiPlayer* pp : drawList) {
         const GuiPlayer& p = *pp;
-        if (p.level == 0) continue;             // eggs have no level ring
-        glm::vec3 base = (p.level % 2 == 1) ? glm::vec3(0.60f, 0.20f, 1.0f)  // odd → purple
-                                            : glm::vec3(1.0f, 1.0f, 1.0f);   // even → white
+        if (p.level == 0) continue;
+        glm::vec3 base = (p.level % 2 == 1) ? glm::vec3(0.60f, 0.20f, 1.0f)   // odd → purple
+                                            : glm::vec3(1.0f, 1.0f, 1.0f);    // even → white
         glm::vec3 col = base * ringPulse;
         glm::vec2 rw = ctx.playerAnims[p.id].curWorld;
         float wx = rw.x;
@@ -394,7 +365,6 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
     glEnable(GL_CULL_FACE);
     glDisable(GL_BLEND);
 
-    // ── evolution glow: white envelope that peaks mid-effect ──────────
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     glDepthMask(GL_FALSE);
@@ -407,8 +377,8 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
         const GuiPlayer& p = *pp;
         PlayerAnim& pa = ctx.playerAnims[p.id];
         if (pa.evoT <= 0.f || p.level < 1) continue;
-        float e    = 1.f - pa.evoT / ctx.evoDur;            // 0 -> 1
-        float glow = std::sin(e * 3.14159f);            // peak at mid
+        float e    = 1.f - pa.evoT / ctx.evoDur;
+        float glow = std::sin(e * 3.14159f);   // peak at mid-effect
         SkinnedMesh& m = ctx.tiers[tierOf(ctx.tiers, p.level)].mesh;
         m.computeBones(0, pa.animTime, pBones, true, false);
         auraShader.setMat4Array("uBones[0]", MAX_BONES, glm::value_ptr(pBones[0]));
@@ -420,7 +390,6 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
         m.draw();
     }
 
-    // ── evolution sparkles: little twinkling stars ────────────────────
     for (auto& s : ctx.sparks) {
         s.vel.y -= 1.5f * dt;
         s.pos += s.vel * dt;
@@ -446,7 +415,6 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
         glBindVertexArray(0);
     }
 
-    // ── night sky: scattered stars + Big Dipper constellation (additive) ──
     if (nightF > 0.02f)
         ctx.constellation.renderNightSky(starShader, sparkVAO, view, proj,
                                          camPos, elapsed, nightF);
@@ -469,7 +437,6 @@ void updateAndDrawPlayers(PlayerRenderCtx& ctx,
                           ctx.tiers[2].loaded || ctx.tiers[3].loaded;
     if (!havePlayerMesh || !(ctx.testMode || ctx.netConnected)) return;
 
-    // unified draw list: demo players, otherwise live server players
     std::vector<const GuiPlayer*> drawList;
     if (ctx.testMode) {
         for (const auto& p : ctx.testPlayers) drawList.push_back(&p);

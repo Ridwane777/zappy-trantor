@@ -20,8 +20,6 @@ using json = nlohmann::json;
 #include <fstream>
 #include <sys/stat.h>
 
-// ── helpers ───────────────────────────────────────────────────────────────────
-
 static float lerp(float a, float b, float t) { return a + (b - a) * t; }
 
 static int findInterval(const std::vector<float>& times, float t)
@@ -54,8 +52,6 @@ static glm::quat sampleSlerp(const std::vector<float>& times,
     float f  = (dt > 1e-6f) ? (t - times[i]) / dt : 0.f;
     return glm::slerp(keys[i], keys[i+1], f);
 }
-
-// ── raw buffer accessor helpers ───────────────────────────────────────────────
 
 static const float* floatPtr(const tinygltf::Model& m, int accIdx)
 {
@@ -92,8 +88,6 @@ static std::vector<unsigned int> getIndices(const tinygltf::Model& m, int accIdx
     }
     return out;
 }
-
-// ── binary cache helpers ──────────────────────────────────────────────────────
 
 static const uint32_t CACHE_MAGIC   = 0x43424C47; // 'GLBC'
 static const uint32_t CACHE_VERSION = 3;
@@ -192,7 +186,7 @@ bool tryLoadCache(const std::string& glbPath, SkinnedMesh& sm,
     struct stat gs{}, cs{};
     if (stat(glbPath.c_str(), &gs) != 0) return false;
     if (stat(cp.c_str(), &cs) != 0) return false;
-    if (cs.st_mtime < gs.st_mtime) return false;  // GLB newer than cache
+    if (cs.st_mtime < gs.st_mtime) return false;   // GLB newer than cache
 
     std::ifstream f(cp, std::ios::binary);
     if (!f) return false;
@@ -212,7 +206,6 @@ bool tryLoadCache(const std::string& glbPath, SkinnedMesh& sm,
     crv(f, sm.parentOf_);
 
     if (!loadAnimsFromCache(f, sm.animations_)) return false;
-    // bone names
     uint32_t nb = 0; cr(f, nb);
     sm.boneNames_.resize(nb);
     for (auto& name : sm.boneNames_) {
@@ -227,7 +220,7 @@ void saveCache(const std::string& glbPath, const SkinnedMesh& sm,
                const std::vector<float>& verts,
                const std::vector<unsigned int>& indices)
 {
-    return;   // streaming mode : on n'écrit RIEN sur le disque (assets en RAM only)
+    return;   // streaming mode: assets live in RAM, nothing written to disk
     std::ofstream f(cachePath(glbPath), std::ios::binary);
     if (!f) return;
     cw(f, CACHE_MAGIC);
@@ -242,7 +235,6 @@ void saveCache(const std::string& glbPath, const SkinnedMesh& sm,
         f.write(reinterpret_cast<const char*>(glm::value_ptr(m)), 64);
     cwv(f, sm.parentOf_);
     saveAnimsToCache(f, sm.animations_);
-    // bone names
     uint32_t nb = (uint32_t)sm.boneNames_.size();
     cw(f, nb);
     for (auto& name : sm.boneNames_) {
@@ -280,13 +272,11 @@ static bool tryLoadAnimCache(const std::string& glbPath, std::vector<Animation>&
 
 static void saveAnimCache(const std::string& glbPath, const std::vector<Animation>& anims)
 {
-    // anim-only cache: just magic + version + single animation block
-    // For simplicity, use a separate .glbca file
     auto cp = glbPath + ".glbca";
     std::ofstream f(cp, std::ios::binary);
     if (!f) return;
     cw(f, CACHE_MAGIC);
-    uint32_t ver2 = CACHE_VERSION + 100; // different tag for anim-only
+    uint32_t ver2 = CACHE_VERSION + 100;   // distinct tag from full cache
     cw(f, ver2);
     saveAnimsToCache(f, anims);
 }
@@ -306,14 +296,8 @@ static bool tryLoadAnimOnlyCache(const std::string& glbPath, std::vector<Animati
     return loadAnimsFromCache(f, out) && f.good();
 }
 
-// ── SkinnedMesh::load ──────────────────────────────────────────────────────────
-
-// tinygltf reads a .gltf's external companions (the .bin buffer, image textures)
-// through these callbacks — we route them to the CDN/memory so nothing touches
-// the disk. A .gltf is just an index file; the geometry/pixels live in sidecars.
-// Base directory of the glTF currently being parsed (e.g. "assets/screen/phoenix/").
-// tinygltf may hand the FsCallbacks a *relative* URI ("scene.bin"); we resolve it
-// against this. thread_local: each load runs the callbacks on its own thread.
+// base dir of the glTF being parsed; tinygltf may pass relative URIs (e.g. "scene.bin")
+// thread_local so concurrent loads don't race
 static thread_local std::string g_gltfBaseDir;
 
 static void setCdnFs(tinygltf::TinyGLTF& loader)
@@ -323,8 +307,8 @@ static void setCdnFs(tinygltf::TinyGLTF& loader)
     fs.ExpandFilePath = [](const std::string& p, void*) { return p; };
     fs.ReadWholeFile  = [](std::vector<unsigned char>* out, std::string* err,
                            const std::string& fp, void*) {
-        std::string b = zappy::assetBytes(fp);          // try as given (may be absolute)
-        if (b.empty() && fp.rfind("assets/", 0) != 0)   // relative URI -> prepend base dir
+        std::string b = zappy::assetBytes(fp);
+        if (b.empty() && fp.rfind("assets/", 0) != 0)   // relative URI: prepend base dir
             b = zappy::assetBytes(g_gltfBaseDir + fp);
         if (b.empty()) { if (err) *err = "cdn read failed: " + fp; return false; }
         out->assign(b.begin(), b.end());
@@ -355,10 +339,8 @@ static std::string base64(const std::string& in)
     return out;
 }
 
-// For an ASCII .gltf, inline its external buffers/images as base64 data URIs so
-// the model is fully self-contained — tinygltf then needs zero external file
-// access (its base_dir handling for streamed memory is unreliable). The sidecar
-// bytes are fetched from the CDN/RAM store.
+// Inline external buffers/images as base64 data URIs so tinygltf needs no external file access.
+// (tinygltf's base_dir handling for streamed memory is unreliable.)
 static std::string embedGltfExternals(const std::string& gltf, const std::string& dir)
 {
     json j = json::parse(gltf, nullptr, false);
@@ -379,15 +361,13 @@ static std::string embedGltfExternals(const std::string& gltf, const std::string
     return j.dump();
 }
 
-// Parse a glTF (.glb binary or .gltf ASCII) straight from its bytes — fetched
-// in memory, never written to disk. For ASCII, external sidecars are inlined.
 static bool loadGltfModel(const std::string& path, tinygltf::Model& model,
                           std::string& err, std::string& warn)
 {
     std::string bytes = zappy::assetBytes(path);
     if (bytes.empty()) return false;
     std::string dir = path.substr(0, path.find_last_of('/') + 1);
-    g_gltfBaseDir = dir;                            // fallback for FsCallbacks
+    g_gltfBaseDir = dir;
     tinygltf::TinyGLTF loader;
     loader.SetImageLoader([](tinygltf::Image*, const int, std::string*, std::string*,
                              int, int, const unsigned char*, int, void*) { return true; }, nullptr);
@@ -406,7 +386,6 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
 {
     SkinnedMesh sm;
 
-    // ── fast path: binary cache ───────────────────────────────────────────────
     {
         std::vector<float>        verts;
         std::vector<unsigned int> indices;
@@ -429,14 +408,12 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
     if (!ok) throw GUIException("tinygltf: " + err);
     if (!warn.empty()) std::cerr << "tinygltf warn: " << warn << "\n";
 
-    // ── skin ──────────────────────────────────────────────────────────────────
     int numJoints = 0;
     if (!model.skins.empty()) {
         auto& skin = model.skins[0];
         numJoints  = (int)skin.joints.size();
         sm.parentOf_.resize(numJoints, -1);
 
-        // inverse bind matrices
         if (skin.inverseBindMatrices >= 0) {
             const float* ibm = floatPtr(model, skin.inverseBindMatrices);
             sm.invBindMats_.resize(numJoints);
@@ -446,7 +423,6 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
             sm.invBindMats_.assign(numJoints, glm::mat4(1.f));
         }
 
-        // parent lookup via node children + store bone names
         sm.boneNames_.resize(numJoints);
         for (int j = 0; j < numJoints; ++j) {
             int nodeIdx = skin.joints[j];
@@ -459,7 +435,6 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
         }
     }
 
-    // ── mesh geometry ─────────────────────────────────────────────────────────
     // vertex layout: pos(3) normal(3) joints(4) weights(4) uv(2) → 16 floats
     std::vector<float>        verts;
     std::vector<unsigned int> indices;
@@ -500,8 +475,7 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
                 const float* wf = floatPtr(model, w0It->second);
                 for (size_t i = 0; i < nv*4; ++i) wvec[i] = wf[i];
             }
-            // non-skinned primitive: bind every vertex fully to bone 0 (identity)
-            // so the GPU skinning leaves the mesh in place instead of collapsing it
+            // non-skinned primitive: bind fully to bone 0 so GPU skinning is a no-op
             if (j0It == prim.attributes.end() && w0It == prim.attributes.end()) {
                 for (size_t i = 0; i < nv; ++i) wvec[i*4+0] = 1.f;
             }
@@ -537,7 +511,6 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
               << "  f=" << indices.size()/3
               << "  joints=" << numJoints << "\n";
 
-    // ── animations ────────────────────────────────────────────────────────────
     if (!model.skins.empty()) {
         auto& skin = model.skins[0];
         for (auto& anim : model.animations) {
@@ -574,7 +547,7 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
                     bc->timesR.assign(times, times+nk);
                     bc->rotKeys.resize(nk);
                     for (size_t i = 0; i < nk; ++i)
-                        // GLTF quat is x,y,z,w; glm is w,x,y,z
+                        // glTF quat: x,y,z,w → glm: w,x,y,z
                         bc->rotKeys[i] = glm::quat(vals[i*4+3], vals[i*4], vals[i*4+1], vals[i*4+2]);
                 } else if (ch.target_path == "scale") {
                     bc->timesS.assign(times, times+nk);
@@ -592,11 +565,8 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
     return sm;
 }
 
-// ── load extra animation from a second GLB (same skeleton) ───────────────────
-
 void SkinnedMesh::loadAnimFrom(const std::string& path)
 {
-    // ── fast path: anim-only cache ────────────────────────────────────────────
     {
         std::vector<Animation> loaded;
         if (tryLoadAnimOnlyCache(path, loaded)) {
@@ -662,12 +632,9 @@ void SkinnedMesh::loadAnimFrom(const std::string& path)
                   << "' dur=" << animations_.back().duration << "s\n";
     }
 
-    // collect only the newly-added animations and write anim-only cache
     std::vector<Animation> newAnims(animations_.end() - (int)model.animations.size(), animations_.end());
     saveAnimCache(path, newAnims);
 }
-
-// ── bone evaluation ───────────────────────────────────────────────────────────
 
 void SkinnedMesh::computeBones(int animIdx, float t,
                                glm::mat4 boneMats[MAX_BONES],
@@ -710,8 +677,7 @@ void SkinnedMesh::computeBones(int animIdx, float t,
         }
     }
 
-    // accumulate global transforms (parents before children — joints are
-    // stored in topological order by GLTF spec)
+    // joints stored in topological order (GLTF spec), so parents are always before children
     std::vector<glm::mat4> global(n);
     for (int i = 0; i < n; ++i) {
         int p = parentOf_[i];
@@ -721,12 +687,9 @@ void SkinnedMesh::computeBones(int animIdx, float t,
     for (int i = 0; i < n; ++i)
         boneMats[i] = global[i] * invBindMats_[i];
 
-    // identity for unused slots
     for (int i = n; i < MAX_BONES; ++i)
         boneMats[i] = glm::mat4(1.f);
 }
-
-// ── GPU upload / draw ─────────────────────────────────────────────────────────
 
 void SkinnedMesh::upload(const std::vector<float>& verts,
                          const std::vector<unsigned int>& idx)
@@ -744,15 +707,15 @@ void SkinnedMesh::upload(const std::vector<float>& verts,
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, idx.size()*4, idx.data(), GL_STATIC_DRAW);
 
     const GLsizei stride = 16 * sizeof(float);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);       // pos
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
     glEnableVertexAttribArray(0);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3*4));   // normal
+    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, stride, (void*)(3*4));
     glEnableVertexAttribArray(1);
-    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, stride, (void*)(6*4));   // joints
+    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, stride, (void*)(6*4));
     glEnableVertexAttribArray(2);
-    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, stride, (void*)(10*4));  // weights
+    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, stride, (void*)(10*4));
     glEnableVertexAttribArray(3);
-    glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, stride, (void*)(14*4));  // uv
+    glVertexAttribPointer(4, 2, GL_FLOAT, GL_FALSE, stride, (void*)(14*4));
     glEnableVertexAttribArray(4);
 
     glBindVertexArray(0);

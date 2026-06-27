@@ -1,6 +1,3 @@
-// Map viewer — reads map.json, renders isometric Sadida world
-// Hot-reloads the file whenever it changes on disk.
-// Controls: drag to orbit, scroll to zoom, R to reset camera
 
 #include <GL/glew.h>
 #include <SFML/Graphics.hpp>
@@ -52,12 +49,8 @@ using json = nlohmann::json;
 #include <algorithm>
 #include <sys/stat.h>
 
-// ── application ─────────────────────────────────────────────────────────────
-// GuiApp::run — owns the window, runs the start menu, then the live game loop
-// (3D scene + HudOverlay). Constructed and invoked from main().
 int GuiApp::run(int argc, char** argv)
 {
-    // ── window ────────────────────────────────────────────────────────────────
     sf::ContextSettings ctx;
     ctx.depthBits = 24; ctx.stencilBits = 8;
     ctx.majorVersion = 3; ctx.minorVersion = 3;
@@ -75,12 +68,8 @@ int GuiApp::run(int argc, char** argv)
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
 
-    // ── startup menu (3D intro + connection config) ───────────────────────────
     const char* SYS_FONT = "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf";
-    // Menu keeps the chunky display font; the in-game HUD/loading uses GAMEDAY,
-    // whose numerals are legible (the menu font renders digits decoratively).
-    // Fonts are streamed from the CDN into RAM; sf::Font keeps reading from that
-    // buffer, so it must stay alive -> assetBytesKept (persistent store).
+    // assetBytesKept keeps the buffer alive — sf::Font reads from it after loadFromMemory
     const std::string& mfBytes = zappy::assetBytesKept("assets/fonts/GamersDemoBold.ttf");
     const std::string& hfBytes = zappy::assetBytesKept("assets/fonts/GAMEDAY.ttf");
     sf::Font menuFont;
@@ -92,11 +81,6 @@ int GuiApp::run(int argc, char** argv)
         !hudFont.loadFromFile(SYS_FONT))
         std::cerr << "Warning: HUD font not loaded\n";
 
-    // ── parallel asset prefetch (RAM, no disk) — kills the per-file freeze ────
-    // Everything streams from the CDN; downloading sequentially on the main
-    // thread froze the window. Instead we prefetch in parallel into the RAM
-    // store: the intro set first (with a responsive bar), then the world set in
-    // the background while the player is in the menu. Loaders then hit warm RAM.
     auto A = [](const std::string& s) { return "assets/" + s; };
     std::vector<std::string> introAssets = {
         A("screen/loading_bg.png"),
@@ -109,9 +93,6 @@ int GuiApp::run(int argc, char** argv)
         A("screen/phoenix/textures/MatI_Ride_FengHuang_01b_emissive.png"),
         A("models/palmtree_1.obj"), A("models/grass_large.obj"), A("models/plant_1.obj"),
     };
-    // ALL audio is prefetched in the intro phase. The menu's audio.init() loads
-    // the whole SFX set synchronously on the MAIN thread — if it streamed there,
-    // the menu would freeze (window "not responding"). Warmed here, it's instant.
     for (const char* s : {"intro","menu_music","game_music",
                           "sparkle","bounce","shimmer_hold","burst","reveal","lensflare","twinkle",
                           "whoosh","click","levelup","hatch","incant","death","pickup",
@@ -149,12 +130,7 @@ int GuiApp::run(int argc, char** argv)
                           "normaltree_1","rock_1","rock_2","rock_3","tree_of_life"})
         gameAssets.push_back(A(std::string("models/") + p + ".obj"));   // audio prefetched in intro
 
-    // Smooth, never-stuck loading bar: the displayed value eases toward the real
-    // file-count fraction and gently creeps so it keeps moving even while a big
-    // file downloads (real progress is per-file, so it would otherwise freeze).
-    // loFrac/hiFrac let a wait map onto a slice of the bar instead of always
-    // running 0->100%, so it can hand off smoothly into advanceLoadingTo's
-    // own range afterwards (one continuous bar instead of two full passes).
+    // loFrac/hiFrac map the wait onto a bar slice so it flows into advanceLoadingTo's range
     auto waitBar = [&](std::atomic<size_t>& done, size_t total, const char* label,
                         float loFrac = 0.f, float hiFrac = 1.f) {
         float shown = loFrac;
@@ -169,9 +145,6 @@ int GuiApp::run(int argc, char** argv)
         drawLoadingScreen(window, hudFont, hiFrac, label);     // snap to the slice's top
     };
 
-    // world set: kicked off right away, in parallel with the intro set, instead
-    // of waiting for the intro to finish first — it keeps streaming in the
-    // background through the intro bar and into the menu.
     std::atomic<size_t> gameDone{0};
     std::thread gamePrefetch([&] { zappy::prefetch(gameAssets, &gameDone, 6); });
 
@@ -183,13 +156,11 @@ int GuiApp::run(int argc, char** argv)
     }
 
     MenuConfig menuCfg;
-    // Standard launch:  ./zappy_gui -p port -h machine   (pre-fills the menu).
     for (int i = 1; i < argc; ++i) {
         std::string a = argv[i];
         if (a == "-p" && i + 1 < argc)      menuCfg.port = std::atoi(argv[++i]);
         else if (a == "-h" && i + 1 < argc) menuCfg.host = argv[++i];
     }
-    // Dev/CI hook: ZAPPY_AUTOSTART=host:port skips the menu and connects directly.
     bool proceed = true;
     if (const char* as = std::getenv("ZAPPY_AUTOSTART"); as && *as) {
         std::string a(as);
@@ -202,9 +173,6 @@ int GuiApp::run(int argc, char** argv)
     }
     if (!proceed) { gamePrefetch.join(); return 0; }   // window closed / quit
 
-    // Server connection no longer waits for local assets to finish loading:
-    // it's kicked off right away, in parallel with the mesh/texture loading
-    // below, and only joined once that loading is done.
     GuiClient netClient;
     std::string netErr;
     bool netConnected = false;
@@ -212,10 +180,6 @@ int GuiApp::run(int argc, char** argv)
         netConnected = netClient.connect(menuCfg.host, menuCfg.port, netErr);
     });
 
-    // make sure the world finished prefetching (if START was clicked early) —
-    // mapped onto the first 10% of the bar so it flows straight into the
-    // mesh-building steps below (advanceLoadingTo starts at 0.10) instead of
-    // showing as a separate, fully-complete loading screen.
     waitBar(gameDone, gameAssets.size(), "Chargement du monde...", 0.f, 0.10f);
     gamePrefetch.join();
     std::cout << "[menu] start -> server " << menuCfg.host << ":"
@@ -242,7 +206,7 @@ int GuiApp::run(int argc, char** argv)
     glEnableVertexAttribArray(0);
     glBindVertexArray(0);
 
-    // ── shaders ───────────────────────────────────────────────────────────────
+
     Shader skyShader ("shaders/sky.vert",         "shaders/sky.frag");
     Shader toon      ("shaders/phong.vert",        "shaders/phong.frag");
     Shader outline   ("shaders/outline.vert",      "shaders/outline.frag");
@@ -253,8 +217,6 @@ int GuiApp::run(int argc, char** argv)
     Shader eggShader     ("shaders/logo.vert",          "shaders/logo.frag");
     Shader waterMapShader("shaders/water_map.vert",     "shaders/water_map.frag");
 
-    // Shore water on the map reuses the same rippling water texture as the
-    // intro screen's lagoon (assets/screen/water.png), instead of a flat tint.
     unsigned int waterMapTex = 0;
     {
         sf::Image wi;
@@ -327,11 +289,8 @@ int GuiApp::run(int argc, char** argv)
         glBindVertexArray(0);
     }
 
-    // ── load skinned characters (Character/CharState in app/Character.hpp) ──────
     std::vector<Character> characters;
     const float CHAR_HEIGHT = 0.01f;
-
-    // ── incantation ritual effects (type + draw in app/IncantationFx) ──────────
     std::vector<IncantationEffect> incantations;
     float incantCooldown = 25.f;  // first demo fires at 25s
 
@@ -341,7 +300,7 @@ int GuiApp::run(int argc, char** argv)
 
     advanceLoadingTo(window, hudFont, 0.10f, "Loading characters...");
 
-    // ── female: Huntress — Idle_6, then laying down after 10s ────────────────
+
     try {
         Character c;
         c.mesh     = SkinnedMesh::load(FEMALE_DIR + "Idle_15_withSkin.glb");
@@ -357,7 +316,7 @@ int GuiApp::run(int argc, char** argv)
     } catch (std::exception& e) { std::cerr << "Female load: " << e.what() << "\n"; }
     advanceLoadingTo(window, hudFont, 0.35f, "Loaded Huntress");
 
-    // ── male: Barefoot Survivor — Idle_11 ─────────────────────────────────────
+
     try {
         Character c;
         c.mesh     = SkinnedMesh::load(MALE_DIR + "Idle_11_withSkin.glb");  // 0 idle
@@ -371,15 +330,11 @@ int GuiApp::run(int argc, char** argv)
     } catch (std::exception& e) { std::cerr << "Male load: " << e.what() << "\n"; }
     advanceLoadingTo(window, hudFont, 0.55f, "Loaded Wanderer");
 
-    // ── player tiers: one character per 2 levels (1-2,3-4,5-6,7-8) ─────────────
-    // anim slots: 0 idle, 1 walk, 2 run, 3 turn-left, 4 turn-right (run/turn
-    // optional — only present for the Meshy "biped" exports).
+    // anim slots: 0=idle 1=walk 2=run 3=turn-left 4=turn-right (run/turn optional)
     PlayerTier tiers[4];
     const char* tierDir[4] = { "woodsprite", "nomad", "nyxara", "huntress" };
     // huntress has no run/turn_left/turn_right source files (CDN nor local prep) — skip
     bool tierHasExtraAnims[4] = { true, true, true, false };
-    // The skinned mesh is far larger than its bind-pose bounds (armature scale),
-    // so empirical per-tier factors are used; globally overridable via env.
     float globalPScale = std::getenv("ZAPPY_PSCALE")
                        ? (float)std::atof(std::getenv("ZAPPY_PSCALE")) : 0.05f / 6.f;
     for (int t = 0; t < 4; ++t) {
@@ -401,11 +356,9 @@ int GuiApp::run(int argc, char** argv)
     }
     advanceLoadingTo(window, hudFont, 0.70f, "Loaded players");
 
-    // Decorative demo characters (Huntress/Ironhorn at island centre) are not
-    // server-driven — drop them so only live players are shown.
-    characters.clear();
+    characters.clear(); // demo chars removed — only live server players are shown
 
-    // ── load map ──────────────────────────────────────────────────────────────
+
     MapData map;
     try { map = loadMap(MAP_FILE); }
     catch (std::exception& e) { std::cerr << e.what() << "\n"; return 1; }
@@ -435,12 +388,10 @@ int GuiApp::run(int argc, char** argv)
 
     advanceLoadingTo(window, hudFont, 1.0f, "Ready");
 
-    // Index map tiles by (x,y) so live server resources can be written in O(1).
     std::unordered_map<long long, std::size_t> tileIndex;
     for (std::size_t k = 0; k < map.tiles.size(); ++k)
         tileIndex[(long long)map.tiles[k].y * 100000 + map.tiles[k].x] = k;
 
-    // ── server connection, kicked off earlier in parallel with asset loading ──
     netThread.join();
     if (netConnected)
         std::cout << "[net] connected to " << menuCfg.host << ":"
@@ -461,8 +412,6 @@ int GuiApp::run(int argc, char** argv)
     std::vector<std::vector<Spark>> treeMotes;
     const float EVO_DUR = 2.0f;    // length of the evolution flash (matches level-up sfx)
 
-    // ── local demo mode: ZAPPY_TESTPLAYERS=N spawns N dummy players that grow
-    // from level 1 to 8, one level every 20s (loops). Renders without a server.
     bool testMode = std::getenv("ZAPPY_TESTPLAYERS") != nullptr;
     std::vector<GuiPlayer> testPlayers;
     float testTimer = 0.f;
@@ -485,17 +434,13 @@ int GuiApp::run(int argc, char** argv)
         std::cout << "[test] spawned " << n << " demo players (grow 1->8, 20s each)\n";
     }
 
-    // ── camera (isometric-ish: 45° yaw, 50° pitch) ───────────────────────────
     float cx = map.w * TILE * 0.5f;
     float cz = map.h * TILE * 0.5f;
     float camYaw   = 45.f  * 3.14159f / 180.f;
     float camPitch = 35.f  * 3.14159f / 180.f;
-    int   nightOverride = 0;   // 0=auto cycle, 1=force night, 2=force day (toggle with N)
-    bool  fullscreen    = false;  // F11 toggles maximized (via the WM)
-    float camDist  = std::max(map.w, map.h) * TILE * 1.1f;
-    // camDist above only frames a single island; it's computed before the
-    // server tells us the real team count, so re-frame once that's known
-    // instead of leaving the camera too close to see the full island ring.
+    int   nightOverride = 0;   // 0=auto, 1=night, 2=day
+    bool  fullscreen    = false;
+    float camDist  = std::max(map.w, map.h) * TILE * 1.1f; // re-framed once team count is known
     bool  camFramedForTeams = false;
     float camTargetY = 0.f;
     if (testMode && !testPlayers.empty()) {            // frame the demo row
@@ -510,7 +455,6 @@ int GuiApp::run(int argc, char** argv)
     bool  dragging = false;
     sf::Vector2i lastMouse;
 
-    // ── admin mode: press A, type "admin1234", fly Mew in 3rd person, Q to quit ──
     SkinnedMesh mewMesh;
     bool  haveMew = false;
     try {
@@ -519,7 +463,6 @@ int GuiApp::run(int argc, char** argv)
         haveMew = true;
     } catch (std::exception& e) { std::cerr << "Mew load: " << e.what() << "\n"; }
 
-    // ── night-cycle moon (textured, self-lit, fades in at night) ──
     SkinnedMesh moonMesh;
     bool haveMoon = false;
     try {
@@ -548,13 +491,10 @@ int GuiApp::run(int argc, char** argv)
     float       mewFlyTimer = 0.f;   // throttles the whoosh while Mew is moving
     float       mewMeowTimer = 10.f; // random ambient meow every ~10 s in admin mode
 
-    // ── night sky: scattered stars + Big Dipper + Mew's purple-energy channel ──
     Constellation constellation;
-    // third-person camera offset around Mew (mouse look), reset with R
-    float admCamYaw = 0.f, admCamPitch = 0.32f;
+    float admCamYaw = 0.f, admCamPitch = 0.32f; // 3rd-person cam offset around Mew
 
 
-    // ── in-game audio: ambient bed + event SFX (missing clips are silent) ───────
     AudioManager gameAudio;
     gameAudio.init("assets/audio");
     if (netConnected) gameAudio.playMusic("game_music", true, 35.f);
@@ -564,7 +504,6 @@ int GuiApp::run(int argc, char** argv)
     sf::Clock clock;
     float elapsed  = 0.f;
 
-    // ── Tree of Life pulse state ──────────────────────────────────────────────
     const glm::vec3 TREE_POS     = {22*TILE, 0.f, 22*TILE};
     const float CHARGE_DURATION  =  8.f;   // seconds to charge up
     const float IDLE_DURATION    = 52.f;   // seconds idle before next charge
@@ -579,7 +518,6 @@ int GuiApp::run(int argc, char** argv)
     float      treeGlow    = 0.f;   // foliage emissive: tracks charge, fades out after release
     float      waveRadius  = 0.f;
 
-    // ── 2D overlay (HUD line, team/player sidebar, inventory popup, feed) ──────
     HudOverlay hud;
     hud.init(hudFont);
 
@@ -599,7 +537,6 @@ int GuiApp::run(int argc, char** argv)
         if (pollId >= 0 && netConnected)
             netClient.send("pin #" + std::to_string(pollId));
 
-        // ── drain new action events into game SFX (levelup/hatch handled at draw) ─
         if (netConnected) {
             const GuiState& gs = netClient.state();
             pickupCooldown = std::max(0.f, pickupCooldown - dt);
@@ -618,27 +555,16 @@ int GuiApp::run(int argc, char** argv)
             lastLogTotal = total;
         }
 
-        // ── live server state: drain socket, mirror tile resources onto the map ─
         if (netConnected) {
             netClient.poll();
             netConnected = netClient.connected();
             const GuiState& gs = netClient.state();
-            // Re-frame the camera once the real team count is known: the
-            // initial camDist only accounts for a single island, so with
-            // several team islands spread in a ring it'd otherwise stay
-            // zoomed in on a fraction of the world until the player manually
-            // presses R or scrolls.
-            if (!camFramedForTeams && !gs.teams.empty()) {
+            if (!camFramedForTeams && !gs.teams.empty()) { // re-frame once team count is known
                 float ext = worldExtentRadius((int)gs.teams.size(), map.w * TILE * 0.455f);
                 camDist = ext * 2.42f;
                 camFramedForTeams = true;
             }
             if (gs.sizeKnown) {
-                // One canonical copy of the server's resource grid, mapped onto
-                // the original single-island footprint (map.tiles). Each team
-                // island is a full-size COPY of this same map, instanced via
-                // translation at draw time (WorldRender.cpp) — so this stays a
-                // single mapping, not one per island.
                 for (auto& t : map.tiles)
                     for (int i = 0; i < 7; ++i) t.res[i] = 0;
                 const int insetT = 7;
@@ -668,9 +594,7 @@ int GuiApp::run(int argc, char** argv)
             }
         }
 
-        // ── demo mode: hatch from egg (lvl 0) then grow to 8 (loops) ──────────
-        // seconds per phase configurable via ZAPPY_TESTSEC (default 20)
-        if (testMode) {
+        if (testMode) { // ZAPPY_TESTSEC controls seconds per level phase
             static float phaseSec = std::getenv("ZAPPY_TESTSEC")
                                   ? (float)std::atof(std::getenv("ZAPPY_TESTSEC")) : 1.f;
             testTimer += dt;
@@ -678,14 +602,11 @@ int GuiApp::run(int argc, char** argv)
             for (auto& p : testPlayers) p.level = lvl;
         }
 
-        // ── pulse state machine ───────────────────────────────────────────────
         pulseTimer += dt;
         switch (pulseState) {
         case PulseState::IDLE: {
             chargeT = 0.f;
-            // When connected, charge during the final CHARGE_DURATION seconds before
-            // the resource reset so the tree "pulses" right as it fires. Offline,
-            // fall back to the ambient self-timed cycle.
+            // online: charge on last CHARGE_DURATION seconds before resource reset; offline: self-timed
             float sr = netConnected ? netClient.state().secondsToReset : -1.f;
             bool trigger = (sr >= 0.f) ? (sr <= CHARGE_DURATION)
                                        : (pulseTimer >= IDLE_DURATION);
@@ -723,8 +644,6 @@ int GuiApp::run(int argc, char** argv)
             }
             break;
         }
-        // foliage glow follows the charge, then fades out gently after release
-        // (instead of snapping off the instant the energy is released)
         if (pulseState == PulseState::CHARGING)
             treeGlow = chargeT;
         else
@@ -733,7 +652,6 @@ int GuiApp::run(int argc, char** argv)
         for (auto& ch : characters)
             if (ch.auraTimer > 0.f) ch.auraTimer -= dt;
 
-        // ── demo incantation trigger ──────────────────────────────────────────
         incantCooldown -= dt;
         if (incantCooldown <= 0.f && !characters.empty() &&
             pulseState == PulseState::IDLE) {
@@ -754,7 +672,6 @@ int GuiApp::run(int argc, char** argv)
             incantations.end());
         for (auto& ch : characters) ch.incanting = anyIncant;
 
-        // ── events ────────────────────────────────────────────────────────────
         sf::Event ev;
         while (window.pollEvent(ev)) {
             if (ev.type == sf::Event::Closed)
@@ -768,7 +685,6 @@ int GuiApp::run(int argc, char** argv)
                 window.setView(sf::View(sf::FloatRect(0.f, 0.f,
                     (float)ev.size.width, (float)ev.size.height)));
 
-            // ── admin password box: A opens it, type, Enter validates, Esc cancels ──
             if (adminPrompt) {
                 if (ev.type == sf::Event::TextEntered) {
                     if (adminEatNext) {                                  // le 'a' d'ouverture
@@ -824,7 +740,6 @@ int GuiApp::run(int argc, char** argv)
                 } else {
                     camYaw = 45.f * 3.14159f / 180.f;
                     camPitch = 35.f * 3.14159f / 180.f;
-                    // Frame the whole ring of team islands, not just one.
                     int tc = netConnected ? (int)netClient.state().teams.size() : 0;
                     float ext = worldExtentRadius(std::max(1, tc), map.w * TILE * 0.455f);
                     camDist = ext * 2.42f;
@@ -832,10 +747,8 @@ int GuiApp::run(int argc, char** argv)
             }
             if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::Tab)
                 hud.toggle();
-            // N: cycle day/night override (auto -> force night -> force day -> auto)
             if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::N)
                 nightOverride = (nightOverride + 1) % 3;
-            // F11: toggle maximized (via the WM, no GL context recreation)
             if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::F11) {
                 fullscreen = !fullscreen;
                 setWindowFullscreen(window.getSystemHandle(), fullscreen);
@@ -875,9 +788,7 @@ int GuiApp::run(int argc, char** argv)
 
             if (ev.type == sf::Event::MouseWheelScrolled) {
                 sf::Vector2i mp = sf::Mouse::getPosition(window);
-                if (!hud.handleScroll(mp, ev.mouseWheelScroll.delta)) {  // sidebar scroll first
-                    // Allow zooming out far enough to see the whole ring of
-                    // team islands, not just the original single-island cap.
+                if (!hud.handleScroll(mp, ev.mouseWheelScroll.delta)) {
                     int tc = netConnected ? (int)netClient.state().teams.size() : 0;
                     float ext = worldExtentRadius(std::max(1, tc), map.w * TILE * 0.455f);
                     float maxDist = std::max(120.f, ext * 3.0f);
@@ -887,7 +798,6 @@ int GuiApp::run(int argc, char** argv)
             }
         }
 
-        // ── hot reload map.json ───────────────────────────────────────────────
         time_t mt = fileMtime(MAP_FILE);
         if (mt != lastMtime) {
             try {
@@ -906,7 +816,6 @@ int GuiApp::run(int argc, char** argv)
             }
         }
 
-        // ── admin: fly Mew (forward/turn + Z up / S down), 3rd-person mouse look ──
         if (adminMode) {
             const float spd = 16.f, turn = 1.9f, vspd = 12.f;
             glm::vec3 fwd(std::sin(mewYaw), 0.f, std::cos(mewYaw));
@@ -919,9 +828,6 @@ int GuiApp::run(int argc, char** argv)
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Z)) { mewPos.y += vspd * dt; mewMoving = true; }  // up
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) { mewPos.y -= vspd * dt; mewMoving = true; }  // down
             if (mewPos.y < MEW_FLOOR) mewPos.y = MEW_FLOOR;   // can't go under the map
-            // anim seulement en déplacement ; à l'arrêt, pose neutre (droit) + le bob flotte
-            // en mouvement : l'animation tourne ; à l'arrêt : on laisse l'animation
-            // se terminer en douceur jusqu'à retomber sur la pose idle, puis on fige
             if (mewMoving) {
                 mewAnimTime += dt;
             } else {
@@ -933,7 +839,6 @@ int GuiApp::run(int argc, char** argv)
                 else                  mewAnimTime += step;        // continue l'anim, vite
             }
 
-            // audio: soft whoosh while gliding, louder hover hum when floating still
             if (mewMoving) {
                 mewFlyTimer -= dt;
                 if (mewFlyTimer <= 0.f) { gameAudio.play("mew_fly", 80.f); mewFlyTimer = 0.7f; }
@@ -943,7 +848,6 @@ int GuiApp::run(int argc, char** argv)
                 gameAudio.setLoopVolume(80.f);
             }
 
-            // every ~10 s, Mew lets out one of its random little meows (a/b/c)
             mewMeowTimer -= dt;
             if (mewMeowTimer <= 0.f) {
                 const char* meows[3] = { "mew_meow_a", "mew_meow_b", "mew_meow_c" };
@@ -951,12 +855,10 @@ int GuiApp::run(int argc, char** argv)
                 mewMeowTimer = 9.f + (std::rand() % 40) / 10.f;   // ~9-13 s
             }
 
-            // hold SPACE to charge the constellation — driven by constellation.tick()
         }
         constellation.tick(sf::Keyboard::isKeyPressed(sf::Keyboard::Space) && !adminPrompt,
                             adminMode, dt);
 
-        // ── camera matrices ───────────────────────────────────────────────────
         glm::vec3 target(cx, camTargetY, cz);
         glm::vec3 camPos = target + glm::vec3(
             camDist * std::cos(camPitch) * std::sin(camYaw),
@@ -970,13 +872,9 @@ int GuiApp::run(int argc, char** argv)
 
         glm::mat4 view = glm::lookAt(camPos, target, glm::vec3(0,1,0));
 
-        // admin: 3rd-person camera locked behind Mew (overrides the orbit cam)
         if (adminMode) {
-            // camera tracks Mew's steady height (NOT the float bob) so the bob is
-            // actually visible on screen instead of cancelling out with the camera
             float by = mewPos.y;
             target = glm::vec3(mewPos.x, by + 1.0f, mewPos.z);
-            // orbit the camera around Mew: yaw follows Mew's facing + mouse offset
             float ay = mewYaw + admCamYaw;
             float ap = glm::clamp(admCamPitch, -1.20f, 1.40f);
             float dist = 9.f, horiz = dist * std::cos(ap);
@@ -986,13 +884,11 @@ int GuiApp::run(int argc, char** argv)
             view = glm::lookAt(camPos, target, glm::vec3(0, 1, 0));
         }
 
-        // ── day/night cycle (client-side timed loop) ──────────────────────────
         DayNight dn = computeDayNight(elapsed, nightOverride);
         float     nightF   = dn.nightF,   ambScale = dn.ambScale;
         glm::vec3 skySunDir = dn.skySunDir, moonDir = dn.moonDir, sunDir = dn.sunDir;
         glm::vec3 lightCol  = dn.lightCol,  skyTop  = dn.skyTop,  skyHor = dn.skyHor;
 
-        // ── sky gradient pass (fullscreen quad, no depth test) ────────────────
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
@@ -1013,7 +909,6 @@ int GuiApp::run(int argc, char** argv)
         glEnable(GL_CULL_FACE);
         glCullFace(GL_BACK);
 
-        // ── set shared uniforms ───────────────────────────────────────────────
         toon.use();
         toon.setMat4("uView",              glm::value_ptr(view));
         toon.setMat4("uProj",              glm::value_ptr(proj));
@@ -1040,25 +935,20 @@ int GuiApp::run(int argc, char** argv)
         toon.setFloat("uShoreInnerR", 0.f);
         toon.setFloat("uShoreWidth",  1.f);
 
-        // ── draw seamless ground (single draw call each, zero seams) ─────────
         int teamCount = netConnected ? (int)netClient.state().teams.size() : 0;
         glm::vec2 sunXZ = glm::normalize(glm::vec2(sunDir.x, sunDir.z) + 1e-6f);
         drawGround(toon, waterMapShader, waterMapTex, view, proj, elapsed, sunXZ,
                    landMesh, oceanMesh, waterMesh, map, cx, cz, teamCount);
 
-        // ── draw props ────────────────────────────────────────────────────────
         drawProps(toon, outline, map, view, proj, elapsed, ambScale, treeGlow,
                  cx, cz, teamCount);
 
-        // ── draw resources (floating textured gemstones, one per type per tile) ──
         drawResources(eggShader, gemTex, map, sunDir, lightCol, ambScale, view, proj, elapsed,
                       cx, cz, teamCount);
 
-        // ── draw food (textured apple/grapes/mushroom, varied per tile) ───────
         drawFood(eggShader, foodMesh, map, sunDir, lightCol, ambScale, view, proj, elapsed,
                 cx, cz, teamCount);
 
-        // ── draw players (live server, or local demo) as skinned characters ───
         {
             PlayerRenderCtx prCtx{
                 tiers, playerAnims, sparks,
@@ -1073,11 +963,9 @@ int GuiApp::run(int argc, char** argv)
                                  nightF, elapsed, dt);
         }
 
-        // ── draw skinned characters ───────────────────────────────────────────
         drawCharacters(characters, skinShader, auraShader, view, proj,
                        camPos, sunDir, lightCol, ambScale, elapsed, dt);
 
-        // ── draw Tree of Life pulse effects (once per team island copy) ───────
         {
             bool charging     = (pulseState == PulseState::CHARGING);
             bool justReleased = (pulseState == PulseState::RELEASING &&
@@ -1095,22 +983,15 @@ int GuiApp::run(int argc, char** argv)
             }
         }
 
-        // ── Mew constellation channel: light-purple energy (tree-of-life style) ──
         constellation.updateMewEnergy(adminMode, dt, mewPos, elapsed);
         constellation.renderMewEnergy(starShader, sparkVAO, view, proj, elapsed);
-
-        // ── draw incantation ritual — dashed circle + ground flash pillars ────
         drawIncantations(incantations, incantShader, view, proj, camPos, elapsed);
-
-        // ── draw clouds (animated drift) ──────────────────────────────────────
         drawClouds(toon, map, elapsed);
 
-        // ── 2D overlay: HUD line, sidebar, inventory popup, action feed ──
         window.resetGLStates();
         hud.draw(window, netConnected ? &netClient.state() : nullptr,
                  menuCfg.host, menuCfg.port, map.w, map.h);
 
-        // ── admin password box (centered) ──
         if (adminPrompt) {
             sf::RectangleShape dim(sf::Vector2f((float)ws.x, (float)ws.y));
             dim.setFillColor(sf::Color(0, 0, 0, 130)); window.draw(dim);
@@ -1139,7 +1020,6 @@ int GuiApp::run(int argc, char** argv)
             hint.setCharacterSize(12); hint.setFillColor(sf::Color(170, 180, 200));
             hint.setPosition(bx + 18.f, byp + 92.f); window.draw(hint);
         }
-        // ── admin mode hint ──
         if (adminMode) {
             sf::Text h; h.setFont(hudFont);
             char hb[160];

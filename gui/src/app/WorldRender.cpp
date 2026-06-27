@@ -31,7 +31,6 @@ void drawGround(Shader& toon, Shader& waterShader, unsigned int waterTex,
     const float baseR = map.w * TILE * 0.455f;
     const int   n     = std::max(1, teamCount);
 
-    // ── océan profond global (une fois) ──
     glm::mat4 I(1.f); glm::mat3 N3(1.f);
     toon.setMat4("uModel",     glm::value_ptr(I));
     toon.setMat3("uNormalMat", glm::value_ptr(N3));
@@ -39,9 +38,6 @@ void drawGround(Shader& toon, Shader& waterShader, unsigned int waterTex,
     toon.setVec3("uColor", 0.06f, 0.22f, 0.55f);
     ocean.draw();
 
-    // ── une copie PLEINE TAILLE de la même île (terre + eau de rive) par
-    // équipe, simplement translatée — même maillage, même mer, même soleil,
-    // juste répété à un autre endroit de l'anneau ──
     for (int i = 0; i < n; ++i) {
         glm::vec2 c   = islandCenter(i, n, cx, cz, baseR);
         glm::vec2 off = c - glm::vec2(cx, cz);
@@ -54,7 +50,7 @@ void drawGround(Shader& toon, Shader& waterShader, unsigned int waterTex,
         toon.setBool("uWave",  false);
         land.draw();
 
-        toon.setVec3("uColor", 0.10f, 0.40f, 0.68f);   // shore water, lighter than the deep ocean
+        toon.setVec3("uColor", 0.10f, 0.40f, 0.68f);
         toon.setBool("uWave",  true);
         water.draw();
         toon.setBool("uWave", false);
@@ -89,7 +85,6 @@ void drawProps(Shader& toon, Shader& outline, const MapData& map,
             Mesh& pm = getMesh(p.model);
             float r  = pm.boundingRadius();
             float s  = (r > 1e-4f) ? p.scale / r : p.scale;
-            // roses (flowers) shrunk to ~resource size
             if (p.model == "flower_1" || p.model == "flower_2")
                 s = (r > 1e-4f) ? 0.25f / r : 0.25f;
 
@@ -97,7 +92,6 @@ void drawProps(Shader& toon, Shader& outline, const MapData& map,
                 {wx + p.dx * TILE, 0.f, wz + p.dz * TILE});
             M = glm::rotate(M, glm::radians(p.rot_y), {0.f, 1.f, 0.f});
             M = glm::scale(M, glm::vec3(s));
-            // Translate so the model base (yMin) sits at ground level, not centroid
             glm::vec3 c = pm.centroid();
             M = glm::translate(M, {-c.x, -pm.yMin(), -c.z});
             glm::mat3 N = glm::mat3(glm::transpose(glm::inverse(M)));
@@ -106,8 +100,7 @@ void drawProps(Shader& toon, Shader& outline, const MapData& map,
             toon.setBool("uSway", sway);
 
             if (p.model == "tree_of_life" && pm.hasVertexColor()) {
-                // Texture colors baked into vertices — ambient ramps up while charging,
-                // then fades out after release (treeGlow) rather than snapping off
+                // ambient ramps up while charging, fades out after release rather than snapping off
                 float pulse = 0.22f + 0.12f * std::sin(elapsed * 0.7f)
                             + treeGlow * 0.40f;
                 toon.use();
@@ -175,7 +168,7 @@ void drawResources(Shader& egg, const std::unique_ptr<TexturedMesh>* gemTex,
         float tileHash = float(tile.x * 17 + tile.y * 31);
 
         int slot = 0;
-        for (int i = 1; i < 7; ++i) {           // stones only (food drawn below)
+        for (int i = 1; i < 7; ++i) {
             if (tile.res[i] == 0 || !gemTex[i]) continue;
             TexturedMesh* gm = gemTex[i].get();
 
@@ -234,7 +227,7 @@ void drawFood(Shader& egg, const std::unique_ptr<TexturedMesh>* foodMesh,
                          : foodMesh[1] ? foodMesh[1].get() : foodMesh[2].get();
         if (!fm) continue;
         float r  = fm->boundingRadius();
-        float s  = (r > 1e-4f) ? 0.175f / r : 0.175f;   // x2.5
+        float s  = (r > 1e-4f) ? 0.175f / r : 0.175f;
         float wx = tile.x * TILE + TILE * 0.5f + ioff.x;
         float wz = tile.y * TILE + TILE * 0.5f + ioff.y;
         float bob = 0.30f + 0.05f * std::sin(elapsed * 1.5f + (tile.x * 17 + tile.y * 31) * 0.1f);
@@ -266,7 +259,7 @@ void drawClouds(Shader& toon, const MapData& map, float elapsed)
         M = glm::scale(M, glm::vec3(s));
         M = glm::translate(M, -cloudMesh.centroid());
         glm::mat3 N = glm::mat3(glm::transpose(glm::inverse(M)));
-        // No outline on clouds — they're white, outline makes them black blobs
+        // no outline: white clouds with outline would render as black blobs
         toon.use();
         toon.setMat4("uModel",     glm::value_ptr(M));
         toon.setMat3("uNormalMat", glm::value_ptr(N));

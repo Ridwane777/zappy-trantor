@@ -13,7 +13,6 @@
 #include <stdexcept>
 #include <cmath>
 
-// ── OBJ parsing (pos + uv + normal) ──────────────────────────────────────────
 namespace {
 
 struct Key {
@@ -28,7 +27,6 @@ struct KeyHash {
     }
 };
 
-// Parse one face-corner token "v/vt/vn" (any component may be absent).
 Key parseCorner(const std::string &s)
 {
     Key k{0, 0, 0};
@@ -50,8 +48,6 @@ Key parseCorner(const std::string &s)
 }
 
 } // namespace
-
-// ── lifecycle ────────────────────────────────────────────────────────────────
 
 TexturedMesh::~TexturedMesh() { cleanup(); }
 
@@ -81,11 +77,9 @@ TexturedMesh &TexturedMesh::operator=(TexturedMesh &&o) noexcept
     return *this;
 }
 
-// ── loading ──────────────────────────────────────────────────────────────────
-
 TexturedMesh TexturedMesh::load(const std::string &objPath, const std::string &texPath)
 {
-    std::string objSrc = zappy::assetBytes(objPath);   // local or streamed from CDN
+    std::string objSrc = zappy::assetBytes(objPath);
     if (objSrc.empty())
         throw GUIException("TexturedMesh: cannot open " + objPath);
     std::istringstream f(objSrc);
@@ -94,7 +88,7 @@ TexturedMesh TexturedMesh::load(const std::string &objPath, const std::string &t
     std::vector<std::array<float, 2>> uvs;
     std::vector<std::array<float, 3>> normals;
 
-    std::vector<float>        verts;     // interleaved pos3 + nrm3 + uv2
+    std::vector<float>        verts;
     std::vector<unsigned int> indices;
     std::unordered_map<Key, unsigned int, KeyHash> seen;
 
@@ -150,7 +144,6 @@ TexturedMesh TexturedMesh::load(const std::string &objPath, const std::string &t
     TexturedMesh m;
     m._indexCount = (int)indices.size();
 
-    // bounds (centroid + radius) from positions
     glm::vec3 lo(1e9f), hi(-1e9f), sum(0.f);
     for (auto &p : positions) {
         glm::vec3 v(p[0], p[1], p[2]);
@@ -160,7 +153,6 @@ TexturedMesh TexturedMesh::load(const std::string &objPath, const std::string &t
     m._radius   = glm::length(hi - lo) * 0.5f;
     if (m._radius < 1e-4f) m._radius = 1.f;
 
-    // GL buffers
     glGenVertexArrays(1, &m._vao);
     glGenBuffers(1, &m._vbo);
     glGenBuffers(1, &m._ebo);
@@ -179,9 +171,9 @@ TexturedMesh TexturedMesh::load(const std::string &objPath, const std::string &t
     glEnableVertexAttribArray(2);
     glBindVertexArray(0);
 
-    // texture (SFML loads to top-left origin; flip to GL bottom-left)
+    // SFML loads top-left origin; flip vertically for GL
     sf::Image img;
-    std::string texBytes = zappy::assetBytes(texPath);   // local or streamed from CDN
+    std::string texBytes = zappy::assetBytes(texPath);
     if (!texBytes.empty() && img.loadFromMemory(texBytes.data(), texBytes.size())) {
         img.flipVertically();
         glGenTextures(1, &m._texId);
