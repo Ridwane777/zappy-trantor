@@ -213,3 +213,33 @@ void GuiClient::_processLine(const std::string &line)
             }
         }
 
+    } else if (cmd == "plv") {
+        std::string idTok;
+        int lvl;
+        if (iss >> idTok >> lvl) {
+            int id = parseId(idTok);
+            auto it = _state.players.find(id);
+            if (it != _state.players.end())
+                it->second.level = lvl;
+            _logEvent(id, "reached level " + std::to_string(lvl), 1);
+        }
+
+    } else if (cmd == "pgt") {
+        std::string idTok;
+        int r;
+        if (iss >> idTok >> r)
+            _logEvent(parseId(idTok), std::string("grabbed ") + resName(r), 0);
+
+    } else if (cmd == "pin") {
+        std::string idTok;
+        int x, y;
+        if (iss >> idTok >> x >> y) {
+            auto it = _state.players.find(parseId(idTok));
+            if (it != _state.players.end()) {
+                it->second.x = x;
+                it->second.y = y;
+                for (int i = 0; i < GUI_RES_COUNT; ++i)
+                    iss >> it->second.inv[i];
+                it->second.invKnown = true;
+            }
+        }
