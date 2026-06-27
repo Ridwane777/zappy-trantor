@@ -38,3 +38,24 @@ void GuiClient::_logEvent(int id, const std::string &action, int kind)
 
 GuiClient::~GuiClient()
 {
+    disconnect();
+}
+
+void GuiClient::disconnect()
+{
+    if (_fd >= 0) {
+        close(_fd);
+        _fd = -1;
+    }
+}
+
+void GuiClient::send(const std::string &line)
+{
+    if (_fd < 0)
+        return;
+    std::string out = line;
+    out.push_back('\n');
+    ssize_t n = ::write(_fd, out.data(), out.size());
+    (void)n;   // best-effort; non-blocking, GUI requests are idempotent
+}
+
