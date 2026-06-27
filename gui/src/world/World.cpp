@@ -228,3 +228,29 @@ Mesh buildGemMesh()
 }
 
 Mesh buildDashedRingMesh(int segs, float fill)
+{
+    std::vector<float>        v;
+    std::vector<unsigned int> idx;
+    const float PI2   = 6.28318f;
+    const float INNER = 0.84f;
+    const int   sub   = 10;
+    unsigned int base = 0;
+    for (int s = 0; s < segs; ++s) {
+        float a0 = PI2 * s / segs;
+        float a1 = a0 + PI2 * fill / segs;
+        for (int i = 0; i <= sub; ++i) {
+            float a  = a0 + (a1 - a0) * i / sub;
+            float ca = std::cos(a), sa = std::sin(a);
+            v.insert(v.end(), {INNER*ca, 0.f, INNER*sa, 0.f, 1.f, 0.f});
+            v.insert(v.end(), {       ca, 0.f,        sa, 0.f, 1.f, 0.f});
+            if (i > 0) {
+                unsigned int b = base + (unsigned int)(i - 1) * 2;
+                idx.insert(idx.end(), {b, b+1, b+2, b+1, b+3, b+2});
+            }
+        }
+        base += (unsigned int)(sub + 1) * 2;
+    }
+    return Mesh(v, idx);
+}
+
+Mesh buildVQuadMesh()
