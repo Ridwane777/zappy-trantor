@@ -1,3 +1,5 @@
+import random
+
 RESOURCES = ["food", "linemate", "deraumere", "sibur", "mendiane", "phiras", "thystame"]
 
 ELEVATION_REQ = {
@@ -12,12 +14,22 @@ ELEVATION_REQ = {
 
 
 class Player:
-    # seuil de food en dessous duquel le joueur doit aller chercher à manger en
-    # priorité. On garde une marge de survie mais sans tout monopoliser : sinon,
-    # à plusieurs joueurs, la nourriture se raréfie et personne ne s'élève jamais.
-    FOOD_THRESHOLD = 12
+    # seuil de food en dessous duquel le joueur cherche à manger en priorité.
+    # Relevé à 18 : les phases de convergence (homing vers le groupe) et
+    # d'incantation (jusqu'à 3 s bloquées) consomment beaucoup sans manger.
+    # Un buffer épais (18 food ≈ 22 s à f=100) évite que l'équipe descende
+    # sous le quorum à cause de morts de faim — la survie de TOUS les joueurs
+    # est la condition pour atteindre les niveaux 6-7-8 (qui exigent 6 joueurs).
+    # Au démarrage (food=10 < 18) le joueur fait d'abord le plein, c'est voulu.
+    FOOD_THRESHOLD = 18
+    # Seuil critique : en dessous, un joueur prêt à incanter quitte le ralliement
+    # pour manger (au-dessus, il reste sur place pour servir de point de rendez-
+    # vous stable). 12 food ≈ 15 s à f=100 : marge pour aller manger et revenir.
+    CRITICAL_FOOD = 12
 
     def __init__(self, initial_team_size: int = 1):
+        # taille initiale de la team passée au démarrage (--team-size)
+        self.initial_team_size = initial_team_size
         # niveau actuel du joueur — démarre à 1, objectif 8
         self.level = 1
         # inventaire : toutes les ressources à 0 au départ
@@ -31,8 +43,37 @@ class Player:
         self.fork_until = 0.0
         # nb de coéquipiers ayant confirmé leur arrivée (HERE) avant l'incantation
         self.here_count = 0
-        # estimation du nombre de joueurs dans la team (transmis via --team-size au fork)
+        # estimation du nombre de joueurs dans la team — utilisé uniquement pour
+        # les broadcasts FORK (évite que deux instances forkent en même temps)
         self.known_team_size = initial_team_size
+        # True quand le joueur a ses pierres et attend des partenaires pour incanter.
+        # Permet d'appliquer la logique ancre/suiveur (anti-oscillation).
+        self.is_elevating_wait = False
+        # Rôle dans le rassemblement : ancre (True) = reste sur place et diffuse
+        # des NEED, suiveur (False) = répond aux NEED et se dirige vers les ancres.
+        # Décidé aléatoirement à chaque entrée en elevate_wait.
+        self.is_anchor = False
+        # Nombre de partenaires sur notre tuile (mis à jour à chaque Look dans
+        # elevate). Permet d'éviter de quitter un groupe partiel déjà formé.
+        self.partners_here = 0
+        # Backoff aléatoire (en ticks) avant d'être éligible au fork de croissance.
+        # Brise la symétrie : sans lui, tous les joueurs voient known_team_size<6
+        # au même tick et forkent simultanément (thundering herd → équipe x2).
+        # Le 1er éligible forke, son broadcast FORK met les autres en cooldown.
+        self.fork_backoff = random.randint(0, 40)
+        # Poids aléatoire fixe pour l'élection d'ancre de rassemblement.
+        # À chaque niveau, le joueur du plus haut poids reste immobile (ancre) et
+        # tous les autres du même niveau convergent vers lui (broadcasts globaux).
+        # Évite l'oscillation des groupes de taille égale qui se croisent sans
+        # jamais se poser sur la même tuile.
+        self.rally_weight = random.randint(1, 1_000_000_000)
+        # True quand un coéquipier a diffusé STUCK : on attend en mode survie
+        # passive que ce joueur nous rejoigne (RESUME reçu).
+        self.is_waiting = False
+        # Niveau que l'on attend d'atteindre le joueur bloqué (=notre niveau).
+        self.wait_for_level = 0
+        # Timestamp limite d'attente (sécurité anti-deadlock).
+        self.wait_until = 0.0
 
     def update_inventory(self, raw: str):
         # on enlève les crochets et les espaces autour
