@@ -47,22 +47,21 @@ def elevate(client: Client, player: Player):
         for _ in range(tiles[0].count("food")):
             client.send("Take food")
 
-    # --- Décision d'incantation (lockstep) ---
-    # On vise à rassembler TOUTE l'équipe (jusqu'à 6) avant d'incanter, pas juste
-    # le minimum requis : sinon les premiers arrivés incantent et abandonnent les
-    # retardataires, l'équipe se désynchronise et rétrécit (on n'atteint jamais
-    # les 6 joueurs des niveaux 6→7→8). Le serveur élève TOUS les joueurs de même
-    # niveau présents, donc en incanter 6 d'un coup les fait tous monter ensemble.
-    # Fallback : après INCANT_PATIENCE ticks au quorum minimum, on incante quand
-    # même (sécurité si des coéquipiers sont morts et ne viendront jamais).
+    # --- Décision d'incantation (lockstep souple) ---
+    # On préfère rassembler toute l'équipe (jusqu'à 6) avant d'incanter, pour ne
+    # pas abandonner les retardataires (le serveur élève TOUS les joueurs de même
+    # niveau présents → en incanter 6 d'un coup les fait monter ensemble).
+    # MAIS le fallback est basé sur wander_tick (temps TOTAL d'attente à ce
+    # niveau), pas sur des ticks consécutifs au quorum : sinon un joueur qui part
+    # manger réinitialise le compteur et on attend 6 pour toujours alors que
+    # l'équipe a rétréci sous 6 (deadlock). Après INCANT_PATIENCE, on incante
+    # avec le quorum minimum présent.
     if here >= needed:
         target = max(needed, min(6, player.known_team_size))
-        if here >= target or player.quorum_wait >= INCANT_PATIENCE:
-            player.quorum_wait = 0
+        if here >= target or player.wander_tick >= INCANT_PATIENCE:
             player.wander_tick = 0
             _do_incantation(client, player)
             return
-        player.quorum_wait += 1
     else:
         player.quorum_wait = 0
 

@@ -81,7 +81,16 @@ class Brain:
                     self.player.fork_until, time.time() + FORK_COOLDOWN_SEC
                 )
 
-        if best_dir is not None:
+        # On ne rejoint la pile QUE si on est prêt à incanter (plus rien à
+        # collecter, niveau exigeant plusieurs joueurs). Sinon le homing tirait
+        # les joueurs en pleine collecte loin de leurs pierres → ils oscillaient
+        # entre collecter et rallier sans jamais finir (deadlock). Collecte
+        # d'abord, ralliement ensuite.
+        ready = (
+            not self.player.missing_for_elevation()
+            and ELEVATION_REQ.get(self.player.level, {}).get("players", 1) > 1
+        )
+        if best_dir is not None and ready:
             for move in DIRECTION_MOVES.get(best_dir, []):
                 self.client.send(move)
 
@@ -101,14 +110,13 @@ class Brain:
 
             self.player.is_elevating_wait = False
 
-            # Fork initial : uniquement quand free_slots==0 (le serveur n'a plus
-            # de slot libre — cas c=1 où on est seul) ET qu'on sait qu'on n'est
-            # pas un enfant forké (initial_team_size==1).
-            # Si free_slots>0 (test avec N instances manuelles), on ne forke pas :
-            # les autres instances connectent directement, pas via fork.
+            # Croissance précoce vers 6 joueurs : on forke TÔT (dès le niveau 1),
+            # avant de commencer à monter, pour que les 6 partent ensemble et
+            # montent en lockstep. Sinon le 6e, forké tard, démarre niveau 1 loin
+            # derrière et ne peut jamais rattraper (il lui faut des partenaires de
+            # son niveau, tous déjà devant). Staggeré par fork_until aléatoire +
+            # broadcast FORK : un seul joueur forke le 6e, les autres s'arrêtent.
             if (self.player.known_team_size < 6
-                    and self.player.initial_team_size == 1
-                    and self.client.free_slots == 0
                     and time.time() >= self.player.fork_until):
                 do_initial_fork(self.client, self.player)
                 continue

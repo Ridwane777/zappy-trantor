@@ -39,8 +39,11 @@ class Player:
         self.wander_tick = 0
         # compteur de pas sans trouver de ressource — utilisé par explore()
         self.explore_steps = 0
-        # timestamp jusqu'auquel on ne peut pas forker (cooldown temps-réel)
-        self.fork_until = 0.0
+        # timestamp jusqu'auquel on ne peut pas forker (cooldown temps-réel).
+        # Initialisé à un petit délai aléatoire : staggere le fork initial pour
+        # que UN SEUL joueur forke le 6e (les autres reçoivent son broadcast FORK
+        # et voient known_team_size==6 avant d'agir → pas de thundering herd).
+        self.fork_until = random.uniform(0.0, 3.0)
         # nb de coéquipiers ayant confirmé leur arrivée (HERE) avant l'incantation
         self.here_count = 0
         # estimation du nombre de joueurs dans la team — utilisé uniquement pour
