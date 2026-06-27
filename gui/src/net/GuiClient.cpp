@@ -98,3 +98,29 @@ bool GuiClient::connect(const std::string &host, int port, std::string &err)
         ssize_t n = read(fd, &ch, 1);
         if (n <= 0) {
             err = "no WELCOME from server (timeout or closed)";
+            close(fd);
+            return false;
+        }
+        if (ch == '\n')
+            break;
+        welcome += ch;
+    }
+    if (welcome.rfind("WELCOME", 0) != 0) {
+        err = "unexpected greeting: '" + welcome + "'";
+        close(fd);
+        return false;
+    }
+
+    const char *graphic = "GRAPHIC\n";
+    if (write(fd, graphic, std::strlen(graphic)) < 0) {
+        err = std::string("write() failed: ") + std::strerror(errno);
+        close(fd);
+        return false;
+    }
+
+    fcntl(fd, F_SETFL, O_NONBLOCK);
+    _fd = fd;
+    _readBuf.clear();
+    _state = GuiState{};
+    return true;
+}
