@@ -205,3 +205,26 @@ void drawMesh(Shader &toon, Shader & /*unused*/, Mesh &mesh,
 }
 
 Mesh buildGemMesh()
+{
+    const float r = 0.14f, h = 0.22f;
+    std::vector<float> v;
+    std::vector<unsigned int> idx;
+
+    auto addFace = [&](glm::vec3 a, glm::vec3 b, glm::vec3 c) {
+        glm::vec3 n = glm::normalize(glm::cross(b-a, c-a));
+        unsigned int base = (unsigned int)(v.size() / 6);
+        for (auto &p : {a,b,c}) { v.push_back(p.x); v.push_back(p.y); v.push_back(p.z);
+                                   v.push_back(n.x); v.push_back(n.y); v.push_back(n.z); }
+        idx.push_back(base); idx.push_back(base+1); idx.push_back(base+2);
+    };
+
+    glm::vec3 top(0,h,0), bot(0,-h,0);
+    glm::vec3 px(r,0,0), mx(-r,0,0), pz(0,0,r), mz(0,0,-r);
+    addFace(top, px, pz);  addFace(top, pz, mx);
+    addFace(top, mx, mz);  addFace(top, mz, px);
+    addFace(bot, pz, px);  addFace(bot, mx, pz);
+    addFace(bot, mz, mx);  addFace(bot, px, mz);
+    return Mesh(v, idx);
+}
+
+Mesh buildDashedRingMesh(int segs, float fill)
