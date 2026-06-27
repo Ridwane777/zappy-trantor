@@ -243,3 +243,23 @@ void GuiClient::_processLine(const std::string &line)
                 it->second.invKnown = true;
             }
         }
+
+    } else if (cmd == "pdi") {
+        std::string idTok;
+        if (iss >> idTok) {
+            int id = parseId(idTok);
+            _logEvent(id, "died", 2);   // log before erasing so the team name is still available
+            _state.players.erase(id);
+        }
+
+    } else if (cmd == "enw") {
+        GuiEgg e;
+        std::string eggTok, playerTok;
+        if (iss >> eggTok >> playerTok >> e.x >> e.y) {
+            e.id = parseId(eggTok);
+            auto pit = _state.players.find(parseId(playerTok));
+            if (pit != _state.players.end())
+                e.team = pit->second.team;
+            _state.eggs[e.id] = e;
+        }
+
