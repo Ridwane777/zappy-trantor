@@ -106,3 +106,52 @@ time_t fileMtime(const std::string &p)
 }
 
 Mesh buildShoreMesh(const std::vector<Tile> &tiles, int dist)
+{
+    std::unordered_map<int, std::string> groundOf;
+    for (auto &t : tiles) groundOf[t.y * 512 + t.x] = t.ground;
+
+    auto isLand = [&](int x, int y) {
+        auto it = groundOf.find(y * 512 + x);
+        return it != groundOf.end() && it->second == "tile";
+    };
+
+    std::unordered_map<int, int> distMap;
+    for (auto &t : tiles) {
+        if (t.ground != "water") continue;
+        int key = t.y * 512 + t.x;
+        int dx[] = {0,0,1,-1}; int dz[] = {1,-1,0,0};
+        int minD = 999;
+        for (int i = 0; i < 4; ++i)
+            if (isLand(t.x + dx[i], t.y + dz[i])) { minD = 1; break; }
+        distMap[key] = minD;
+    }
+    for (int d = 2; d <= dist + 1; ++d) {
+        for (auto &t : tiles) {
+            if (t.ground != "water") continue;
+            int key = t.y * 512 + t.x;
+            if (distMap[key] < d) continue;
+            int dx[] = {0,0,1,-1}; int dz[] = {1,-1,0,0};
+            for (int i = 0; i < 4; ++i) {
+                int nk = (t.y + dz[i]) * 512 + (t.x + dx[i]);
+                if (distMap.count(nk) && distMap[nk] == d - 1) { distMap[key] = d; break; }
+            }
+        }
+    }
+
+    std::vector<float> verts; std::vector<unsigned int> idx; unsigned int base = 0;
+    for (auto &t : tiles) {
+        if (t.ground != "water") continue;
+        int d = distMap.count(t.y * 512 + t.x) ? distMap[t.y * 512 + t.x] : 999;
+        if (d != dist) continue;
+        float x0 = t.x * TILE - TILE * 0.501f, x1 = t.x * TILE + TILE * 0.501f;
+        float z0 = t.y * TILE - TILE * 0.501f, z1 = t.y * TILE + TILE * 0.501f;
+        float y = -1.80f;
+        verts.insert(verts.end(), {x0,y,z0, 0,1,0}); verts.insert(verts.end(), {x1,y,z0, 0,1,0});
+        verts.insert(verts.end(), {x1,y,z1, 0,1,0}); verts.insert(verts.end(), {x0,y,z1, 0,1,0});
+        idx.insert(idx.end(), {base,base+1,base+2, base,base+2,base+3}); base += 4;
+    }
+    if (verts.empty()) { verts={0,0,0,0,1,0, 0,0,0,0,1,0, 0,0,0,0,1,0}; idx={0,1,2}; }
+    return Mesh(verts, idx);
+}
+
+Mesh buildGroundMesh(const std::vector<Tile> &tiles, const std::string &groundType,
