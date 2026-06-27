@@ -188,3 +188,28 @@ void GuiClient::_processLine(const std::string &line)
 
     } else if (cmd == "bct") {
         int x, y;
+        if (iss >> x >> y && _state.inBounds(x, y)) {
+            GuiTile &t = _state.tileAt(x, y);
+            for (int i = 0; i < GUI_RES_COUNT; ++i)
+                iss >> t.res[i];
+        }
+
+    } else if (cmd == "pnw") {
+        GuiPlayer p;
+        std::string idTok;
+        iss >> idTok >> p.x >> p.y >> p.orientation >> p.level >> p.team;
+        p.id = parseId(idTok);
+        _state.players[p.id] = p;
+
+    } else if (cmd == "ppo") {
+        std::string idTok;
+        int x, y, o;
+        if (iss >> idTok >> x >> y >> o) {
+            auto it = _state.players.find(parseId(idTok));
+            if (it != _state.players.end()) {
+                it->second.x = x;
+                it->second.y = y;
+                it->second.orientation = o;
+            }
+        }
+
