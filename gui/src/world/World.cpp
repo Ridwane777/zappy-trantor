@@ -190,3 +190,18 @@ Mesh buildGroundMesh(const std::vector<Tile> &tiles, const std::string &groundTy
 }
 
 void drawMesh(Shader &toon, Shader & /*unused*/, Mesh &mesh,
+              const glm::mat4 &model, const glm::mat3 &normalMat, const glm::vec3 &color,
+              const glm::mat4 & /*view*/, const glm::mat4 & /*proj*/,
+              float elapsed, bool sway)
+{
+    toon.use();
+    toon.setMat4("uModel",     glm::value_ptr(model));
+    toon.setMat3("uNormalMat", glm::value_ptr(normalMat));
+    toon.setVec3("uColor",     color.r, color.g, color.b);
+    toon.setBool("uEmissive",  false);
+    toon.setFloat("uTime",     elapsed);
+    toon.setBool("uSway",      sway);
+    mesh.draw();
+}
+
+Mesh buildGemMesh()
