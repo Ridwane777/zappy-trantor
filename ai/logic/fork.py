@@ -23,13 +23,16 @@ def should_fork(client: Client, player: Player) -> bool:
         return False
     if player.wander_tick < WANDER_FORK_THRESHOLD:
         return False
-    # La team n'est pas encore à 6 : on crée un nouveau joueur.
+    # On forke UNIQUEMENT pour amener l'équipe à 6 joueurs, jamais au-delà.
     # Le backoff aléatoire stagger l'éligibilité : le 1er joueur forke et son
     # broadcast FORK met les autres en cooldown (évite le thundering herd).
+    # Plus de fork d'urgence/rescue : ils faisaient exploser l'effectif (jusqu'à
+    # 32 joueurs), créaient des stragglers niveau 1 condamnés et congestionnaient
+    # la carte, ce qui cassait la coordination. Une équipe de 6 propre + survie
+    # (auto-alimentation) + lockstep suffit.
     if player.known_team_size < 6:
         return player.wander_tick >= WANDER_FORK_THRESHOLD + player.fork_backoff
-    # Fork d'urgence : bloqué seul trop longtemps (deadlock inter-niveaux)
-    return player.wander_tick >= EMERGENCY_FORK_THRESHOLD
+    return False
 
 
 def _spawn(client: Client, player: Player):

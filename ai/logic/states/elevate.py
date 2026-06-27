@@ -1,29 +1,14 @@
-import math
-
 from network.client import Client
 from network.parser import parse_look
 from logic.player import Player, ELEVATION_REQ
 from network.broadcast import encode
-from logic.fork import should_fork, do_fork, rescue_fork, RESCUE_FORK_THRESHOLD
+from logic.fork import should_fork, do_fork
 
 STONES = ["linemate", "deraumere", "sibur", "mendiane", "phiras", "thystame"]
 
-
-def _step_toward_tile(client: Client, tile_idx: int):
-    """Avance d'un seul pas vers une tuile visible (convergence locale de
-    proximité, en complément du homing par broadcast vers l'ancre)."""
-    if tile_idx <= 0:
-        return
-    r = int(math.sqrt(tile_idx))
-    col = tile_idx - r * (r + 1)
-    if col < 0:
-        client.send("Left")
-        client.send("Forward")
-    elif col > 0:
-        client.send("Right")
-        client.send("Forward")
-    else:
-        client.send("Forward")
+# Ticks d'attente une fois le quorum MINIMUM atteint, avant d'incanter sans
+# attendre toute l'équipe (fallback anti-deadlock si des coéquipiers sont morts).
+INCANT_PATIENCE = 30
 
 
 def _do_incantation(client: Client, player: Player):
@@ -52,28 +37,42 @@ def elevate(client: Client, player: Player):
     tiles = parse_look(raw)
     players_here = max(0, tiles[0].count("player") - 1) if tiles else 0
     player.partners_here = players_here
+    here = players_here + 1
 
-    if players_here + 1 >= needed:
-        player.here_count = 0
-        player.wander_tick = 0
-        _do_incantation(client, player)
-        return
+    # --- Auto-alimentation sur place ---
+    # Un joueur qui attend (surtout l'ancre, immobile) mange la nourriture
+    # présente sur sa tuile : il se nourrit sans quitter le rendez-vous, ce qui
+    # évite que l'équipe meure de faim pendant les longues attentes/incantations.
+    if tiles:
+        for _ in range(tiles[0].count("food")):
+            client.send("Take food")
+
+    # --- Décision d'incantation (lockstep) ---
+    # On vise à rassembler TOUTE l'équipe (jusqu'à 6) avant d'incanter, pas juste
+    # le minimum requis : sinon les premiers arrivés incantent et abandonnent les
+    # retardataires, l'équipe se désynchronise et rétrécit (on n'atteint jamais
+    # les 6 joueurs des niveaux 6→7→8). Le serveur élève TOUS les joueurs de même
+    # niveau présents, donc en incanter 6 d'un coup les fait tous monter ensemble.
+    # Fallback : après INCANT_PATIENCE ticks au quorum minimum, on incante quand
+    # même (sécurité si des coéquipiers sont morts et ne viendront jamais).
+    if here >= needed:
+        target = max(needed, min(6, player.known_team_size))
+        if here >= target or player.quorum_wait >= INCANT_PATIENCE:
+            player.quorum_wait = 0
+            player.wander_tick = 0
+            _do_incantation(client, player)
+            return
+        player.quorum_wait += 1
+    else:
+        player.quorum_wait = 0
 
     player.is_elevating_wait = True
     player.wander_tick += 1
 
-    # --- Convergence locale de proximité (Look) ---
-    # Si un groupe plus grand est visible juste à côté, on s'en rapproche d'un
-    # pas. Complète le homing par broadcast (ancre) pour les rapprochements fins.
-    best_idx = -1
-    best_cnt = 0
-    for i in range(1, len(tiles)):
-        cnt = tiles[i].count("player")
-        if cnt > best_cnt:
-            best_cnt = cnt
-            best_idx = i
-    if best_idx >= 0 and best_cnt > players_here:
-        _step_toward_tile(client, best_idx)
+    # NB : pas de pas local via Look ici. Il faisait dériver l'ancre vers ses
+    # suiveurs visibles (elle les pourchasse → oscillation, jamais de rendez-
+    # vous). Tout déplacement passe par le homing broadcast (brain), où seuls
+    # les non-ancres bougent.
 
     # --- Rassemblement par ancre élue (Broadcast) ---
     # On diffuse NEED:team:level:weight. L'ancre = le joueur de plus haut weight
@@ -84,12 +83,6 @@ def elevate(client: Client, player: Player):
             f"Broadcast {encode('NEED', f'{client.team}:{player.level}:{player.rally_weight}')}"
         )
 
-    # Rescue : si seul depuis trop longtemps → STUCK + fork des enfants.
-    if players_here == 0 and player.wander_tick >= RESCUE_FORK_THRESHOLD:
-        if player.wander_tick % 20 == 0:
-            client.send(f"Broadcast {encode('STUCK', f'{client.team}:{player.level}')}")
-        if player.wander_tick == RESCUE_FORK_THRESHOLD:
-            rescue_fork(client, player, needed)
-
+    # Fork uniquement pour amener l'équipe à 6 (géré par should_fork).
     if should_fork(client, player):
         do_fork(client, player)

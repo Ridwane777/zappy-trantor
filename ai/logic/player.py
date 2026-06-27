@@ -67,13 +67,10 @@ class Player:
         # Évite l'oscillation des groupes de taille égale qui se croisent sans
         # jamais se poser sur la même tuile.
         self.rally_weight = random.randint(1, 1_000_000_000)
-        # True quand un coéquipier a diffusé STUCK : on attend en mode survie
-        # passive que ce joueur nous rejoigne (RESUME reçu).
-        self.is_waiting = False
-        # Niveau que l'on attend d'atteindre le joueur bloqué (=notre niveau).
-        self.wait_for_level = 0
-        # Timestamp limite d'attente (sécurité anti-deadlock).
-        self.wait_until = 0.0
+        # Compteur de patience une fois le quorum minimum atteint : on attend des
+        # joueurs supplémentaires (objectif : toute l'équipe) avant d'incanter,
+        # pour ne pas abandonner les retardataires et garder l'équipe groupée.
+        self.quorum_wait = 0
 
     def update_inventory(self, raw: str):
         # on enlève les crochets et les espaces autour

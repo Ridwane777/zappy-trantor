@@ -21,9 +21,6 @@ DIRECTION_MOVES = {
     8: ["Left", "Forward"],
 }
 
-# Délai maximum d'attente (mode WAIT) avant de reprendre quoi qu'il arrive.
-_WAIT_TIMEOUT = 300.0
-
 
 class Brain:
     def __init__(self, client: Client, initial_team_size: int = 1):
@@ -50,43 +47,24 @@ class Brain:
                 sender_team = ""
 
             if msg_type == "NEED" and sender_team == self.client.team:
-                if self.player.is_waiting:
-                    continue
                 parts = data.split(":")
                 try:
-                    sender_level = int(parts[1])
                     sender_weight = int(parts[2])
                 except (ValueError, IndexError):
                     continue
-                if sender_level != self.player.level:
-                    continue
+                # Ralliement GLOBAL (indépendant du niveau) : tout le monde
+                # converge vers le joueur du plus haut weight de l'équipe, quel
+                # que soit son niveau. Ainsi les retardataires sont sur la MÊME
+                # tuile que les leaders (jamais isolés), et chaque sous-groupe de
+                # même niveau incante sur place. C'est la « salle d'attente ».
                 # direction 0 = même tuile : inutile de bouger.
                 if direction != 0 and sender_weight > best_weight:
                     best_weight = sender_weight
                     best_dir = direction
 
-            elif msg_type == "STUCK" and sender_team == self.client.team:
-                # Un coéquipier est bloqué seul à un niveau inférieur au nôtre.
-                # On passe en mode attente passive (survive only) jusqu'à ce qu'il
-                # nous rejoigne (RESUME reçu) ou que le timeout expire.
-                try:
-                    stuck_level = int(data.split(":", 1)[1])
-                except (ValueError, IndexError):
-                    stuck_level = 0
-                if self.player.level > stuck_level and not self.player.is_waiting:
-                    self.player.is_waiting = True
-                    self.player.wait_for_level = self.player.level
-                    self.player.wait_until = time.time() + _WAIT_TIMEOUT
-
-            elif msg_type == "RESUME" and sender_team == self.client.team:
-                # Le joueur bloqué vient d'avancer : si son nouveau niveau atteint
-                # le nôtre, on reprend le jeu normal.
-                try:
-                    resume_level = int(data.split(":", 1)[1])
-                except (ValueError, IndexError):
-                    resume_level = 0
-                if self.player.is_waiting and resume_level >= self.player.wait_for_level:
-                    self.player.is_waiting = False
+            # NB : on ignore STUCK/RESUME pour le déplacement. L'ancienne mise en
+            # attente passive (is_waiting) gelait les joueurs prêts → deadlock.
+            # Le rescue_fork (côté elevate) suffit à aider un joueur isolé.
 
             elif msg_type == "HERE" and sender_team == self.client.team and direction == 0:
                 self.player.here_count += 1
@@ -134,15 +112,6 @@ class Brain:
                     and time.time() >= self.player.fork_until):
                 do_initial_fork(self.client, self.player)
                 continue
-
-            # Mode WAIT : un coéquipier est bloqué seul, on l'attend.
-            if self.player.is_waiting:
-                if time.time() >= self.player.wait_until:
-                    self.player.is_waiting = False
-                else:
-                    if self.player.needs_food():
-                        survive(self.client, self.player)
-                    continue
 
             # Décision nourriture/action.
             # Un joueur PRÊT à incanter (plus rien à collecter, niveau exigeant
