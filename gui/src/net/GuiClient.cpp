@@ -59,3 +59,42 @@ void GuiClient::send(const std::string &line)
     (void)n;   // best-effort; non-blocking, GUI requests are idempotent
 }
 
+bool GuiClient::connect(const std::string &host, int port, std::string &err)
+{
+    struct addrinfo hints{};
+    hints.ai_family   = AF_INET;
+    hints.ai_socktype = SOCK_STREAM;
+
+    struct addrinfo *res = nullptr;
+    std::string portStr = std::to_string(port);
+    if (getaddrinfo(host.c_str(), portStr.c_str(), &hints, &res) != 0 || !res) {
+        err = "cannot resolve host '" + host + "'";
+        return false;
+    }
+
+    int fd = socket(res->ai_family, res->ai_socktype, res->ai_protocol);
+    if (fd < 0) {
+        err = std::string("socket() failed: ") + std::strerror(errno);
+        freeaddrinfo(res);
+        return false;
+    }
+
+    // bound handshake timeout so a wrong host/port can't hang the menu
+    struct timeval tv{};
+    tv.tv_sec = 5;
+    setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
+
+    if (::connect(fd, res->ai_addr, res->ai_addrlen) < 0) {
+        err = std::string("connect() failed: ") + std::strerror(errno);
+        close(fd);
+        freeaddrinfo(res);
+        return false;
+    }
+    freeaddrinfo(res);
+
+    std::string welcome;
+    char ch;
+    while (welcome.size() < 64) {
+        ssize_t n = read(fd, &ch, 1);
+        if (n <= 0) {
+            err = "no WELCOME from server (timeout or closed)";
