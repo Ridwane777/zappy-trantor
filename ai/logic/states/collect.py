@@ -6,8 +6,11 @@ from logic.explore import explore
 
 
 def collect(client: Client, player: Player):
-    # on récupère ce qui manque pour le prochain niveau
-    missing = player.missing_for_elevation()
+    # STOCKPILE-AHEAD : on collecte d'avance le CUMUL des pierres de TOUS les
+    # niveaux restants. Une fois stocké, le joueur n'a plus jamais à repartir
+    # collecter entre deux niveaux → la cohorte co-localisée peut enchaîner les
+    # incantations sans se redisperser.
+    missing = player.missing_stockpile()
 
     # on regarde autour pour voir les tuiles visibles et leur contenu
     raw = client.send("Look")

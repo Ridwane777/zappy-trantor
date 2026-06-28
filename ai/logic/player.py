@@ -26,10 +26,12 @@ class Player:
     # pour manger (au-dessus, il reste sur place pour servir de point de rendez-
     # vous stable). 12 food ≈ 15 s à f=100 : marge pour aller manger et revenir.
     CRITICAL_FOOD = 12
+    # Réserve de food visée avant de rallier (hystérésis). Modérée : assez pour
+    # tenir au rendez-vous sans famine, mais pas trop pour ne pas passer tout son
+    # temps à manger au lieu de monter (un gros buffer ralentissait la montée).
+    FOOD_RALLY_TARGET = 25
 
-    def __init__(self, initial_team_size: int = 1):
-        # taille initiale de la team passée au démarrage (--team-size)
-        self.initial_team_size = initial_team_size
+    def __init__(self):
         # niveau actuel du joueur — démarre à 1, objectif 8
         self.level = 1
         # inventaire : toutes les ressources à 0 au départ
@@ -39,16 +41,19 @@ class Player:
         self.wander_tick = 0
         # compteur de pas sans trouver de ressource — utilisé par explore()
         self.explore_steps = 0
-        # timestamp jusqu'auquel on ne peut pas forker (cooldown temps-réel).
-        # Initialisé à un petit délai aléatoire : staggere le fork initial pour
-        # que UN SEUL joueur forke le 6e (les autres reçoivent son broadcast FORK
-        # et voient known_team_size==6 avant d'agir → pas de thundering herd).
+        # timestamp jusqu'auquel on ne peut pas forker (cooldown réel du fork de
+        # réapprovisionnement). Petit délai aléatoire initial pour staggerer les
+        # joueurs et éviter qu'ils déclenchent un réapprovisionnement au même tick.
         self.fork_until = random.uniform(0.0, 3.0)
         # nb de coéquipiers ayant confirmé leur arrivée (HERE) avant l'incantation
         self.here_count = 0
-        # estimation du nombre de joueurs dans la team — utilisé uniquement pour
-        # les broadcasts FORK (évite que deux instances forkent en même temps)
-        self.known_team_size = initial_team_size
+        # Hystérésis de ravitaillement : True = on (re)fait le plein de food.
+        # On bascule à True sous CRITICAL_FOOD et à False à FOOD_RALLY_TARGET.
+        # Entre les deux on garde l'état → un joueur engagé au rdv y reste (il ne
+        # repart pas manger dès qu'il perd 1 food), ce qui évite l'oscillation
+        # forage↔rdv qui empêchait la cohorte de se former. Démarre à True
+        # (food=10 < seuil) : on fait le plein avant toute chose.
+        self.need_fuel = True
         # True quand le joueur a ses pierres et attend des partenaires pour incanter.
         # Permet d'appliquer la logique ancre/suiveur (anti-oscillation).
         self.is_elevating_wait = False
@@ -59,21 +64,12 @@ class Player:
         # Nombre de partenaires sur notre tuile (mis à jour à chaque Look dans
         # elevate). Permet d'éviter de quitter un groupe partiel déjà formé.
         self.partners_here = 0
-        # Backoff aléatoire (en ticks) avant d'être éligible au fork de croissance.
-        # Brise la symétrie : sans lui, tous les joueurs voient known_team_size<6
-        # au même tick et forkent simultanément (thundering herd → équipe x2).
-        # Le 1er éligible forke, son broadcast FORK met les autres en cooldown.
-        self.fork_backoff = random.randint(0, 40)
         # Poids aléatoire fixe pour l'élection d'ancre de rassemblement.
         # À chaque niveau, le joueur du plus haut poids reste immobile (ancre) et
         # tous les autres du même niveau convergent vers lui (broadcasts globaux).
         # Évite l'oscillation des groupes de taille égale qui se croisent sans
         # jamais se poser sur la même tuile.
         self.rally_weight = random.randint(1, 1_000_000_000)
-        # Compteur de patience une fois le quorum minimum atteint : on attend des
-        # joueurs supplémentaires (objectif : toute l'équipe) avant d'incanter,
-        # pour ne pas abandonner les retardataires et garder l'équipe groupée.
-        self.quorum_wait = 0
 
     def update_inventory(self, raw: str):
         # on enlève les crochets et les espaces autour
@@ -99,6 +95,27 @@ class Player:
             resource: req[resource] - self.inventory[resource]
             for resource in RESOURCES
             if resource != "food" and self.inventory[resource] < req.get(resource, 0)
+        }
+
+    def missing_stockpile(self) -> dict:
+        # STOCKPILE-AHEAD : on vise le CUMUL des pierres nécessaires du niveau
+        # courant jusqu'au niveau 8, pas seulement le niveau courant. Ainsi, une
+        # fois le stock complet, le joueur n'a plus JAMAIS besoin de repartir
+        # collecter entre deux niveaux → il reste sur le rendez-vous et la cohorte
+        # ne se redisperse pas. Effet de bord clé : un joueur entièrement stocké
+        # est en permanence « ready » → il rallie en continu → le beacon de
+        # rassemblement se stabilise et la convergence s'améliore.
+        if self.level >= 8:
+            return {}
+        need = {r: 0 for r in RESOURCES if r != "food"}
+        for lvl in range(self.level, 8):
+            req = ELEVATION_REQ.get(lvl, {})
+            for resource in need:
+                need[resource] += req.get(resource, 0)
+        return {
+            resource: need[resource] - self.inventory[resource]
+            for resource in need
+            if self.inventory[resource] < need[resource]
         }
 
     def needs_food(self) -> bool:

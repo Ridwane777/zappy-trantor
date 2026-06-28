@@ -4,79 +4,83 @@ import time
 import subprocess
 
 from network.client import Client
-from logic.player import Player
 
-FORK_COOLDOWN_SEC        = 60.0  # cooldown des autres après réception d'un FORK
-FORK_SELF_COOLDOWN_SEC   = 90.0  # cooldown du forkeur lui-même après do_fork
-INITIAL_FORK_COOLDOWN    = 5.0   # cooldown court pour les forks d'initialisation
-WANDER_FORK_THRESHOLD    = 30    # tours d'attente avant de créer un nouveau joueur
-EMERGENCY_FORK_THRESHOLD = 400   # fork d'urgence si bloqué trop longtemps
+# Effectif d'équipe visé (PAR ÉQUIPE). On force 9 quel que soit le -c du serveur :
+# redondance pour tenir les quorums (4 puis 6) des hauts niveaux malgré les morts.
+TEAM_TARGET = 9
 
-# Seuil en tours sans partenaire avant de déclencher le mécanisme de rescue.
-RESCUE_FORK_THRESHOLD = 80
+# Cooldown court entre deux créations de joueur (le temps que l'œuf forké éclose
+# et que l'enfant se connecte, pour ne pas spammer pendant la latence du Fork).
+BUILD_FORK_COOLDOWN = 2.0
 
 
-def should_fork(client: Client, player: Player) -> bool:
-    if player.level >= 8:
-        return False
-    if time.time() < player.fork_until:
-        return False
-    if player.wander_tick < WANDER_FORK_THRESHOLD:
-        return False
-    # On forke UNIQUEMENT pour amener l'équipe à 6 joueurs, jamais au-delà.
-    # Le backoff aléatoire stagger l'éligibilité : le 1er joueur forke et son
-    # broadcast FORK met les autres en cooldown (évite le thundering herd).
-    # Plus de fork d'urgence/rescue : ils faisaient exploser l'effectif (jusqu'à
-    # 32 joueurs), créaient des stragglers niveau 1 condamnés et congestionnaient
-    # la carte, ce qui cassait la coordination. Une équipe de 6 propre + survie
-    # (auto-alimentation) + lockstep suffit.
-    if player.known_team_size < 6:
-        return player.wander_tick >= WANDER_FORK_THRESHOLD + player.fork_backoff
-    return False
+def _spawn(client: Client) -> subprocess.Popen:
+    """Lance un nouveau process zappy_ai et renvoie son handle (pour supervision).
 
-
-def _spawn(client: Client, player: Player):
-    """Envoie la commande Fork et lance le subprocess AI."""
-    from network.broadcast import encode
-    client.send(f"Broadcast {encode('FORK', f'{client.team}:{player.known_team_size}')}")
-    client.send("Fork")
+    L'enfant reçoit la variable d'env ZAPPY_CHILD=1 : c'est un simple RÔLE de
+    lancement (réinforcement), pas une donnée de jeu. Il NE recrute pas (seul le
+    recruteur gère l'effectif) ; il joue normalement. Aucune info de jeu (taille
+    d'équipe, etc.) n'est transmise → l'interdiction de communiquer hors-jeu est
+    respectée. À la connexion, le serveur lui attribue un slot initial libre, sinon
+    fait éclore un œuf (Fork) de l'équipe.
+    """
     entry = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "zappy_ai")
-    subprocess.Popen(
+    env = dict(os.environ, ZAPPY_CHILD="1")
+    return subprocess.Popen(
         [
             sys.executable, entry,
             "-p", str(client.port),
             "-n", client.team,
             "-h", client.host,
-            "--team-size", str(player.known_team_size),
         ],
+        env=env,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
 
 
-def do_fork(client: Client, player: Player):
-    """Fork normal : crée 1 enfant et applique le cooldown long."""
-    player.known_team_size += 1
-    player.wander_tick = 0
-    _spawn(client, player)
-    player.fork_until = time.time() + FORK_SELF_COOLDOWN_SEC
+class TeamManager:
+    """Construit et MAINTIENT l'équipe à TEAM_TARGET joueurs (par équipe).
 
-
-def do_initial_fork(client: Client, player: Player):
-    """Fork d'initialisation : cooldown court pour atteindre 6 rapidement."""
-    player.known_team_size += 1
-    _spawn(client, player)
-    player.fork_until = time.time() + INITIAL_FORK_COOLDOWN
-
-
-def rescue_fork(client: Client, player: Player, n: int):
-    """Fork n enfants immédiatement pour débloquer un deadlock inter-niveaux.
-
-    Les enfants vont s'entraider entre eux pour remonter jusqu'au niveau du
-    joueur bloqué, lui fournir les partenaires dont il a besoin pour incanter,
-    et lui permettre de rejoindre le reste de la team.
+    Un seul process est « recruteur » (celui lancé à la main, sans ZAPPY_CHILD) ;
+    les autres (lancés par _spawn, avec ZAPPY_CHILD) ne recrutent pas. Le recruteur
+    crée les (TEAM_TARGET-1) coéquipiers et SURVEILLE leurs process : dès qu'un
+    enfant meurt (son joueur est mort → le process se termine), il en relance un
+    (Fork d'un œuf + nouveau process) pour revenir à 9. Tout passe par des
+    commandes de jeu légales (Fork) + la gestion locale de ses sous-process ;
+    aucune donnée de jeu n'est échangée hors du serveur.
     """
-    for _ in range(n):
-        player.known_team_size += 1
-        _spawn(client, player)
-    player.fork_until = time.time() + FORK_SELF_COOLDOWN_SEC
+
+    def __init__(self, client: Client):
+        self.client = client
+        # Recruteur = process lancé directement (pas un enfant _spawn).
+        self.is_recruiter = os.environ.get("ZAPPY_CHILD") is None
+        # Handles des coéquipiers créés par CE recruteur.
+        self.children = []
+        # Slots initiaux (-c) encore libres au moment de notre connexion : autant
+        # de coéquipiers qu'on peut créer par simple connexion (sans Fork).
+        self.free_slots = client.free_slots if self.is_recruiter else 0
+        self.slots_used = 0
+        self.next_build = 0.0
+
+    def tick(self):
+        if not self.is_recruiter:
+            return
+        # On retire les enfants morts (process terminé = joueur mort).
+        self.children = [c for c in self.children if c.poll() is None]
+        # Équipe complète ? rien à faire.
+        if len(self.children) >= TEAM_TARGET - 1:
+            return
+        if time.time() < self.next_build:
+            return
+        # Un seul œuf en vol à la fois (régulation par le serveur).
+        if self.client.connect_nbr() > 0:
+            return
+        if self.slots_used < self.free_slots:
+            # Il reste un slot initial : l'enfant s'y connectera (pas besoin de Fork).
+            self.slots_used += 1
+        else:
+            # Plus de slot initial → on crée un œuf pour l'enfant.
+            self.client.send("Fork")
+        self.children.append(_spawn(self.client))
+        self.next_build = time.time() + BUILD_FORK_COOLDOWN

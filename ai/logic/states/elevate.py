@@ -2,21 +2,33 @@ from network.client import Client
 from network.parser import parse_look
 from logic.player import Player, ELEVATION_REQ
 from network.broadcast import encode
-from logic.fork import should_fork, do_fork
 
 STONES = ["linemate", "deraumere", "sibur", "mendiane", "phiras", "thystame"]
 
-# Ticks d'attente une fois le quorum MINIMUM atteint, avant d'incanter sans
-# attendre toute l'équipe (fallback anti-deadlock si des coéquipiers sont morts).
-INCANT_PATIENCE = 30
+
+def _topup_stones(client: Client, player: Player, first_tile: list):
+    """Dépose sur la case SEULEMENT le déficit pour atteindre les prérequis du
+    niveau (mise en commun). On compte ce qui est DÉJÀ sur la case (posé par les
+    coéquipiers) et on n'ajoute que ce qui manque, dans la limite de ce qu'on
+    porte. Effet : chaque joueur présent contribue tour à tour, ce ne sont pas
+    les ressources d'une seule personne qui sont prises, et rien n'est gaspillé.
+    """
+    req = ELEVATION_REQ.get(player.level, {})
+    for stone in STONES:
+        deficit = req.get(stone, 0) - first_tile.count(stone)
+        held = player.inventory.get(stone, 0)
+        for _ in range(min(deficit, held)):
+            client.send(f"Set {stone}")
+            player.inventory[stone] -= 1  # garder l'inventaire local cohérent
 
 
 def _do_incantation(client: Client, player: Player):
-    req = ELEVATION_REQ.get(player.level, {})
-    for stone in STONES:
-        for _ in range(req.get(stone, 0)):
-            client.send(f"Set {stone}")
-            
+    # On regarde la case et on complète le déficit de pierres (ce que les autres
+    # ont déjà déposé compte) avant de lancer l'incantation.
+    raw = client.send("Look")
+    tiles = parse_look(raw)
+    _topup_stones(client, player, tiles[0] if tiles else [])
+
     start_msg = client.send("Incantation", is_incantation=True)
     if start_msg == "ko":
         return
@@ -52,41 +64,29 @@ def elevate(client: Client, player: Player):
         for _ in range(tiles[0].count("food")):
             client.send("Take food")
 
-    # --- Décision d'incantation (lockstep souple) ---
-    # On préfère rassembler toute l'équipe (jusqu'à 6) avant d'incanter, pour ne
-    # pas abandonner les retardataires (le serveur élève TOUS les joueurs de même
-    # niveau présents → en incanter 6 d'un coup les fait monter ensemble).
-    # MAIS le fallback est basé sur wander_tick (temps TOTAL d'attente à ce
-    # niveau), pas sur des ticks consécutifs au quorum : sinon un joueur qui part
-    # manger réinitialise le compteur et on attend 6 pour toujours alors que
-    # l'équipe a rétréci sous 6 (deadlock). Après INCANT_PATIENCE, on incante
-    # avec le quorum minimum présent.
+    # --- Décision d'incantation ---
+    # Dès que le quorum du niveau est atteint sur la tuile, on incante (le serveur
+    # élève tous les joueurs de même niveau présents). Attendre les 6 a été testé
+    # et n'aide pas : le blocage n'est pas le timing mais la co-localisation de 4+
+    # joueurs sur une case. Incanter au quorum maximise la progression observée.
     if here >= needed:
-        target = max(needed, min(6, player.known_team_size))
-        if here >= target or player.wander_tick >= INCANT_PATIENCE:
-            player.wander_tick = 0
-            _do_incantation(client, player)
-            return
-    else:
-        player.quorum_wait = 0
+        player.wander_tick = 0
+        _do_incantation(client, player)
+        return
 
     player.is_elevating_wait = True
     player.wander_tick += 1
 
-    # NB : pas de pas local via Look ici. Il faisait dériver l'ancre vers ses
-    # suiveurs visibles (elle les pourchasse → oscillation, jamais de rendez-
-    # vous). Tout déplacement passe par le homing broadcast (brain), où seuls
-    # les non-ancres bougent.
-
     # --- Rassemblement par ancre élue (Broadcast) ---
-    # On diffuse NEED:team:level:weight. L'ancre = le joueur de plus haut weight
-    # parmi ceux du même niveau ; elle reste immobile, les autres convergent vers
-    # elle (voir brain._handle_broadcasts). Broadcasts globaux sur ce serveur.
-    if player.wander_tick % 4 == 0:
-        client.send(
-            f"Broadcast {encode('NEED', f'{client.team}:{player.level}:{player.rally_weight}')}"
-        )
-
-    # Fork uniquement pour amener l'équipe à 6 (géré par should_fork).
-    if should_fork(client, player):
-        do_fork(client, player)
+    # On diffuse NEED:team:level:weight à CHAQUE tour (beacon continu). C'est
+    # essentiel : un suiveur ne peut se diriger que s'il reçoit une direction
+    # FRAÎCHE à ce tour (le numéro de tuile K dépend de sa position/orientation
+    # courante, qui changent dès qu'il bouge → impossible de réutiliser une
+    # ancienne direction). En émettant à chaque tour, le suiveur a une direction à
+    # chaque pas et converge vite (vérifié en simulation : ~7-8 pas). L'ancre =
+    # plus haut weight ; elle reste immobile, les autres convergent (brain).
+    client.send(
+        f"Broadcast {encode('NEED', f'{client.team}:{player.level}:{player.rally_weight}')}"
+    )
+    # (Plus de fork ici : l'effectif est géré par TeamManager — construction à 9
+    # + remplacement des morts, plafonné à 9.)

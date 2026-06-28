@@ -14,7 +14,6 @@ def parse_args():
     parser.add_argument("-n", type=str, required=True, dest="name")
     # adresse du serveur — localhost par défaut
     parser.add_argument("-h", type=str, default="localhost", dest="host")
-    parser.add_argument("--team-size", type=int, default=1, dest="team_size")
     return parser.parse_args()
 
 
@@ -23,7 +22,7 @@ def main():
     client = Client(args.host, args.port, args.name)
     try:
         client.connect()
-        brain = Brain(client, initial_team_size=args.team_size)
+        brain = Brain(client)
         brain.run()
     except (ConnectionError, BrokenPipeError, KeyboardInterrupt):
         # serveur fermé / partie terminée / interruption : on sort proprement

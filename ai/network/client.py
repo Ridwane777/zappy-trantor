@@ -128,6 +128,17 @@ class Client:
         self._pending_level = None
         return lvl
 
+    def connect_nbr(self) -> int:
+        # Nombre d'œufs (issus de Fork) de l'équipe encore en attente d'éclosion,
+        # tel que rapporté PAR LE SERVEUR. C'est notre seule source d'effectif
+        # légitime (le sujet interdit toute communication hors-jeu). Sert de
+        # sémaphore : si > 0, un œuf est déjà en vol → inutile d'en reforker un.
+        raw = self.send("Connect_nbr")
+        try:
+            return int(raw)
+        except (ValueError, TypeError):
+            return 0
+
     _DEBUG = os.getenv("ZAPPY_DEBUG") == "1"
 
     def _log(self, direction: str, text: str):

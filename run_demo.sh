@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-# Lance la démo complète : serveur + 6 équipes de 5 IA + GUI.
-# Les IA se connectent dès le départ et jouent pendant l'intro ; quand tu
-# appuies sur START après l'intro, la GUI rejoint la partie déjà en cours.
+# Lance la démo complète : serveur + 6 équipes + GUI.
+# On lance UNE seule IA par équipe : la chaîne de remplissage interne peuple
+# automatiquement les slots restants jusqu'à -c (effectif piloté par le serveur,
+# plus de --team-size). Quand tu appuies sur START après l'intro, la GUI rejoint
+# la partie déjà en cours.
 #
 # Usage : ./run_demo.sh [MOVE_SEC] [PORT]
 #   MOVE_SEC  durée d'un déplacement en secondes  (défaut 0.5 -> ~2 tuiles/s ;
@@ -17,7 +19,7 @@ AI_DELAY="${1:-0.5}"
 PORT="${2:-4242}"
 WIDTH=20
 HEIGHT=20
-PLAYERS_PER_TEAM=5
+PLAYERS_PER_TEAM=9
 TEAMS=(team1 team2 team3 team4 team5 team6)
 
 pids=()
@@ -35,14 +37,11 @@ echo "[run_demo] serveur port $PORT — ${#TEAMS[@]} équipes x $PLAYERS_PER_TEA
 pids+=($!)
 sleep 1
 
-echo "[run_demo] IA : $((${#TEAMS[@]} * PLAYERS_PER_TEAM)) clients (délai=${AI_DELAY}s/déplacement)"
+echo "[run_demo] IA : 1 client par équipe (la chaîne de remplissage peuple jusqu'à -c=$PLAYERS_PER_TEAM ; délai=${AI_DELAY}s/déplacement)"
 for team in "${TEAMS[@]}"; do
-    for _ in $(seq "$PLAYERS_PER_TEAM"); do
-        ( cd "$ROOT/ai" && ZAPPY_AI_DELAY="$AI_DELAY" \
-            python3 zappy_ai -p "$PORT" -n "$team" -h localhost \
-            --team-size "$PLAYERS_PER_TEAM" ) &
-        pids+=($!)
-    done
+    ( cd "$ROOT/ai" && ZAPPY_AI_DELAY="$AI_DELAY" \
+        python3 zappy_ai -p "$PORT" -n "$team" -h localhost ) &
+    pids+=($!)
 done
 sleep 1
 
