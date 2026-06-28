@@ -105,16 +105,6 @@ class Brain:
             raw = self.client.send("Inventory")
             self.player.update_inventory(raw)
 
-            # REINE : le recruteur ne joue PAS comme les autres. Son seul rôle est
-            # de SURVIVRE et de maintenir l'effectif (team.tick ci-dessus reforke
-            # les morts). Elle mange en priorité et n'évolue pas → elle ne meurt
-            # quasiment jamais → l'équipe reste peuplée. Les ouvriers (les 8 autres)
-            # évoluent ; 8 ≥ 6 suffit pour les quorums des hauts niveaux. Sans ça,
-            # si le recruteur mourait, son équipe cessait d'être réapprovisionnée.
-            if team.is_recruiter:
-                survive(self.client, self.player)
-                continue
-
             if self.player.level >= 8:
                 break
 
