@@ -73,14 +73,18 @@ class TeamManager:
             return
         if time.time() < self.next_build:
             return
-        # Un seul œuf en vol à la fois (régulation par le serveur).
-        if self.client.connect_nbr() > 0:
-            return
+
         if self.slots_used < self.free_slots:
-            # Il reste un slot initial : l'enfant s'y connectera (pas besoin de Fork).
+            # Il reste un slot initial : l'enfant peut s'y connecter tout de suite.
             self.slots_used += 1
+            self.children.append(_spawn(self.client))
+        elif self.client.connect_nbr() > 0:
+            # Un œuf (forké au tour précédent) est prêt : on lance l'enfant qui va
+            # l'éclore. CRUCIAL : on n'envoie l'enfant QUE quand un slot/œuf existe,
+            # sinon le serveur répond « ko » et le process reste bloqué (fuite).
+            self.children.append(_spawn(self.client))
         else:
-            # Plus de slot initial → on crée un œuf pour l'enfant.
+            # Ni slot ni œuf → on crée un œuf maintenant ; l'enfant viendra l'éclore
+            # au prochain tick, une fois l'œuf matérialisé (Fork coûte 42 ticks).
             self.client.send("Fork")
-        self.children.append(_spawn(self.client))
         self.next_build = time.time() + BUILD_FORK_COOLDOWN

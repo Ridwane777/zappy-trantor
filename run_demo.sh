@@ -20,7 +20,7 @@ PORT="${2:-4242}"
 WIDTH=20
 HEIGHT=20
 PLAYERS_PER_TEAM=9
-TEAMS=(team1 team2 team3 team4 team5 team6)
+TEAMS=(team1 team2 team3)
 
 pids=()
 cleanup() {
