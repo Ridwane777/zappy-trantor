@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Lance la démo complète : serveur + 6 équipes + GUI.
-# On lance UNE seule IA par équipe : la chaîne de remplissage interne peuple
-# automatiquement les slots restants jusqu'à -c (effectif piloté par le serveur,
-# plus de --team-size). Quand tu appuies sur START après l'intro, la GUI rejoint
-# la partie déjà en cours.
+# Lance la démo complète : serveur + 3 équipes + GUI.
+# On lance UNE seule IA par équipe : c'est la REINE de l'équipe. Elle ne fait que
+# survivre et forker pour maintenir l'effectif (rebâtit sous 7, plafond 9) ; ses
+# ouvriers évoluent et coopèrent entre équipes (incantations cross-team par
+# niveau). Quand tu appuies sur START après l'intro, la GUI rejoint la partie.
 #
 # Usage : ./run_demo.sh [MOVE_SEC] [PORT]
 #   MOVE_SEC  durée d'un déplacement en secondes  (défaut 0.5 -> ~2 tuiles/s ;
@@ -20,7 +20,7 @@ PORT="${2:-4242}"
 WIDTH=20
 HEIGHT=20
 PLAYERS_PER_TEAM=9
-TEAMS=(team1)
+TEAMS=(team1 team2)
 
 pids=()
 cleanup() {

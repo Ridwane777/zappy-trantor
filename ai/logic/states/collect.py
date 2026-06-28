@@ -6,31 +6,39 @@ from logic.explore import explore
 
 
 def collect(client: Client, player: Player):
-    # STOCKPILE-AHEAD : on collecte d'avance le CUMUL des pierres de TOUS les
-    # niveaux restants. Une fois stocké, le joueur n'a plus jamais à repartir
-    # collecter entre deux niveaux → la cohorte co-localisée peut enchaîner les
-    # incantations sans se redisperser.
-    missing = player.missing_stockpile()
+    """Va chercher les pierres qui manquent pour l'élévation du niveau courant.
 
-    # on regarde autour pour voir les tuiles visibles et leur contenu
+    Stratégie simple et efficace :
+      1. on calcule les pierres manquantes (niveau courant uniquement) ;
+      2. on regarde autour de soi (Look) ;
+      3. on va sur la PREMIÈRE case en vue qui contient une pierre utile, on la
+         ramasse (et au passage la food qui s'y trouve) ;
+      4. si rien d'utile n'est visible, on explore pour découvrir d'autres cases.
+
+    On vise le niveau courant seulement (et non un gros stock d'avance) : la
+    collecte reste courte, ce qui permet de vite repartir au regroupement plutôt
+    que de passer tout son temps à amasser des pierres.
+    """
+    missing = player.missing_for_elevation()
+
+    # Champ de vision actuel : liste de cases (voir parse_look).
     raw = client.send("Look")
     tiles = parse_look(raw)
 
-    # on cherche la première tuile qui contient au moins une ressource manquante
+    # On cherche la première case qui contient au moins une pierre manquante.
     for index, tile in enumerate(tiles):
         resources_here = [r for r in missing if r in tile]
         if resources_here:
-            # on se déplace une seule fois vers cette tuile
+            # Un seul déplacement vers cette case.
             _go_to_tile(client, index)
-            # on ramasse toutes les ressources manquantes présentes sur cette tuile
+            # On ramasse toutes les pierres utiles présentes sur la case.
             for resource in resources_here:
                 client.send(f"Take {resource}")
-            # bonus opportuniste : tant qu'on est déjà sur place, on ramasse
-            # aussi la food qui s'y trouve (sinon elle ne monte jamais au-delà
-            # du strict seuil de survie, et le fork ne se déclenche jamais)
+            # Bonus opportuniste : tant qu'on est là, on prend aussi la food. Sans
+            # ça la réserve de food ne dépasse jamais le strict seuil de survie.
             for _ in range(tile.count("food")):
                 client.send("Take food")
             return
 
-    # aucune ressource en vue : exploration intelligente pour couvrir la carte
+    # Aucune pierre utile en vue : on explore pour couvrir d'autres zones.
     explore(client, player)

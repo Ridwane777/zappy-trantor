@@ -102,7 +102,6 @@ Gère la socket TCP et l'envoi/réception des commandes. Bufferise les broadcast
 | `connect()` | Ouvre la socket, fait le handshake (WELCOME → nom → CLIENT-NUM → dimensions). Remplit `free_slots`, `map_x`, `map_y`. |
 | `send(cmd, is_incantation=False)` | Envoie une commande **et** lit sa réponse (renvoie la réponse). |
 | `receive(is_incantation=False)` | Lit une réponse **sans** envoyer (utilisé pour la 2ᵉ phase de l'incantation). |
-| `send_incantation()` | Variante 2-phases pour l'incantation (lit `Elevation underway` puis `Current level`). *Présente mais non utilisée : `elevate` passe par `send`/`receive`.* |
 | `send_batch(cmds)` | Envoie une liste de commandes par **paquets de 10** (limite du serveur : 10 requêtes sans réponse), puis lit toutes les réponses. Sert au déplacement « pipeline ». |
 | `get_broadcasts()` | Renvoie et **vide** la file des sons reçus (consommée par le brain). |
 | `get_level_update()` | Renvoie le niveau reçu en asynchrone (`Current level` non sollicité, ex. on est participant d'une incantation lancée par un autre), puis l'efface. |
@@ -153,13 +152,12 @@ Nos messages d'équipe ont le format `TYPE:donnees` (ex. `NEED:team1:4:837421`).
 - `CRITICAL_FOOD = 12` : seuil critique (un joueur au rendez-vous ne repart manger qu'en dessous).
 - `FOOD_RALLY_TARGET = 25` : niveau de food jusqu'auquel on fait le **plein** (hystérésis) avant de se figer au rendez-vous.
 
-**Attributs clés :** `level`, `inventory`, `wander_tick` (temps d'attente au rendez-vous), `need_fuel` (hystérésis food), `is_anchor` (suis-je l'ancre ?), `rally_weight` (poids aléatoire fixe pour l'élection d'ancre).
+**Attributs clés :** `level`, `inventory`, `need_fuel` (hystérésis food), `is_anchor` (suis-je l'ancre de mon niveau ?), `rally_weight` (poids aléatoire fixe pour l'élection d'ancre), `explore_steps` (compteur pour l'exploration en zig-zag).
 
 | Méthode | Rôle |
 |---|---|
 | `update_inventory(raw)` | Parse la réponse `Inventory` et met à jour `self.inventory`. |
-| `missing_for_elevation()` | Renvoie les pierres manquantes pour le **niveau courant uniquement** (ignore la food). `{}` si niveau ≥ 8. |
-| `missing_stockpile()` | **Stockpile-ahead** : renvoie le **cumul** des pierres manquantes pour **tous les niveaux restants** (du niveau courant à 7). Une fois ce stock complet, le joueur n'a plus à repartir collecter entre deux niveaux. |
+| `missing_for_elevation()` | Renvoie les pierres manquantes pour le **niveau courant uniquement** (ignore la food). `{}` si niveau ≥ 8. C'est la seule cible de collecte : on collecte court, on monte, on recommence. |
 | `needs_food()` | `True` si `food < FOOD_THRESHOLD`. |
 
 ---
@@ -180,27 +178,27 @@ Nos messages d'équipe ont le format `TYPE:donnees` (ex. `NEED:team1:4:837421`).
 | Méthode | Rôle |
 |---|---|
 | `__init__(client)` | Crée le `Player`. |
-| `_handle_broadcasts()` | **Ralliement (homing).** Lit tous les sons reçus. Pour les messages `NEED` de notre équipe, repère le **plus haut `weight`** entendu (élection d'ancre). Si quelqu'un a un poids supérieur au nôtre, on est un **suiveur** → on se dirige vers lui (`DIRECTION_MOVES[best_dir]`). Si personne n'est au-dessus, **on est l'ancre** (`is_anchor = True`) → on ne bouge pas. On ne se dirige que si on est **`ready`** (plus rien à collecter dans le stockpile, food OK, niveau exigeant ≥ 2 joueurs). |
-| `run()` | **Boucle principale** (voir §4). Crée le `TeamManager`, puis, à chaque tour : `team.tick()` → `_handle_broadcasts()` → maj niveau → `Inventory` → arrêt si niveau 8 → **décision** : `survive`/`collect`/`elevate` selon la food et les pierres manquantes (hystérésis `need_fuel` pour la food). |
+| `_handle_broadcasts()` | **Ralliement (homing).** Lit tous les sons reçus. Pour les `NEED` **de notre niveau** (toutes équipes confondues, car une incantation réunit les joueurs de même niveau quelle que soit l'équipe), repère le **plus haut `weight`** entendu (élection d'ancre). Si quelqu'un a un poids supérieur au nôtre, on est un **suiveur** → on se dirige vers lui. Sinon **on est l'ancre** (`is_anchor = True`). On retient le plus haut poids **même en direction 0** (sur notre case) → un suiveur déjà arrivé **reste** au lieu d'être réaspiré ailleurs. On ne se déplace que si on est **`ready`** (plus rien à collecter pour le niveau courant, food OK, niveau ≥ 2 joueurs). |
+| `run()` | **Boucle principale** (voir §4). Crée le `TeamManager`. Si ce process est la **reine** (`is_recruiter`) : il se contente de survivre (manger sous `QUEEN_FOOD_MIN`) + `team.tick()`. Sinon (ouvrier), à chaque tour : `team.tick()` → `_handle_broadcasts()` → maj niveau → `Inventory` → arrêt si niveau 8 → diffusion du **beacon `NEED`** (si niveau de groupe) → **décision** : si on est l'ancre on se **fige** (rendez-vous), sinon `survive`/`collect`/`elevate`. |
 
-**Logique de décision food (dans `run`)** :
-- `need_fuel` passe à `True` sous `CRITICAL_FOOD`, à `False` à `FOOD_RALLY_TARGET`, et **garde son état entre les deux** (hystérésis) → un joueur engagé au rendez-vous n'en repart pas dès qu'il perd 1 food.
-- Joueur **prêt** (pierres OK, niveau multi-joueurs) : `must_eat = need_fuel`.
-- Sinon : `must_eat = needs_food()` (seuil normal).
+**Logique de décision (dans `run`)** :
+- **Ancre** d'un niveau de groupe (`is_anchor`) : se **fige** comme point de rendez-vous (`elevate`), et ne part manger (`survive`) que sous `CRITICAL_FOOD`.
+- `need_fuel` passe à `True` sous `CRITICAL_FOOD`, à `False` à `FOOD_RALLY_TARGET`, et **garde son état entre les deux** (hystérésis) → un suiveur engagé au rendez-vous n'en repart pas dès qu'il perd 1 food.
+- Suiveur **prêt** (pierres OK, niveau multi-joueurs) : `must_eat = need_fuel` ; sinon `must_eat = needs_food()` (seuil normal). Puis `survive` / `collect` / `elevate`.
 
 ---
 
 ### `logic/fork.py` — gestion de l'effectif (`class TeamManager`)
 
-**`TEAM_TARGET = 9`** : effectif visé **par équipe** (redondance pour tenir les quorums des hauts niveaux malgré les morts). **`BUILD_FORK_COOLDOWN = 2.0`** : délai entre deux créations (le temps qu'un œuf éclose).
+**`TEAM_CAP = 9`** : plafond **dur** de joueurs par équipe (jamais dépassé). **`REFORK_BELOW = 7`** : seuil de réapprovisionnement (hystérésis) — la reine ne reforke que lorsque l'effectif tombe **sous 7**, puis rebâtit jusqu'à 9 (7 = 1 reine + 6 ouvriers = quorum des niveaux 6-7). **`BUILD_FORK_COOLDOWN = 2.0`** : délai entre deux créations (le temps qu'un œuf éclose).
 
 | Élément | Rôle |
 |---|---|
 | `_spawn(client)` | Lance un nouveau process `zappy_ai` (avec `-p/-n/-h`) et **renvoie son handle** (pour le surveiller). L'enfant reçoit `ZAPPY_CHILD=1` (un simple **rôle de lancement**, pas une donnée de jeu) → il ne recrute pas, il joue. À la connexion, le serveur lui donne un slot libre, sinon fait éclore un œuf. |
 | `TeamManager.__init__` | Détermine si ce process est le **recruteur** (`is_recruiter` = lancé à la main, sans `ZAPPY_CHILD`). Mémorise les `free_slots` initiaux. |
-| `TeamManager.tick()` | **Construit et maintient l'équipe à 9.** Seul le **recruteur** agit. Il : (1) **retire** de sa liste les enfants dont le **process est mort** (= joueur mort) ; (2) si l'équipe < 9 et cooldown écoulé : crée un coéquipier — soit via un **slot initial** restant, soit via un **œuf** (`Fork`). **Point clé :** on ne lance l'enfant que **quand un slot/œuf existe** (slot dispo, ou `connect_nbr() > 0` = œuf prêt) ; sinon on `Fork` d'abord et l'enfant viendra au tour suivant. Ça évite que des enfants lancés trop tôt reçoivent « ko » et restent **bloqués** (fuite de process). |
+| `TeamManager.tick()` | **Construit et maintient l'effectif (hystérésis 7→9).** Seul le **recruteur** (la reine) agit. Il : (1) **retire** de sa liste les enfants dont le **process est mort** (= joueur mort) ; (2) calcule l'effectif `1 (reine) + enfants vivants` ; (3) passe en mode **rebuild** quand l'effectif tombe sous `REFORK_BELOW` (7) et en sort à `TEAM_CAP` (9) ; (4) en mode rebuild et cooldown écoulé : crée un coéquipier — via un **slot initial** restant, sinon un **œuf** (`Fork`). **Point clé :** on ne lance l'enfant que **quand un slot/œuf existe** (slot dispo, ou `connect_nbr() > 0` = œuf prêt) ; sinon on `Fork` d'abord et l'enfant viendra au tour suivant. Ça évite que des enfants lancés trop tôt reçoivent « ko » et restent **bloqués** (fuite de process). |
 
-> **Comment l'équipe revient à 9 quand quelqu'un meurt :** le recruteur surveille les **handles de process** de ses enfants. Quand un joueur meurt, son process se termine ; `tick()` le détecte (`poll()`), le retire, et en relance un (Fork + nouveau process). Plafonné à 9 (jamais plus).
+> **Comment l'équipe est réapprovisionnée :** le recruteur surveille les **handles de process** de ses enfants. Quand un joueur meurt, son process se termine ; `tick()` le détecte (`poll()`) et le retire. Dès que l'effectif tombe **sous 7**, la reine rebâtit jusqu'à **9** (Fork + nouveaux process). Plafonné à 9 (jamais plus).
 
 ---
 
@@ -217,7 +215,7 @@ Nos messages d'équipe ont le format `TYPE:donnees` (ex. `NEED:team1:4:837421`).
 
 | Fonction | Rôle |
 |---|---|
-| `collect(client, player)` | Calcule les pierres manquantes (**stockpile cumulatif**, `missing_stockpile`). `Look`, va sur la **première case** contenant une pierre manquante, la ramasse (+ la food présente au passage). Si rien en vue → `explore()`. |
+| `collect(client, player)` | Calcule les pierres manquantes du **niveau courant** (`missing_for_elevation`). `Look`, va sur la **première case** contenant une pierre manquante, la ramasse (+ la food présente au passage). Si rien en vue → `explore()`. |
 
 ---
 
@@ -228,8 +226,8 @@ Nos messages d'équipe ont le format `TYPE:donnees` (ex. `NEED:team1:4:837421`).
 | Fonction | Rôle |
 |---|---|
 | `_topup_stones(client, player, first_tile)` | **Dépôt mutualisé.** Pose sur la case **seulement le déficit** pour atteindre les prérequis du niveau : on compte ce qui est **déjà** sur la case (déposé par les coéquipiers) et on n'ajoute que ce qui manque, dans la limite de ce qu'on porte. → chacun contribue, pas de gaspillage. |
-| `_do_incantation(client, player)` | `Look` + `_topup_stones` (s'assurer que la case a les pierres) + envoie `Incantation`. Lit le résultat : si `Current level: K`, met à jour `player.level` et diffuse un `RESUME`. |
-| `elevate(client, player)` | Cœur du rassemblement. Si le niveau exige **1 joueur** → incante directement. Sinon : `Look`, compte les joueurs présents (`here`), **mange la food de la case** (auto-alimentation pendant l'attente). Si **quorum atteint** (`here ≥ needed`) → incante. Sinon → diffuse `NEED:team:level:weight` **à chaque tour** (beacon continu, indispensable pour que les suiveurs aient une direction fraîche à chaque pas). |
+| `_do_incantation(client, player)` | `Look` + `_topup_stones` (s'assurer que la case a les pierres) + envoie `Incantation` (2 phases : `Elevation underway`, puis 300 ticks plus tard `Current level: K`). Si succès, met à jour `player.level`. |
+| `elevate(client, player)` | Si le niveau exige **1 joueur** → incante directement. Sinon : `Look`, compte les joueurs présents (`here`), **mange la food de la case** (auto-alimentation pendant l'attente). Si **quorum atteint** (`here ≥ needed`) → incante. Sinon → patiente sur place (le beacon `NEED` est désormais diffusé par `run()` à chaque tour, plus ici). |
 
 ---
 

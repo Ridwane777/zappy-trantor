@@ -1,92 +1,100 @@
 from network.client import Client
 from network.parser import parse_look
 from logic.player import Player, ELEVATION_REQ
-from network.broadcast import encode
 
+# Les 6 pierres déposables sur le sol pour une incantation (la food n'en fait pas
+# partie). L'ordre n'a pas d'importance, il sert juste à parcourir les pierres.
 STONES = ["linemate", "deraumere", "sibur", "mendiane", "phiras", "thystame"]
 
 
 def _topup_stones(client: Client, player: Player, first_tile: list):
-    """Dépose sur la case SEULEMENT le déficit pour atteindre les prérequis du
-    niveau (mise en commun). On compte ce qui est DÉJÀ sur la case (posé par les
-    coéquipiers) et on n'ajoute que ce qui manque, dans la limite de ce qu'on
-    porte. Effet : chaque joueur présent contribue tour à tour, ce ne sont pas
-    les ressources d'une seule personne qui sont prises, et rien n'est gaspillé.
+    """Dépose sur la case SEULEMENT ce qui manque pour atteindre les prérequis.
+
+    Mise en commun des pierres : avant d'incanter, on regarde ce qui est DÉJÀ sur
+    la case (déposé par les coéquipiers arrivés avant nous) et on ne complète que
+    le déficit, dans la limite de ce qu'on porte. Conséquences :
+      - chaque joueur présent contribue à tour de rôle (ce ne sont pas les pierres
+        d'une seule personne qui sont consommées) ;
+      - on ne dépose jamais en trop, donc rien n'est gaspillé.
+
+    `first_tile` est le contenu de notre case (la 1re case renvoyée par Look).
     """
     req = ELEVATION_REQ.get(player.level, {})
     for stone in STONES:
         deficit = req.get(stone, 0) - first_tile.count(stone)
         held = player.inventory.get(stone, 0)
+        # On dépose une à une les pierres manquantes qu'on possède réellement.
         for _ in range(min(deficit, held)):
             client.send(f"Set {stone}")
-            player.inventory[stone] -= 1  # garder l'inventaire local cohérent
+            player.inventory[stone] -= 1  # on garde l'inventaire local cohérent
 
 
 def _do_incantation(client: Client, player: Player):
-    # On regarde la case et on complète le déficit de pierres (ce que les autres
-    # ont déjà déposé compte) avant de lancer l'incantation.
+    """Complète les pierres manquantes sur la case puis lance l'incantation.
+
+    Déroulé côté serveur : "Incantation" gèle les participants pendant 300 ticks,
+    puis renvoie "Current level: N" en cas de succès (ou "ko" si les conditions ne
+    sont plus réunies, par exemple s'il manque un joueur ou une pierre).
+    """
+    # On relit la case et on complète le déficit de pierres avant d'incanter.
     raw = client.send("Look")
     tiles = parse_look(raw)
     _topup_stones(client, player, tiles[0] if tiles else [])
 
+    # Phase 1 : démarrage. "ko" => les conditions ne sont pas réunies, on abandonne.
     start_msg = client.send("Incantation", is_incantation=True)
     if start_msg == "ko":
         return
-        
+
+    # Phase 2 : on attend le résultat final (300 ticks plus tard).
     end_msg = client.receive(is_incantation=True)
     if end_msg.startswith("Current level"):
         try:
             player.level = int(end_msg.split(":")[1].strip())
-            client.send(f"Broadcast {encode('RESUME', f'{client.team}:{player.level}')}")
         except (IndexError, ValueError):
             pass
 
 
 def elevate(client: Client, player: Player):
+    """Tente de faire monter le joueur d'un niveau.
+
+    Deux cas :
+      - niveau "solo" (1 seul joueur requis) : on incante immédiatement ;
+      - niveau de groupe : on attend d'avoir le quorum de joueurs sur la case, en
+        mangeant la food présente pour tenir, puis on incante dès qu'il est atteint.
+    Le déplacement vers le point de rendez-vous est géré ailleurs (brain.py) ; ici
+    on ne fait que constater la situation sur place et incanter quand c'est bon.
+    """
     req = ELEVATION_REQ.get(player.level, {})
     needed = req.get("players", 1)
 
+    # Niveau 1 -> 2 : un seul joueur suffit, on incante sans attendre personne.
     if needed == 1:
         _do_incantation(client, player)
         return
 
+    # Niveau de groupe : on regarde combien de joueurs sont sur notre case.
     raw = client.send("Look")
     tiles = parse_look(raw)
+    # tiles[0] = notre propre case. Elle nous inclut nous-même dans le compte des
+    # "player", d'où le -1 pour obtenir le nombre de PARTENAIRES, puis +1 pour le
+    # total présent (partenaires + nous).
     players_here = max(0, tiles[0].count("player") - 1) if tiles else 0
-    player.partners_here = players_here
     here = players_here + 1
 
-    # --- Auto-alimentation sur place ---
-    # Un joueur qui attend (surtout l'ancre, immobile) mange la nourriture
-    # présente sur sa tuile : il se nourrit sans quitter le rendez-vous, ce qui
-    # évite que l'équipe meure de faim pendant les longues attentes/incantations.
+    # Auto-alimentation sur place : un joueur qui attend (en particulier l'ancre,
+    # immobile) mange la food présente sur sa case. Il se nourrit sans quitter le
+    # rendez-vous, ce qui évite que le groupe meure de faim pendant les attentes.
     if tiles:
         for _ in range(tiles[0].count("food")):
             client.send("Take food")
 
-    # --- Décision d'incantation ---
-    # Dès que le quorum du niveau est atteint sur la tuile, on incante (le serveur
-    # élève tous les joueurs de même niveau présents). Attendre les 6 a été testé
-    # et n'aide pas : le blocage n'est pas le timing mais la co-localisation de 4+
-    # joueurs sur une case. Incanter au quorum maximise la progression observée.
+    # Quorum atteint : on incante. Le serveur élève d'un coup tous les joueurs de
+    # notre niveau présents sur la case (toutes équipes confondues).
     if here >= needed:
-        player.wander_tick = 0
         _do_incantation(client, player)
         return
 
-    player.is_elevating_wait = True
-    player.wander_tick += 1
-
-    # --- Rassemblement par ancre élue (Broadcast) ---
-    # On diffuse NEED:team:level:weight à CHAQUE tour (beacon continu). C'est
-    # essentiel : un suiveur ne peut se diriger que s'il reçoit une direction
-    # FRAÎCHE à ce tour (le numéro de tuile K dépend de sa position/orientation
-    # courante, qui changent dès qu'il bouge → impossible de réutiliser une
-    # ancienne direction). En émettant à chaque tour, le suiveur a une direction à
-    # chaque pas et converge vite (vérifié en simulation : ~7-8 pas). L'ancre =
-    # plus haut weight ; elle reste immobile, les autres convergent (brain).
-    client.send(
-        f"Broadcast {encode('NEED', f'{client.team}:{player.level}:{player.rally_weight}')}"
-    )
-    # (Plus de fork ici : l'effectif est géré par TeamManager — construction à 9
-    # + remplacement des morts, plafonné à 9.)
+    # Quorum pas encore atteint : on patiente sur place. Le beacon de regroupement
+    # (broadcast "NEED" à chaque tour) est émis par brain.py ; il n'y a donc rien à
+    # faire ici, on attend simplement l'arrivée des autres au prochain tour.

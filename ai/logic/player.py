@@ -1,7 +1,16 @@
 import random
 
+# Les 7 ressources du jeu. "food" sert uniquement à survivre (elle se consomme
+# avec le temps) ; les 6 autres ("les pierres") servent aux incantations qui font
+# monter de niveau.
 RESOURCES = ["food", "linemate", "deraumere", "sibur", "mendiane", "phiras", "thystame"]
 
+# Table des prérequis d'élévation, recopiée du sujet Zappy.
+# Pour passer du niveau N au niveau N+1, il faut réunir sur UNE MÊME case :
+#   - "players" joueurs du niveau N (qui lancent l'incantation ensemble),
+#   - les quantités de pierres indiquées.
+# Exemple : passer du niveau 4 au niveau 5 exige 4 joueurs + 1 linemate + 1
+# deraumere + 2 sibur + 1 phiras présents sur la case.
 ELEVATION_REQ = {
     1: {"players": 1, "linemate": 1, "deraumere": 0, "sibur": 0, "mendiane": 0, "phiras": 0, "thystame": 0},
     2: {"players": 2, "linemate": 1, "deraumere": 1, "sibur": 1, "mendiane": 0, "phiras": 0, "thystame": 0},
@@ -14,110 +23,95 @@ ELEVATION_REQ = {
 
 
 class Player:
-    # seuil de food en dessous duquel le joueur cherche à manger en priorité.
-    # Relevé à 18 : les phases de convergence (homing vers le groupe) et
-    # d'incantation (jusqu'à 3 s bloquées) consomment beaucoup sans manger.
-    # Un buffer épais (18 food ≈ 22 s à f=100) évite que l'équipe descende
-    # sous le quorum à cause de morts de faim — la survie de TOUS les joueurs
-    # est la condition pour atteindre les niveaux 6-7-8 (qui exigent 6 joueurs).
-    # Au démarrage (food=10 < 18) le joueur fait d'abord le plein, c'est voulu.
+    """Représente l'état local d'UN joueur, tel que l'IA le connaît.
+
+    Le serveur est la seule source de vérité (position, niveau réel, etc.) ; cette
+    classe ne stocke que ce dont l'IA a besoin pour décider quoi faire au tour
+    suivant : son niveau, son inventaire, et quelques drapeaux de coordination.
+    """
+
+    # --- Seuils de gestion de la nourriture ---
+    # En dessous de ce seuil, un joueur en phase de collecte va manger en priorité.
+    # 18 food ≈ 22 secondes de vie à fréquence 100 : un coussin confortable, car la
+    # convergence vers le point de rendez-vous et les incantations (jusqu'à 300
+    # ticks) consomment beaucoup de temps sans permettre de manger.
     FOOD_THRESHOLD = 18
-    # Seuil critique : en dessous, un joueur prêt à incanter quitte le ralliement
-    # pour manger (au-dessus, il reste sur place pour servir de point de rendez-
-    # vous stable). 12 food ≈ 15 s à f=100 : marge pour aller manger et revenir.
+    # Seuil "critique" : c'est seulement en dessous qu'un joueur déjà arrivé au
+    # rendez-vous (ou l'ancre, qui doit rester immobile) accepte de partir manger.
+    # Au-dessus, il reste sur place pour ne pas casser le regroupement.
     CRITICAL_FOOD = 12
-    # Réserve de food visée avant de rallier (hystérésis). Modérée : assez pour
-    # tenir au rendez-vous sans famine, mais pas trop pour ne pas passer tout son
-    # temps à manger au lieu de monter (un gros buffer ralentissait la montée).
+    # Niveau de food visé quand on refait le plein avant/pendant un regroupement.
+    # Volontairement modéré : assez pour tenir au rendez-vous sans famine, mais pas
+    # trop, sinon le joueur passe son temps à manger au lieu de monter de niveau.
     FOOD_RALLY_TARGET = 25
 
     def __init__(self):
-        # niveau actuel du joueur — démarre à 1, objectif 8
+        # Niveau courant : démarre à 1, objectif 8.
         self.level = 1
-        # inventaire : toutes les ressources à 0 au départ
+        # Inventaire local (toutes les ressources à 0 au départ). Mis à jour à
+        # chaque tour depuis la réponse de la commande "Inventory" du serveur.
         self.inventory = {resource: 0 for resource in RESOURCES}
-        # compteur d'errance, sert à n'émettre l'appel au rassemblement
-        # que périodiquement plutôt qu'à chaque tour
-        self.wander_tick = 0
-        # compteur de pas sans trouver de ressource — utilisé par explore()
+
+        # Compteur de pas effectués en exploration sans rien trouver. Sert à faire
+        # tourner le joueur régulièrement (voir explore.py) pour qu'il ne traverse
+        # pas la carte en ligne droite et balaie mieux le terrain.
         self.explore_steps = 0
-        # timestamp jusqu'auquel on ne peut pas forker (cooldown réel du fork de
-        # réapprovisionnement). Petit délai aléatoire initial pour staggerer les
-        # joueurs et éviter qu'ils déclenchent un réapprovisionnement au même tick.
-        self.fork_until = random.uniform(0.0, 3.0)
-        # nb de coéquipiers ayant confirmé leur arrivée (HERE) avant l'incantation
-        self.here_count = 0
-        # Hystérésis de ravitaillement : True = on (re)fait le plein de food.
-        # On bascule à True sous CRITICAL_FOOD et à False à FOOD_RALLY_TARGET.
-        # Entre les deux on garde l'état → un joueur engagé au rdv y reste (il ne
-        # repart pas manger dès qu'il perd 1 food), ce qui évite l'oscillation
-        # forage↔rdv qui empêchait la cohorte de se former. Démarre à True
-        # (food=10 < seuil) : on fait le plein avant toute chose.
+
+        # Hystérésis de ravitaillement (anti-oscillation) : True = "je refais le
+        # plein de food". On passe à True sous CRITICAL_FOOD et on ne repasse à
+        # False qu'une fois FOOD_RALLY_TARGET atteint. Entre les deux on garde
+        # l'état précédent → un joueur engagé au rendez-vous n'y repart pas manger
+        # dès qu'il perd 1 food (ce qui ferait osciller forage <-> rendez-vous).
+        # Démarre à True (on commence avec 10 food, donc on mange d'abord).
         self.need_fuel = True
-        # True quand le joueur a ses pierres et attend des partenaires pour incanter.
-        # Permet d'appliquer la logique ancre/suiveur (anti-oscillation).
-        self.is_elevating_wait = False
-        # Rôle dans le rassemblement : ancre (True) = reste sur place et diffuse
-        # des NEED, suiveur (False) = répond aux NEED et se dirige vers les ancres.
-        # Décidé aléatoirement à chaque entrée en elevate_wait.
+
+        # Rôle dans le regroupement, recalculé à chaque tour dans le brain :
+        #   True  = je suis l'ANCRE de mon niveau (le plus haut "poids" entendu) →
+        #           je reste immobile et je sers de point de rendez-vous.
+        #   False = je suis un suiveur → je me dirige vers l'ancre.
         self.is_anchor = False
-        # Nombre de partenaires sur notre tuile (mis à jour à chaque Look dans
-        # elevate). Permet d'éviter de quitter un groupe partiel déjà formé.
-        self.partners_here = 0
-        # Poids aléatoire fixe pour l'élection d'ancre de rassemblement.
-        # À chaque niveau, le joueur du plus haut poids reste immobile (ancre) et
-        # tous les autres du même niveau convergent vers lui (broadcasts globaux).
-        # Évite l'oscillation des groupes de taille égale qui se croisent sans
-        # jamais se poser sur la même tuile.
+
+        # "Poids" de ralliement : un grand nombre aléatoire FIXE, tiré une fois.
+        # À chaque niveau, le joueur ayant le plus grand poids (toutes équipes
+        # confondues) devient l'ancre ; tous les autres convergent vers lui. Ce
+        # tirage aléatoire fixe garantit un attracteur unique et stable, ce qui
+        # évite que des groupes de taille égale se croisent sans jamais se poser
+        # sur la même case.
         self.rally_weight = random.randint(1, 1_000_000_000)
 
     def update_inventory(self, raw: str):
-        # on enlève les crochets et les espaces autour
+        """Met à jour l'inventaire local depuis la réponse du serveur.
+
+        Le serveur renvoie l'inventaire sous la forme :
+            [food 12, linemate 3, deraumere 0, ...]
+        On enlève les crochets, on découpe sur les virgules, puis chaque morceau
+        est un couple "nom quantité" qu'on range dans self.inventory.
+        """
         raw = raw.strip("[] \n")
-        # on découpe par virgule pour avoir chaque "nom quantité"
         for item in raw.split(","):
             parts = item.strip().split()
-            # chaque item doit avoir exactement un nom et une quantité
             if len(parts) == 2:
                 name, qty = parts
                 if name in self.inventory:
                     self.inventory[name] = int(qty)
 
     def missing_for_elevation(self) -> dict:
-        # si on est déjà au niveau max, rien ne manque
+        """Renvoie les pierres qui MANQUENT pour l'élévation du niveau COURANT.
+
+        On compare les prérequis du niveau actuel à l'inventaire et on ne renvoie
+        que les ressources en déficit (la food est ignorée : elle ne sert pas à
+        l'élévation). Un dictionnaire vide signifie "j'ai déjà toutes mes pierres,
+        je peux aller au rendez-vous".
+        """
         if self.level >= 8:
             return {}
-        # on récupère les prérequis du niveau actuel
         req = ELEVATION_REQ[self.level]
-        # on retourne uniquement les ressources dont on manque
-        # (on ignore food, elle ne sert pas à l'élévation)
         return {
             resource: req[resource] - self.inventory[resource]
             for resource in RESOURCES
             if resource != "food" and self.inventory[resource] < req.get(resource, 0)
         }
 
-    def missing_stockpile(self) -> dict:
-        # STOCKPILE-AHEAD : on vise le CUMUL des pierres nécessaires du niveau
-        # courant jusqu'au niveau 8, pas seulement le niveau courant. Ainsi, une
-        # fois le stock complet, le joueur n'a plus JAMAIS besoin de repartir
-        # collecter entre deux niveaux → il reste sur le rendez-vous et la cohorte
-        # ne se redisperse pas. Effet de bord clé : un joueur entièrement stocké
-        # est en permanence « ready » → il rallie en continu → le beacon de
-        # rassemblement se stabilise et la convergence s'améliore.
-        if self.level >= 8:
-            return {}
-        need = {r: 0 for r in RESOURCES if r != "food"}
-        for lvl in range(self.level, 8):
-            req = ELEVATION_REQ.get(lvl, {})
-            for resource in need:
-                need[resource] += req.get(resource, 0)
-        return {
-            resource: need[resource] - self.inventory[resource]
-            for resource in need
-            if self.inventory[resource] < need[resource]
-        }
-
     def needs_food(self) -> bool:
-        # retourne True si le stock de food est sous le seuil de survie
+        """True si la réserve de food est passée sous le seuil de survie normal."""
         return self.inventory["food"] < self.FOOD_THRESHOLD

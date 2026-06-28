@@ -4,14 +4,15 @@ import time
 
 
 class Client:
-    # Notre serveur n'applique pas de coût en temps par action (la vitesse spec
-    # vient de -f) : l'IA tournerait donc à plein régime et les joueurs
-    # fileraient jusqu'aux bords de la carte (torus) en se téléportant.
-    # ZAPPY_AI_DELAY = durée d'UN déplacement (Forward/Left/Right) en secondes,
-    # ce qui cadence la vitesse visible. 0.5 -> ~2 tuiles/seconde. 0 = plein régime.
+    # Le serveur applique DÉJÀ un coût en temps par action (Forward/Look=7 ticks,
+    # Inventory=1, Fork=42, Incantation=300), cadencé par la fréquence -f : l'IA est
+    # donc naturellement rythmée par le serveur (chaque send bloque jusqu'à la
+    # réponse, qui n'arrive qu'une fois l'action terminée). ZAPPY_AI_DELAY est un
+    # throttle CLIENT optionnel EN PLUS, uniquement pour ralentir la démo visuelle
+    # (durée d'un déplacement en s ; 0.5 -> ~2 tuiles/s). 0 (défaut) = pas de
+    # throttle client, on suit le rythme du serveur.
     MOVE_INTERVAL = float(os.getenv("ZAPPY_AI_DELAY", "0") or 0)
-    # On ne cadence que l'avancée d'une tuile : à 0.5 -> 2 tuiles/s pile. Les
-    # rotations restent rapides (peu fréquentes), elles n'entament pas le rythme.
+    # On ne cadence que l'avancée d'une tuile ; les rotations restent rapides.
     _MOVE_CMDS = ("Forward",)
 
     def __init__(self, host: str, port: int, team: str):
@@ -53,55 +54,6 @@ class Client:
 
     def receive(self, is_incantation: bool = False) -> str:
         return self._read_response(is_incantation)
-
-    def send_incantation(self) -> str:
-        """Two-phase send for Incantation.
-
-        Phase 1 reads until 'Elevation underway' (start OK) or 'ko' (immediate fail).
-        Phase 2 reads until 'Current level: N' (success) or 'ko' (fail after 300 ticks).
-        Keeps routing broadcasts/eject/dead normally so participants are not affected.
-        """
-        self._write("Incantation")
-
-        # Phase 1 — expect "Elevation underway" or "ko"
-        # "Current level" peut arriver ici si on était participant d'une
-        # incantation concurrente qui vient de se terminer : on le stocke
-        # et on continue à lire (notre propre Incantation n'est pas encore traitée)
-        while True:
-            line = self._read_line()
-            if line.startswith("message "):
-                self._broadcasts.append(line)
-            elif line.startswith("Current level"):
-                try:
-                    self._pending_level = int(line.split(":")[1].strip())
-                except (IndexError, ValueError):
-                    pass
-            elif line.startswith("eject:"):
-                pass
-            elif line == "dead":
-                raise ConnectionError("Mort de faim ou fin de partie")
-            elif line == "ko":
-                return "ko"
-            else:
-                break  # "Elevation underway"
-
-        # Phase 2 — wait for final result (300 ticks later)
-        while True:
-            line = self._read_line()
-            if line.startswith("message "):
-                self._broadcasts.append(line)
-            elif line.startswith("eject:"):
-                pass
-            elif line == "dead":
-                raise ConnectionError("Mort de faim ou fin de partie")
-            elif line == "ko":
-                return "ko"
-            elif line.startswith("Current level"):
-                try:
-                    self._pending_level = int(line.split(":")[1].strip())
-                except (IndexError, ValueError):
-                    pass
-                return line
 
     def send_batch(self, commands: list) -> list:
         # envoie les commandes par chunks de 10 (limite du serveur) sans attendre

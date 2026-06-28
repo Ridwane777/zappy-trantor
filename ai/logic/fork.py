@@ -5,9 +5,14 @@ import subprocess
 
 from network.client import Client
 
-# Effectif d'équipe visé (PAR ÉQUIPE). On force 9 quel que soit le -c du serveur :
-# redondance pour tenir les quorums (4 puis 6) des hauts niveaux malgré les morts.
-TEAM_TARGET = 9
+# Plafond DUR de joueurs par équipe : la reine ne dépasse jamais ce nombre.
+TEAM_CAP = 9
+
+# Seuil de réapprovisionnement (hystérésis). La reine ne reforke QUE lorsque
+# l'effectif tombe SOUS ce seuil, puis rebâtit jusqu'au plafond. On évite ainsi
+# de forker pour chaque mort isolée. 7 est choisi exprès : 1 reine + 6 ouvriers,
+# soit le quorum exact des niveaux 6 et 7 (les plus exigeants).
+REFORK_BELOW = 7
 
 # Cooldown court entre deux créations de joueur (le temps que l'œuf forké éclose
 # et que l'enfant se connecte, pour ne pas spammer pendant la latence du Fork).
@@ -18,7 +23,7 @@ def _spawn(client: Client) -> subprocess.Popen:
     """Lance un nouveau process zappy_ai et renvoie son handle (pour supervision).
 
     L'enfant reçoit la variable d'env ZAPPY_CHILD=1 : c'est un simple RÔLE de
-    lancement (réinforcement), pas une donnée de jeu. Il NE recrute pas (seul le
+    lancement (renforcement de l'équipe), pas une donnée de jeu. Il NE recrute pas (seul le
     recruteur gère l'effectif) ; il joue normalement. Aucune info de jeu (taille
     d'équipe, etc.) n'est transmise → l'interdiction de communiquer hors-jeu est
     respectée. À la connexion, le serveur lui attribue un slot initial libre, sinon
@@ -40,15 +45,15 @@ def _spawn(client: Client) -> subprocess.Popen:
 
 
 class TeamManager:
-    """Construit et MAINTIENT l'équipe à TEAM_TARGET joueurs (par équipe).
+    """La REINE : construit et MAINTIENT l'effectif de l'équipe (par équipe).
 
-    Un seul process est « recruteur » (celui lancé à la main, sans ZAPPY_CHILD) ;
-    les autres (lancés par _spawn, avec ZAPPY_CHILD) ne recrutent pas. Le recruteur
-    crée les (TEAM_TARGET-1) coéquipiers et SURVEILLE leurs process : dès qu'un
-    enfant meurt (son joueur est mort → le process se termine), il en relance un
-    (Fork d'un œuf + nouveau process) pour revenir à 9. Tout passe par des
-    commandes de jeu légales (Fork) + la gestion locale de ses sous-process ;
-    aucune donnée de jeu n'est échangée hors du serveur.
+    Un seul process est « recruteur » / reine (celui lancé à la main, sans
+    ZAPPY_CHILD) ; les autres (lancés par _spawn, avec ZAPPY_CHILD) ne recrutent
+    pas, ce sont les ouvriers qui évoluent. La reine crée les coéquipiers jusqu'au
+    plafond TEAM_CAP, puis SURVEILLE leurs process : dès que l'effectif retombe
+    sous REFORK_BELOW (morts cumulées), elle rebâtit jusqu'au plafond (hystérésis).
+    Tout passe par des commandes de jeu légales (Fork) + la gestion locale de ses
+    sous-process ; aucune donnée de jeu n'est échangée hors du serveur.
     """
 
     def __init__(self, client: Client):
@@ -62,14 +67,29 @@ class TeamManager:
         self.free_slots = client.free_slots if self.is_recruiter else 0
         self.slots_used = 0
         self.next_build = 0.0
+        # Hystérésis : True = on bâtit/rebâtit jusqu'au plafond. Démarre à True
+        # (équipe à construire) ; repasse à True dès qu'on retombe sous le seuil.
+        self.rebuilding = True
 
     def tick(self):
         if not self.is_recruiter:
             return
         # On retire les enfants morts (process terminé = joueur mort).
         self.children = [c for c in self.children if c.poll() is None]
-        # Équipe complète ? rien à faire.
-        if len(self.children) >= TEAM_TARGET - 1:
+        # Effectif courant = la reine (nous) + les ouvriers vivants qu'on a créés.
+        members = 1 + len(self.children)
+
+        # Hystérésis de réapprovisionnement : on (re)bâtit dès que l'effectif passe
+        # sous REFORK_BELOW, et on s'arrête une fois le plafond TEAM_CAP atteint.
+        # Entre les deux on conserve l'état → pas de fork pour chaque mort isolée,
+        # mais un vrai réapprovisionnement quand l'équipe est trop entamée.
+        if members < REFORK_BELOW:
+            self.rebuilding = True
+        elif members >= TEAM_CAP:
+            self.rebuilding = False
+
+        # Rien à faire si on ne rebâtit pas, ou si le plafond est déjà atteint.
+        if not self.rebuilding or members >= TEAM_CAP:
             return
         if time.time() < self.next_build:
             return
