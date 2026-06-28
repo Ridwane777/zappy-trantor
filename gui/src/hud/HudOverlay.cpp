@@ -160,6 +160,42 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
             ev.setPosition(x + (WIDTH - 2 * pad) - vb.width - 8.f, y + 2.f);
             win.draw(ev);
             y += 38.f;
+
+            // Server <-> client raw protocol traffic, inside the EVENTS section,
+            // as two separate feeds (not just two colors of the same list).
+            auto drawFeed = [&](const char *label, const char *prefix,
+                                 sf::Color color, int maxLines) {
+                sf::Text lbl; lbl.setFont(font); lbl.setString(label);
+                lbl.setCharacterSize(13); lbl.setFillColor(sf::Color(150, 180, 215));
+                lbl.setPosition(x, y); win.draw(lbl); y += 18.f;
+
+                std::vector<const std::string *> matches;
+                for (int i = (int)state->rawFeed.size() - 1;
+                     i >= 0 && (int)matches.size() < maxLines; --i) {
+                    if (state->rawFeed[i].rfind(prefix, 0) == 0)
+                        matches.push_back(&state->rawFeed[i]);
+                }
+                const float lineH = 13.f;
+                int shown = (int)matches.size();
+                float h = shown * lineH + 8.f;
+                sf::RectangleShape bg(sf::Vector2f(WIDTH - 2 * pad, h));
+                bg.setPosition(x, y);
+                bg.setFillColor(sf::Color(0, 0, 0, 110));
+                win.draw(bg);
+                for (int k = 0; k < shown; ++k) {
+                    const std::string &raw = *matches[shown - 1 - k];   // oldest first
+                    sf::Text lt; lt.setFont(font);
+                    lt.setString(raw.size() > 30 ? raw.substr(0, 27) + "..." : raw);
+                    lt.setCharacterSize(11);
+                    lt.setFillColor(color);
+                    lt.setPosition(x + 4.f, y + 4.f + k * lineH);
+                    win.draw(lt);
+                }
+                y += h + 10.f;
+            };
+            drawFeed("SERVER >>", "<< ", sf::Color(140, 235, 170, 230), 5);
+            drawFeed("CLIENT >>", ">> ", sf::Color(255, 200, 110, 230), 4);
+            y += 4.f;
         }
 
         sf::Text title; title.setFont(font); title.setString("TEAMS");
