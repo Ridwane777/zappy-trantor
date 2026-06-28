@@ -13,8 +13,7 @@ CXX      = g++
 # Les libs header-only (json, tinygltf) sont installées comme une dépendance
 # dans le include path utilisateur (~/.local/include) — voir setup_libs.sh —
 # et PAS versionnées dans le repo. -I système (/usr/local/include) marche aussi.
-# -MMD -MP : dépendances (.d) pour recompiler les .cpp quand un header change.
-CXXFLAGS = -std=c++17 -O2 -Wall -Iinclude -I$(HOME)/.local/include -pthread -MMD -MP
+CXXFLAGS = -std=c++17 -O2 -Wall -Iinclude -I$(HOME)/.local/include -pthread
 LDFLAGS  = -lGL -lGLEW -lsfml-graphics -lsfml-window -lsfml-system -lsfml-audio -lX11 -pthread
 
 NAME = zappy_gui
@@ -37,13 +36,13 @@ SRCS = src/render/Shader.cpp \
        src/app/WorldRender.cpp \
        src/app/Islands.cpp \
        src/app/CharacterRender.cpp \
+       src/app/Wildlife.cpp \
        src/app/PlayerRender.cpp \
        src/app/Fullscreen.cpp \
        src/app/GuiApp.cpp \
        src/main.cpp
 
 OBJS = $(SRCS:.cpp=.o)
-DEPS = $(OBJS:.o=.d)
 
 all: $(NAME)
 
@@ -68,9 +67,7 @@ $(DEPS_STAMP):
 $(OBJS): | $(DEPS_STAMP)
 
 clean:
-	rm -f $(OBJS) $(DEPS)
-
--include $(DEPS)
+	rm -f $(OBJS)
 
 fclean: clean
 	rm -f $(NAME)

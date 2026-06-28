@@ -10,8 +10,8 @@ uniform mat4 uView;
 uniform mat4 uProj;
 uniform mat3 uNormalMat;
 
-const int MAX_BONES = 96;
-uniform mat4 uBones[96];
+const int MAX_BONES = 128;
+uniform mat4 uBones[128];
 
 out vec3  vPos;
 out vec3  vNormal;

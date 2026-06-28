@@ -16,6 +16,7 @@ uniform bool  uMultiColor;    // enable zone coloring
 uniform bool      uUseVertexColor;
 uniform sampler2D uTexture;
 uniform bool      uUseTexture;
+uniform bool      uAlphaCutout;   // butterfly wings: shape lives in texture alpha
 uniform float uShininess;
 uniform float uAmbientStrength;
 uniform bool  uEmissive;
@@ -47,7 +48,13 @@ void main() {
 
     // pick base color: texture > vertex-baked > zone > uniform
     vec3 baseColor = uColor;
-    if      (uUseTexture)     baseColor = texture(uTexture, vTexCoord).rgb;
+    float texAlpha = 1.0;
+    if      (uUseTexture) {
+        vec4 t = texture(uTexture, vTexCoord);
+        baseColor = t.rgb;
+        texAlpha  = t.a;
+        if (uAlphaCutout && texAlpha < 0.15) discard;  // carve wing shape from alpha
+    }
     else if (uUseVertexColor) baseColor = vVertColor;
     if (!uUseTexture && !uUseVertexColor && uMultiColor) {
         if      (vPos.y < uSplit2) baseColor = uColor3;
@@ -91,6 +98,7 @@ void main() {
     }
 
     float alpha = uAlpha;
+    if (uAlphaCutout) alpha *= texAlpha;   // soft wing edges
     if (uCircleClip) {
         float d    = length(vPos.xz - uClipCenter);
         float fade = clamp((uClipRadius - d) / (uClipRadius * 0.06), 0.0, 1.0);

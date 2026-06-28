@@ -20,8 +20,6 @@ using json = nlohmann::json;
 #include <fstream>
 #include <sys/stat.h>
 
-static float lerp(float a, float b, float t) { return a + (b - a) * t; }
-
 static int findInterval(const std::vector<float>& times, float t)
 {
     if (times.size() < 2) return 0;
@@ -90,7 +88,7 @@ static std::vector<unsigned int> getIndices(const tinygltf::Model& m, int accIdx
 }
 
 static const uint32_t CACHE_MAGIC   = 0x43424C47; // 'GLBC'
-static const uint32_t CACHE_VERSION = 3;
+static const uint32_t CACHE_VERSION = 4;
 
 static std::string cachePath(const std::string& glbPath) {
     return glbPath + ".glbc";
@@ -242,32 +240,6 @@ void saveCache(const std::string& glbPath, const SkinnedMesh& sm,
         cw(f, nl);
         f.write(name.c_str(), nl);
     }
-}
-
-static bool tryLoadAnimCache(const std::string& glbPath, std::vector<Animation>& anims)
-{
-    auto cp = cachePath(glbPath);
-    struct stat gs{}, cs{};
-    if (stat(glbPath.c_str(), &gs) != 0) return false;
-    if (stat(cp.c_str(), &cs) != 0) return false;
-    if (cs.st_mtime < gs.st_mtime) return false;
-
-    std::ifstream f(cp, std::ios::binary);
-    if (!f) return false;
-    uint32_t magic = 0, version = 0;
-    cr(f, magic); cr(f, version);
-    if (magic != CACHE_MAGIC || version != CACHE_VERSION) return false;
-    // skip bounds, verts, indices, skin
-    glm::vec3 dummy3;
-    f.read(reinterpret_cast<char*>(&dummy3), 12); // bmin
-    f.read(reinterpret_cast<char*>(&dummy3), 12); // bmax
-    uint32_t n = 0;
-    cr(f, n); f.seekg(n * 4 * sizeof(float), std::ios::cur); // verts
-    cr(f, n); f.seekg(n * sizeof(uint32_t), std::ios::cur);  // indices
-    uint32_t nj = 0; cr(f, nj);
-    f.seekg(nj * 64, std::ios::cur);              // invBindMats
-    cr(f, n); f.seekg(n * sizeof(int32_t), std::ios::cur);   // parents
-    return loadAnimsFromCache(f, anims) && f.good();
 }
 
 static void saveAnimCache(const std::string& glbPath, const std::vector<Animation>& anims)
@@ -424,14 +396,66 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
         }
 
         sm.boneNames_.resize(numJoints);
+        sm.bindLocal_.resize(numJoints);
         for (int j = 0; j < numJoints; ++j) {
             int nodeIdx = skin.joints[j];
+            const auto& nd = model.nodes[nodeIdx];
+            LocalTRS& bl = sm.bindLocal_[j];
+            if (nd.translation.size() == 3)
+                bl.t = {(float)nd.translation[0],(float)nd.translation[1],(float)nd.translation[2]};
+            if (nd.rotation.size() == 4)
+                bl.r = {(float)nd.rotation[3],(float)nd.rotation[0],(float)nd.rotation[1],(float)nd.rotation[2]};
+            if (nd.scale.size() == 3)
+                bl.s = {(float)nd.scale[0],(float)nd.scale[1],(float)nd.scale[2]};
             sm.boneNames_[j] = model.nodes[nodeIdx].name;
             for (auto& child : model.nodes[nodeIdx].children) {
                 auto it = std::find(skin.joints.begin(), skin.joints.end(), child);
                 if (it != skin.joints.end())
                     sm.parentOf_[it - skin.joints.begin()] = j;
             }
+        }
+
+        // Compute the world transform of all SCENE nodes that are ancestors of
+        // the skin's root joint but are NOT themselves joints. Sketchfab exports
+        // often bury the skeleton under nodes with non-identity scales (e.g.
+        // scale=6.33 and scale=0.01). Without this, computeBones misses those
+        // transforms and the mesh deforms.
+        {
+            // Build scene-graph parent map
+            int numNodes = (int)model.nodes.size();
+            std::vector<int> nodeParent(numNodes, -1);
+            for (int ni = 0; ni < numNodes; ++ni)
+                for (int child : model.nodes[ni].children)
+                    if (child < numNodes) nodeParent[child] = ni;
+
+            // Node local transform helper
+            auto nodeMat = [&](int ni) -> glm::mat4 {
+                auto& n = model.nodes[ni];
+                if (!n.matrix.empty()) {
+                    glm::mat4 m;
+                    memcpy(glm::value_ptr(m), n.matrix.data(), 64);
+                    return m;
+                }
+                glm::vec3 t(0.f); glm::quat r(1.f,0.f,0.f,0.f); glm::vec3 s(1.f);
+                if (n.translation.size()==3) t = {(float)n.translation[0],(float)n.translation[1],(float)n.translation[2]};
+                if (n.rotation.size()==4)    r = {(float)n.rotation[3],(float)n.rotation[0],(float)n.rotation[1],(float)n.rotation[2]};
+                if (n.scale.size()==3)       s = {(float)n.scale[0],(float)n.scale[1],(float)n.scale[2]};
+                return glm::translate(glm::mat4(1.f), t) * glm::toMat4(r) * glm::scale(glm::mat4(1.f), s);
+            };
+
+            // Find root joint node
+            int rootJointNode = skin.joints[0];
+
+            // Collect ancestor chain (from scene root down to parent of root joint)
+            std::vector<int> chain;
+            for (int cur = nodeParent[rootJointNode]; cur >= 0; cur = nodeParent[cur])
+                chain.push_back(cur);
+
+            // Multiply top-down (outermost ancestor first)
+            glm::mat4 xform(1.f);
+            for (int i = (int)chain.size()-1; i >= 0; --i)
+                xform = xform * nodeMat(chain[i]);
+            sm.skinRootXform_ = xform;
         }
     }
 
@@ -648,7 +672,12 @@ void SkinnedMesh::computeBones(int animIdx, float t,
 
     if (n > MAX_BONES) n = MAX_BONES;
 
+    // seed every joint with its bind-pose local transform; animated channels override below
     std::vector<glm::mat4> local(n, glm::mat4(1.f));
+    for (int i = 0; i < n && i < (int)bindLocal_.size(); ++i)
+        local[i] = glm::translate(glm::mat4(1.f), bindLocal_[i].t)
+                 * glm::toMat4(bindLocal_[i].r)
+                 * glm::scale(glm::mat4(1.f), bindLocal_[i].s);
 
     if (animIdx >= 0 && animIdx < (int)animations_.size()) {
         auto& anim = animations_[animIdx];
@@ -663,8 +692,11 @@ void SkinnedMesh::computeBones(int animIdx, float t,
             int ji = ch.boneIndex;
             if (ji >= n) continue;
 
-            glm::vec3 T(0.f), S(1.f);
-            glm::quat R(1.f,0.f,0.f,0.f);
+            // default to the bind-pose TRS so bones with only a rotation track
+            // keep their rest offset (bone length) instead of collapsing to 0
+            glm::vec3 T = (ji < (int)bindLocal_.size()) ? bindLocal_[ji].t : glm::vec3(0.f);
+            glm::quat R = (ji < (int)bindLocal_.size()) ? bindLocal_[ji].r : glm::quat(1.f,0.f,0.f,0.f);
+            glm::vec3 S = (ji < (int)bindLocal_.size()) ? bindLocal_[ji].s : glm::vec3(1.f);
 
             if (!ch.transKeys.empty())  T = sampleLinear(ch.timesT, ch.transKeys, t);
             if (!ch.rotKeys.empty())    R = sampleSlerp (ch.timesR, ch.rotKeys,   t);
@@ -681,7 +713,10 @@ void SkinnedMesh::computeBones(int animIdx, float t,
     std::vector<glm::mat4> global(n);
     for (int i = 0; i < n; ++i) {
         int p = parentOf_[i];
-        global[i] = (p >= 0 && p < n) ? global[p] * local[i] : local[i];
+        if (p >= 0 && p < n)
+            global[i] = global[p] * local[i];
+        else
+            global[i] = local[i]; // inverseBindMatrices are already skeleton-local
     }
 
     for (int i = 0; i < n; ++i)
@@ -846,10 +881,13 @@ SkinnedMesh::~SkinnedMesh()
 }
 
 SkinnedMesh::SkinnedMesh(SkinnedMesh&& o) noexcept
-    : vao_(o.vao_), vbo_(o.vbo_), ebo_(o.ebo_), indexCount_(o.indexCount_),
-      colorVbo_(o.colorVbo_), texId_(o.texId_),
+    : vao_(o.vao_), vbo_(o.vbo_), ebo_(o.ebo_), colorVbo_(o.colorVbo_),
+      texId_(o.texId_), indexCount_(o.indexCount_),
       invBindMats_(std::move(o.invBindMats_)),
       parentOf_(std::move(o.parentOf_)),
+      bindLocal_(std::move(o.bindLocal_)),
+      boneNames_(std::move(o.boneNames_)),
+      skinRootXform_(o.skinRootXform_),
       animations_(std::move(o.animations_)),
       bmin_(o.bmin_), bmax_(o.bmax_)
 { o.vao_ = o.vbo_ = o.ebo_ = o.colorVbo_ = o.texId_ = 0; }

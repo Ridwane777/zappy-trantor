@@ -807,8 +807,10 @@ bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,
                 p.vel += glm::vec3(frand(-0.4f, 0.4f), frand(-0.3f, 0.3f), frand(-0.4f, 0.4f)) * dt;
                 p.vel  = glm::clamp(p.vel, glm::vec3(-0.5f), glm::vec3(0.5f));
                 p.pos += p.vel * dt;
-                if (p.pos.x < -5.f) p.pos.x = 5.f;  if (p.pos.x >  5.f) p.pos.x = -5.f;
-                if (p.pos.z < -3.f) p.pos.z = 2.5f; if (p.pos.z >  2.5f) p.pos.z = -3.f;
+                if (p.pos.x < -5.f) p.pos.x = 5.f;
+                if (p.pos.x >  5.f) p.pos.x = -5.f;
+                if (p.pos.z < -3.f) p.pos.z = 2.5f;
+                if (p.pos.z >  2.5f) p.pos.z = -3.f;
                 if (p.pos.y <  0.2f){ p.pos.y = 0.2f; p.vel.y = std::abs(p.vel.y); }
                 if (p.pos.y >  2.5f){ p.pos.y = 2.5f; p.vel.y = -std::abs(p.vel.y); }
             }

@@ -36,6 +36,7 @@ void drawCharacters(std::vector<Character>& chars, Shader& skin, Shader& aura,
     skin.setFloat("uShoreInnerR",     0.f);
     skin.setFloat("uShoreWidth",      1.f);
     skin.setBool ("uUseTexture",      true);
+    skin.setBool ("uAlphaCutout",     false);
     skin.setInt  ("uTexture",         0);
     skin.setBool ("uUseVertexColor",  false);
     skin.setBool ("uMultiColor",      false);

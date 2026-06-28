@@ -23,6 +23,7 @@
 #include "app/Fullscreen.hpp"
 #include "app/Islands.hpp"
 #include "app/PlayerRender.hpp"
+#include "app/Wildlife.hpp"
 #include "render/ObjLoader.hpp"
 #include "render/SkinnedMesh.hpp"
 #include "render/TexturedMesh.hpp"
@@ -471,6 +472,63 @@ int GuiApp::run(int argc, char** argv)
         haveMoon = true;
     } catch (std::exception& e) { std::cerr << "Moon load: " << e.what() << "\n"; }
 
+    // ── wildlife (pterodactyl + butterfly) ────────────────────────────────────
+    const float TILE_F   = TILE;
+    auto wfrand = [](float lo, float hi) {
+        return lo + (hi - lo) * (std::rand() / (float)RAND_MAX);
+    };
+
+    // spawn helper: a point in a disk of `rad` around the island centre (cx,cz)
+    auto spawnXZ = [&](float rad) {
+        float a = wfrand(0.f, 6.2831853f);
+        float r = rad * std::sqrt(wfrand(0.f, 1.f));
+        return glm::vec2(cx + r * std::cos(a), cz + r * std::sin(a));
+    };
+    const float spawnR = map.w * TILE_F * 0.455f;   // ~one island radius; roaming expands later
+
+    WildlifeGroup ptero, butterfly;
+    try {
+        ptero.mesh = SkinnedMesh::load("assets/wildlife/ptero/scene.gltf");
+        ptero.mesh.loadTexture("assets/wildlife/ptero/textures/material0_baseColor.png");
+        float ph = ptero.mesh.boundsMax().y - ptero.mesh.boundsMin().y;
+        ptero.scale = (ph > 0.001f) ? (TILE_F * 0.38f) / ph : 0.01f;
+        for (int i = 0; i < 6; ++i) {
+            WildlifeEntity e;
+            glm::vec2 p = spawnXZ(spawnR);
+            e.minY   = TILE_F * 3.0f;   // soar well above the islands
+            e.maxY   = TILE_F * 5.5f;
+            e.pos    = { p.x, wfrand(e.minY, e.maxY), p.y };
+            e.target = e.pos;
+            e.speed  = wfrand(TILE_F * 0.9f, TILE_F * 1.5f);
+            e.animTime = wfrand(0.f, 3.f);
+            ptero.entities.push_back(e);
+        }
+    } catch (std::exception& e) { std::cerr << "Ptero load: " << e.what() << "\n"; }
+
+    try {
+        butterfly.mesh = SkinnedMesh::load("assets/wildlife/butterfly/scene.gltf");
+        butterfly.mesh.loadTexture("assets/wildlife/butterfly/textures/butterflyMAT_baseColor.png");
+        // This asset is authored flat: wide in X (wingspan), thin in Y. Normalise
+        // by the wingspan so it isn't blown up, and roll it upright so the wings
+        // face outward instead of lying flat to the ground.
+        glm::vec3 bsz = butterfly.mesh.boundsMax() - butterfly.mesh.boundsMin();
+        float span = std::max(bsz.x, bsz.z);
+        butterfly.scale     = (span > 0.001f) ? (TILE_F * 0.28f) / span : 0.005f;
+        butterfly.baseRoll  = 90.f;
+        butterfly.alphaCutout = true;   // wing silhouette is in the texture alpha
+        for (int i = 0; i < 25; ++i) {
+            WildlifeEntity e;
+            glm::vec2 p = spawnXZ(spawnR);
+            e.minY   = TILE_F * 0.10f;  // flit just above ground level
+            e.maxY   = TILE_F * 0.55f;
+            e.pos    = { p.x, wfrand(e.minY, e.maxY), p.y };
+            e.target = e.pos;
+            e.speed  = wfrand(TILE_F * 0.5f, TILE_F * 1.1f);
+            e.animTime = wfrand(0.f, 2.f);
+            butterfly.entities.push_back(e);
+        }
+    } catch (std::exception& e) { std::cerr << "Butterfly load: " << e.what() << "\n"; }
+
     // lowest Mew may descend to — keeps his whole body above the map surface
     const float MEW_FLOOR = std::getenv("ZAPPY_MEW_FLOOR")
                           ? (float)std::atof(std::getenv("ZAPPY_MEW_FLOOR")) : 1.0f;
@@ -560,7 +618,7 @@ int GuiApp::run(int argc, char** argv)
             netConnected = netClient.connected();
             const GuiState& gs = netClient.state();
             if (!camFramedForTeams && !gs.teams.empty()) { // re-frame once team count is known
-                float ext = worldExtentRadius((int)gs.teams.size(), map.w * TILE * 0.455f);
+                float ext = worldExtentRadius(1, map.w * TILE * 0.455f);
                 camDist = ext * 2.42f;
                 camFramedForTeams = true;
             }
@@ -740,8 +798,7 @@ int GuiApp::run(int argc, char** argv)
                 } else {
                     camYaw = 45.f * 3.14159f / 180.f;
                     camPitch = 35.f * 3.14159f / 180.f;
-                    int tc = netConnected ? (int)netClient.state().teams.size() : 0;
-                    float ext = worldExtentRadius(std::max(1, tc), map.w * TILE * 0.455f);
+                    float ext = worldExtentRadius(1, map.w * TILE * 0.455f);
                     camDist = ext * 2.42f;
                 }
             }
@@ -789,8 +846,7 @@ int GuiApp::run(int argc, char** argv)
             if (ev.type == sf::Event::MouseWheelScrolled) {
                 sf::Vector2i mp = sf::Mouse::getPosition(window);
                 if (!hud.handleScroll(mp, ev.mouseWheelScroll.delta)) {
-                    int tc = netConnected ? (int)netClient.state().teams.size() : 0;
-                    float ext = worldExtentRadius(std::max(1, tc), map.w * TILE * 0.455f);
+                    float ext = worldExtentRadius(1, map.w * TILE * 0.455f);
                     float maxDist = std::max(120.f, ext * 3.0f);
                     camDist = glm::clamp(camDist - ev.mouseWheelScroll.delta * 1.5f,
                                          4.f, maxDist);
@@ -935,19 +991,18 @@ int GuiApp::run(int argc, char** argv)
         toon.setFloat("uShoreInnerR", 0.f);
         toon.setFloat("uShoreWidth",  1.f);
 
-        int teamCount = netConnected ? (int)netClient.state().teams.size() : 0;
         glm::vec2 sunXZ = glm::normalize(glm::vec2(sunDir.x, sunDir.z) + 1e-6f);
         drawGround(toon, waterMapShader, waterMapTex, view, proj, elapsed, sunXZ,
-                   landMesh, oceanMesh, waterMesh, map, cx, cz, teamCount);
+                   landMesh, oceanMesh, waterMesh, map, cx, cz, 1);
 
         drawProps(toon, outline, map, view, proj, elapsed, ambScale, treeGlow,
-                 cx, cz, teamCount);
+                 cx, cz, 1);
 
         drawResources(eggShader, gemTex, map, sunDir, lightCol, ambScale, view, proj, elapsed,
-                      cx, cz, teamCount);
+                      cx, cz, 1);
 
         drawFood(eggShader, foodMesh, map, sunDir, lightCol, ambScale, view, proj, elapsed,
-                cx, cz, teamCount);
+                cx, cz, 1);
 
         {
             PlayerRenderCtx prCtx{
@@ -972,21 +1027,22 @@ int GuiApp::run(int argc, char** argv)
                                  prevPulse  != PulseState::RELEASING);
             prevPulse = pulseState;
 
-            int n = std::max(1, teamCount);
-            if ((int)treeMotes.size() != n) treeMotes.resize(n);
-            float ibaseR = map.w * TILE * 0.455f;
-            for (int isl = 0; isl < n; ++isl) {
-                glm::vec2 ioff = islandCenter(isl, n, cx, cz, ibaseR) - glm::vec2(cx, cz);
-                glm::vec3 islTreePos = TREE_POS + glm::vec3(ioff.x, 0.f, ioff.y);
-                drawTreeMotes(treeMotes[isl], charging, chargeT, justReleased, islTreePos,
-                              starShader, sparkVAO, view, proj, elapsed, dt);
-            }
+            if (treeMotes.empty()) treeMotes.resize(1);
+            drawTreeMotes(treeMotes[0], charging, chargeT, justReleased, TREE_POS,
+                          starShader, sparkVAO, view, proj, elapsed, dt);
         }
 
         constellation.updateMewEnergy(adminMode, dt, mewPos, elapsed);
         constellation.renderMewEnergy(starShader, sparkVAO, view, proj, elapsed);
         drawIncantations(incantations, incantShader, view, proj, camPos, elapsed);
         drawClouds(toon, map, elapsed);
+
+        // keep the wildlife roaming over the island cluster, not the open ocean
+        float wfRadius = worldExtentRadius(1, map.w * TILE * 0.455f);
+        updateWildlife(ptero,     dt, cx, cz, wfRadius);
+        updateWildlife(butterfly, dt, cx, cz, wfRadius);
+        drawWildlife(ptero,     skinShader, view, proj, camPos, skySunDir, lightCol, ambScale, elapsed);
+        drawWildlife(butterfly, skinShader, view, proj, camPos, skySunDir, lightCol, ambScale, elapsed);
 
         window.resetGLStates();
         hud.draw(window, netConnected ? &netClient.state() : nullptr,

@@ -5,7 +5,7 @@
 #include <string>
 #include <vector>
 
-static const int MAX_BONES = 96;
+static const int MAX_BONES = 128;
 
 struct BoneChannel {
     int   boneIndex;
@@ -74,7 +74,9 @@ private:
 
     std::vector<glm::mat4> invBindMats_;
     std::vector<int>       parentOf_;
+    std::vector<LocalTRS>  bindLocal_;   // per-joint bind-pose TRS (default when a channel is absent)
     std::vector<std::string> boneNames_;
+    glm::mat4              skinRootXform_{1.f}; // ancestor-node transforms above the root joint
 
     std::vector<Animation> animations_;
 

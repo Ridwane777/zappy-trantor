@@ -1,10 +1,10 @@
 # Makefile racine — délègue à chaque composant.
 #
 # Règles disponibles :
-#   all         : compile server + gui + ai
+#   all         : compile server + gui
 #   server      : compile uniquement le serveur
 #   gui         : compile uniquement la GUI
-#   ai          : prépare uniquement l'IA (install deps)
+#   ai          : vérifie que zappy_ai est présent (script Python, rien à compiler)
 #   clean       : nettoie les objets de tous les composants
 #   fclean      : supprime les binaires de tous les composants
 #   re          : fclean + all
@@ -22,7 +22,8 @@ gui:
 	$(MAKE) -C gui
 
 ai:
-	pip3 install -r ai/requirements.txt --quiet
+	@test -f ai/$(NAME_AI) || (echo "ERROR: ai/$(NAME_AI) not found" && exit 1)
+	@echo "ai/$(NAME_AI) OK"
 
 clean:
 	$(MAKE) -C server clean

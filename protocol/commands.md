@@ -23,7 +23,8 @@ Handshake: `WELCOME` → send team name → `CLIENT-NUM` → `X Y`.
 ## Server → GUI (GRAPHIC)
 
 | msg | format | | msg | format |
-|---|---|---|---|---|
+|---|--Few or zero competing teams, long run, food-dense map (more food = more survivable waits).
+-|---|---|---|
 | `msz` | `msz X Y` | | `pgt` | `pgt #id i` (took) |
 | `sgt` | `sgt T` | | `pdr` | `pdr #id i` (dropped) |
 | `tna` | `tna N` | | `pic` | `pic X Y L #id…` |

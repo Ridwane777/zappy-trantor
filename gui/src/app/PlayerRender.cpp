@@ -39,12 +39,7 @@ static glm::vec2 worldRaw(PlayerRenderCtx& ctx, const GuiPlayer& p) {
     const GuiState& gs = ctx.netClient.state();
     int W = gs.sizeKnown ? gs.width : ctx.map.w;
     int H = gs.sizeKnown ? gs.height : ctx.map.h;
-    int count = (int)gs.teams.size();
-    int idx = 0;
-    for (int i = 0; i < count; ++i) if (gs.teams[i] == p.team) { idx = i; break; }
-    float cx = ctx.map.w * TILE * 0.5f, cz = ctx.map.h * TILE * 0.5f;
-    float baseR = ctx.map.w * TILE * 0.455f;
-    glm::vec2 off = islandCenter(idx, count, cx, cz, baseR) - glm::vec2(cx, cz);
+    glm::vec2 off(0.f, 0.f);
 
     const float insetT = 7.f;
     float landX = std::max(1.f, ctx.map.w - 2.f * insetT);
@@ -182,6 +177,7 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
     skinShader.setFloat("uShoreInnerR",    0.f);
     skinShader.setFloat("uShoreWidth",     1.f);
     skinShader.setBool ("uUseTexture",     true);
+    skinShader.setBool ("uAlphaCutout",    false);
     skinShader.setInt  ("uTexture",        0);
     skinShader.setBool ("uUseVertexColor", false);
     skinShader.setBool ("uMultiColor",     false);

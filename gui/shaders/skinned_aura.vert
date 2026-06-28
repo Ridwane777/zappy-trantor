@@ -8,8 +8,8 @@ uniform mat4 uModel;
 uniform mat4 uView;
 uniform mat4 uProj;
 
-const int MAX_BONES = 96;
-uniform mat4 uBones[96];
+const int MAX_BONES = 128;
+uniform mat4 uBones[128];
 
 void main() {
     mat4 skin = aWeights.x * uBones[int(aJoints.x)]
