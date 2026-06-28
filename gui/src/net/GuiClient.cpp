@@ -57,6 +57,10 @@ void GuiClient::send(const std::string &line)
     out.push_back('\n');
     ssize_t n = ::write(_fd, out.data(), out.size());
     (void)n;   // best-effort; non-blocking, GUI requests are idempotent
+
+    _state.rawFeed.push_back(">> " + line);
+    if (_state.rawFeed.size() > 200)
+        _state.rawFeed.pop_front();
 }
 
 bool GuiClient::connect(const std::string &host, int port, std::string &err)
@@ -122,6 +126,8 @@ bool GuiClient::connect(const std::string &host, int port, std::string &err)
     _fd = fd;
     _readBuf.clear();
     _state = GuiState{};
+    _state.rawFeed.push_back("<< " + welcome);
+    _state.rawFeed.push_back(">> GRAPHIC");
     return true;
 }
 
