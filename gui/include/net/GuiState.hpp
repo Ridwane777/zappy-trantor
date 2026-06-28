@@ -67,6 +67,10 @@ struct GuiState {
     std::deque<GuiLogEntry> log;   // recent player actions (capped); newest at back
     unsigned long logTotal = 0;    // total actions ever logged (for audio event draining)
 
+    // Raw protocol traffic (capped, newest at back). Each entry is prefixed
+    // with "<< " (received from the server) or ">> " (sent by this client).
+    std::deque<std::string> rawFeed;
+
     GuiTile &tileAt(int x, int y) { return tiles[y * width + x]; }
     const GuiTile &tileAt(int x, int y) const { return tiles[y * width + x]; }
 

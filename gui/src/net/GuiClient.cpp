@@ -155,8 +155,12 @@ void GuiClient::poll()
         _readBuf.erase(0, nl + 1);
         if (!line.empty() && line.back() == '\r')
             line.pop_back();
-        if (!line.empty())
+        if (!line.empty()) {
+            _state.rawFeed.push_back("<< " + line);
+            if (_state.rawFeed.size() > 200)
+                _state.rawFeed.pop_front();
             _processLine(line);
+        }
     }
 }
 
