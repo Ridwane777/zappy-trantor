@@ -90,7 +90,7 @@ bool World::hatchEgg(const std::string &team)
 void World::removePlayer(int fd)
 {
     Player *p = _getPlayer(fd);
-    if (p && onGuiEvent)
+    if (p && onGuiEvent && !p->isDead)
         onGuiEvent("pdi #" + std::to_string(p->id) + "\n");
 
     _players.erase(
@@ -119,12 +119,18 @@ void World::update(int ticks)
                 for (int y = 0; y < _map.getHeight(); y++)
                     for (int x = 0; x < _map.getWidth(); x++)
                         onGuiEvent(bctMsg(x, y, _map.getTile(x, y)));
+                onGuiEvent("sst 20\n");
             }
         }
 
         for (auto it = _players.begin(); it != _players.end(); ) {
             Player &p = *it;
-            
+
+            if (p.isDead) {
+                ++it;
+                continue;
+            }
+
             p.foodTimer--;
             if (p.foodTimer <= 0) {
                 if (p.inventory[FOOD] > 0) {
@@ -442,6 +448,7 @@ std::string World::_cmdTake(Player &p, const std::string &res)
     if (onGuiEvent) {
         onGuiEvent("pgt #" + std::to_string(p.id) + " " + std::to_string(r) + "\n");
         onGuiEvent(bctMsg(p.x, p.y, tile));
+        onGuiEvent(guiPlayerInventory(p.id));
     }
     return "ok";
 }
@@ -462,6 +469,7 @@ std::string World::_cmdSet(Player &p, const std::string &res)
     if (onGuiEvent) {
         onGuiEvent("pdr #" + std::to_string(p.id) + " " + std::to_string(r) + "\n");
         onGuiEvent(bctMsg(p.x, p.y, tile));
+        onGuiEvent(guiPlayerInventory(p.id));
     }
     return "ok";
 }
