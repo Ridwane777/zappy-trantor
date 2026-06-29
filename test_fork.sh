@@ -38,9 +38,11 @@ for team in "${TEAMS[@]}"; do
         python3 zappy_ai -p "$PORT" -n "$team" -h localhost ) &
     pids+=($!)
 done
-sleep 1
 
-echo "[test_fork] GUI — observers en direct sur 127.0.0.1:$PORT"
+echo "[test_fork] GUI — clique START dans le menu pour rejoindre 127.0.0.1:$PORT"
 echo "            Watch the HUD: players should grow from 2 -> 4 -> 8 ..."
 cd "$ROOT/gui"
+# No ZAPPY_AUTOSTART: the menu appears with host/port pre-filled so the
+# user clicks START when they are ready — the game no longer runs before
+# the GUI window is even on screen.
 ./zappy_gui -p "$PORT" -h localhost
