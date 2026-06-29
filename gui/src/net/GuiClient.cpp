@@ -309,6 +309,16 @@ void GuiClient::_processLine(const std::string &line)
             if (kv.second.x == fx.x && kv.second.y == fx.y)
                 kv.second.incanting = false;
 
+    } else if (cmd == "pex") {
+        std::string idTok;
+        if (iss >> idTok) {
+            int id = parseId(idTok);
+            auto it = _state.players.find(id);
+            if (it != _state.players.end())
+                it->second.ejected = true;
+            _logEvent(id, "was ejected", 4);
+        }
+
     } else if (cmd == "seg") {
         std::string team;
         if (iss >> team)

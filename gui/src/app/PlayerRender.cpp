@@ -83,7 +83,9 @@ static void updatePlayerStates(PlayerRenderCtx& ctx,
             // torus map: large coord delta means wrapping — snap rather than glide
             bool wrap = std::abs(p.x - pa.px) > W / 2 ||
                         std::abs(p.y - pa.py) > H / 2;
-            if (wrap) {
+            bool snap = wrap || const_cast<GuiPlayer&>(p).ejected;
+            const_cast<GuiPlayer&>(p).ejected = false;
+            if (snap) {
                 pa.prevWorld = target; pa.curWorld = target; pa.moveLerp = 1.f;
             } else {
                 pa.prevWorld = pa.curWorld; pa.moveLerp = 0.f; pa.moveT = 0.5f;
@@ -106,11 +108,18 @@ static void updatePlayerStates(PlayerRenderCtx& ctx,
         }
         pa.moveT = std::max(0.f, pa.moveT - dt);
         pa.turnT = std::max(0.f, pa.turnT - dt);
+        static const float ANIM_BLEND_DUR = 0.18f;
         int a = 0;
         if (frozen)                 a = 0;
         else if (pa.moveLerp < 1.f) a = 1;
         else if (pa.turnT > 0.f)    a = pa.turnAnim;
         if (a >= ctx.tiers[tierOf(ctx.tiers, p.level)].mesh.animCount()) a = 0;
+        if (a != pa.anim) {
+            pa.prevAnim     = pa.anim;
+            pa.prevAnimTime = pa.animTime;
+            pa.blendT       = ANIM_BLEND_DUR;
+        }
+        pa.blendT = std::max(0.f, pa.blendT - dt);
         pa.anim = a;
         // sync walk animation to ground distance to prevent foot sliding
         if (a == 1) {
@@ -185,8 +194,16 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
         const GuiPlayer& p = *pp;
         if (p.level == 0) continue;   // unhatched egg drawn separately below
         SkinnedMesh& m = ctx.tiers[tierOf(ctx.tiers, p.level)].mesh;
-        int a = ctx.playerAnims[p.id].anim;
-        m.computeBones(a, ctx.playerAnims[p.id].animTime, pBones, true, false);
+        static const float ANIM_BLEND_DUR = 0.18f;
+        const PlayerAnim& pa2 = ctx.playerAnims[p.id];
+        m.computeBones(pa2.anim, pa2.animTime, pBones, true, false);
+        if (pa2.blendT > 0.f) {
+            glm::mat4 prevBones[MAX_BONES];
+            m.computeBones(pa2.prevAnim, pa2.prevAnimTime, prevBones, true, false);
+            float alpha = 1.f - pa2.blendT / ANIM_BLEND_DUR;
+            for (int i = 0; i < MAX_BONES; ++i)
+                pBones[i] = prevBones[i] * (1.f - alpha) + pBones[i] * alpha;
+        }
         skinShader.setMat4Array("uBones[0]", MAX_BONES, glm::value_ptr(pBones[0]));
         glm::mat4 M = playerModel(ctx, p);
         glm::mat3 N3 = glm::mat3(glm::transpose(glm::inverse(M)));
@@ -208,6 +225,38 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
         skinShader.setMat4("uModel",     glm::value_ptr(M));
         skinShader.setMat3("uNormalMat", glm::value_ptr(N3));
         ctx.mewMesh.draw();
+    }
+
+    if (ctx.haveCharz) {
+        ctx.charzMesh.computeBones(ctx.charzAnimIdx, ctx.charzAnimTime, pBones, true, false, ctx.charzStripRoot);
+        skinShader.setMat4Array("uBones[0]", MAX_BONES, glm::value_ptr(pBones[0]));
+        // reset shader uniforms — previous player pass leaves wrong state
+        skinShader.setBool ("uUseTexture",     true);
+        skinShader.setBool ("uAlphaCutout",    false);
+        skinShader.setInt  ("uTexture",        0);
+        skinShader.setBool ("uUseVertexColor", false);
+        skinShader.setBool ("uMultiColor",     false);
+        skinShader.setBool ("uEmissive",       false);
+        skinShader.setBool ("uCrystal",        false);
+        // Lower, so the directional diffuse shapes the body instead of the flat
+        // warm ambient washing this grey/cream skin out to a uniform tan.
+        skinShader.setFloat("uAmbientStrength",0.32f * ambScale);
+        skinShader.setFloat("uShininess",      24.f);
+        skinShader.setFloat("uAlpha",          1.f);
+        skinShader.setVec3 ("uColor",          1.f, 1.f, 1.f);
+        skinShader.setBool ("uCircleClip",     false);
+        skinShader.setBool ("uShoreBlend",     false);
+        glDisable(GL_CULL_FACE);
+        float by = ctx.charzPos.y + std::sin(elapsed * 1.6f) * ctx.charzBobAmp;
+        glm::mat4 M = glm::translate(glm::mat4(1.f), glm::vec3(ctx.charzPos.x, by, ctx.charzPos.z));
+        M = glm::rotate(M, ctx.charzYaw, glm::vec3(0, 1, 0));
+        M = glm::rotate(M, glm::radians(90.f), glm::vec3(1, 0, 0));  // GLB is Z-up
+        M = glm::scale(M, glm::vec3(ctx.charzScale));
+        glm::mat3 N3 = glm::mat3(glm::transpose(glm::inverse(M)));
+        skinShader.setMat4("uModel",     glm::value_ptr(M));
+        skinShader.setMat3("uNormalMat", glm::value_ptr(N3));
+        ctx.charzMesh.draw();
+        glEnable(GL_CULL_FACE);
     }
 
     if (ctx.haveMoon && nightF > 0.01f) {
@@ -302,19 +351,13 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
             const GuiState& gs = ctx.netClient.state();
             int W = gs.sizeKnown ? gs.width : ctx.map.w;
             int H = gs.sizeKnown ? gs.height : ctx.map.h;
-            int count = (int)gs.teams.size();
-            float icx = ctx.map.w * TILE * 0.5f, icz = ctx.map.h * TILE * 0.5f;
-            float baseR = ctx.map.w * TILE * 0.455f;
             const float insetT = 7.f;
             float landX = std::max(1.f, ctx.map.w - 2.f * insetT);
             float landY = std::max(1.f, ctx.map.h - 2.f * insetT);
             for (const auto& kv : gs.eggs) {
                 const GuiEgg& egg = kv.second;
-                int idx = 0;
-                for (int i = 0; i < count; ++i) if (gs.teams[i] == egg.team) { idx = i; break; }
-                glm::vec2 off = islandCenter(idx, count, icx, icz, baseR) - glm::vec2(icx, icz);
-                float wx = (insetT + (egg.x + 0.5f) * landX / W) * TILE + off.x;
-                float wz = (insetT + (egg.y + 0.5f) * landY / H) * TILE + off.y;
+                float wx = (insetT + (egg.x + 0.5f) * landX / W) * TILE;
+                float wz = (insetT + (egg.y + 0.5f) * landY / H) * TILE;
                 float wob = std::sin(elapsed * 3.f + egg.id) * 0.06f;
                 glm::mat4 M = glm::translate(glm::mat4(1.f), {wx, es * r, wz});
                 M = glm::rotate(M, wob, {0.f, 0.f, 1.f});

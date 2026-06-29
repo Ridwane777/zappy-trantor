@@ -464,6 +464,14 @@ int GuiApp::run(int argc, char** argv)
         haveMew = true;
     } catch (std::exception& e) { std::cerr << "Mew load: " << e.what() << "\n"; }
 
+    SkinnedMesh charzMesh;
+    bool  haveCharz = false;
+    try {
+        charzMesh = SkinnedMesh::load("assets/characters/charizard/scene.glb");
+        // body_a/body_b/eyes/fire come from the GLB's embedded per-material maps
+        haveCharz = true;
+    } catch (std::exception& e) { std::cerr << "Charizard load: " << e.what() << "\n"; }
+
     SkinnedMesh moonMesh;
     bool haveMoon = false;
     try {
@@ -534,20 +542,73 @@ int GuiApp::run(int argc, char** argv)
                           ? (float)std::atof(std::getenv("ZAPPY_MEW_FLOOR")) : 1.0f;
     const float MEW_SCALE = std::getenv("ZAPPY_MEW_SCALE")
                           ? (float)std::atof(std::getenv("ZAPPY_MEW_SCALE")) : 0.27f;
+    const glm::vec3 TREE_POS = {22*TILE, 0.f, 22*TILE};
+
     // pose figée à l'arrêt : une frame de vol (pas la frame 0 qui est verticale)
     float       mewIdlePose = std::getenv("ZAPPY_MEW_POSE")
                           ? (float)std::atof(std::getenv("ZAPPY_MEW_POSE")) : 2.0f;
     const float mewAnimDur = (haveMew && mewMesh.animCount() > 0)
                           ? mewMesh.animDuration(0) : 11.f;
-    bool        adminPrompt = false;     // password input box open
-    bool        adminEatNext = false;    // ignore the 'a' that opened the box
-    bool        adminMode   = false;     // currently flying Mew
+    bool        adminPrompt = false;
+    bool        adminEatNext = false;
+    bool        adminMode   = false;
+    bool        charzMode   = false;   // player has control of Charizard
     std::string adminInput;
     glm::vec3   mewPos(cx, 6.f, cz);
     float       mewYaw = 0.f, mewAnimTime = mewIdlePose;
     bool        mewMoving = false;
-    float       mewFlyTimer = 0.f;   // throttles the whoosh while Mew is moving
-    float       mewMeowTimer = 10.f; // random ambient meow every ~10 s in admin mode
+    float       mewFlyTimer = 0.f;
+    float       mewMeowTimer = 10.f;
+
+    // ── Charizard admin mount ──────────────────────────────────────────────────
+    // Behaves exactly like Mew (password -> control it), the difference being it
+    // can land and walk/run on the ground instead of only flying.
+    const float CHARZ_SCALE    = std::getenv("ZAPPY_CHARZ_SCALE")
+                               ? (float)std::atof(std::getenv("ZAPPY_CHARZ_SCALE")) : 0.9f;
+    const float CHARZ_GROUND_Y = std::getenv("ZAPPY_CHARZ_GROUND_Y")
+                              ? (float)std::atof(std::getenv("ZAPPY_CHARZ_GROUND_Y")) : 0.0f;
+    // anim indices (verified against scene.glb's 83 clips)
+    // NB: anim 0 (defaultwait) is a *hovering* pose for Charizard, so the
+    // grounded idle defaults to battlewait01_loop (1, upright stance). Override
+    const int CA_IDLE     = std::getenv("ZAPPY_CHARZ_IDLE")
+                         ? std::atoi(std::getenv("ZAPPY_CHARZ_IDLE")) : 1;  // ground idle: battlewait01_loop
+    const int CA_FLY_IDLE = std::getenv("ZAPPY_CHARZ_FLY_IDLE")
+                         ? std::atoi(std::getenv("ZAPPY_CHARZ_FLY_IDLE")) : 49; // flying idle: battlewait01_loop (hover)
+    const float CHARZ_ANIM_SPEED = std::getenv("ZAPPY_CHARZ_ANIM_SPEED")
+                         ? (float)std::atof(std::getenv("ZAPPY_CHARZ_ANIM_SPEED")) : 1.5f;
+    const int CA_WALK       = 7;   // ground walk01_loop
+    const int CA_RUN        = 8;   // ground run01_loop
+    const int CA_TURN_L     = 4;   // ground turn left
+    const int CA_TURN_R     = 5;   // ground turn right
+    const int CA_AIR_WALK   = 54;  // air walk01_loop
+    const int CA_AIR_RUN    = 55;  // air run01_loop
+    const int CA_AIR_TURN_L = 53;  // air turn left
+    const int CA_AIR_TURN_R = 52;  // air turn right
+    const int CA_TAKEOFF    = 12;  // jumpup01_start        (one-shot)
+    const int CA_FLY        = 13;  // jumpup01_loop         (airborne)
+    const int CA_FALL       = 62;  // 20153_jumpdown01_loop (aerial descent)
+    const int CA_LAND_A     = 63;  // 20155_land02          (aerial phase, plays first)
+    const int CA_LAND_B     = 16;  // 00155_land02          (ground phase, plays second)
+    const float CHARZ_FLY_Y = CHARZ_GROUND_Y + 6.f;
+    const float caTakeoffDur = (haveCharz && charzMesh.animCount() > CA_TAKEOFF)
+                             ? charzMesh.animDuration(CA_TAKEOFF) : 0.8f;
+    // jumpup01_start is only ~0.12s (a crouch-prep pose); the actual ascent lives
+    // in jumpup01_loop. Spread the 6-unit climb over a longer window so it reads
+    // as a launch instead of teleporting straight up.
+    const float caClimbDur = 0.9f;
+    const float caLandADur   = (haveCharz && charzMesh.animCount() > CA_LAND_A)
+                             ? charzMesh.animDuration(CA_LAND_A) : 0.5f;
+    const float caLandBDur   = (haveCharz && charzMesh.animCount() > CA_LAND_B)
+                             ? charzMesh.animDuration(CA_LAND_B) : 0.7f;
+    enum class CharzMove { GROUNDED, TAKEOFF, FLYING, LANDING_A, LANDING_B };
+    CharzMove   charzMove     = CharzMove::GROUNDED;
+    float       charzMoveT    = 0.f;   // time inside a one-shot transition
+    glm::vec3   charzPos      (cx, CHARZ_GROUND_Y, cz);
+    float       charzYaw      = 0.f;
+    float       charzAnimTime = 0.f;
+    int         charzAnimIdx  = CA_IDLE;
+    int         charzPrevAnim = -1;
+    float       charzBobAmp   = 0.f;
 
     Constellation constellation;
     float admCamYaw = 0.f, admCamPitch = 0.32f; // 3rd-person cam offset around Mew
@@ -561,8 +622,6 @@ int GuiApp::run(int argc, char** argv)
 
     sf::Clock clock;
     float elapsed  = 0.f;
-
-    const glm::vec3 TREE_POS     = {22*TILE, 0.f, 22*TILE};
     const float CHARGE_DURATION  =  8.f;   // seconds to charge up
     const float IDLE_DURATION    = 52.f;   // seconds idle before next charge
     const float WAVE_SPEED       = 14.f;   // world units / second
@@ -756,7 +815,20 @@ int GuiApp::run(int argc, char** argv)
                 }
                 if (ev.type == sf::Event::KeyPressed) {
                     if (ev.key.code == sf::Keyboard::Enter) {
-                        if (adminInput == "admin1234") {                 // déverrouillage
+                        if (adminInput == "char6006") {                  // déverrouillage Charizard
+                            charzMode = true;
+                            charzMove = CharzMove::FLYING; charzMoveT = 0.f;
+                            charzPos  = glm::vec3(
+                                cx + std::sin(camYaw) * 12.f,
+                                12.f,
+                                cz + std::cos(camYaw) * 12.f);
+                            charzYaw    = camYaw + glm::radians(180.f);
+                            charzAnimTime = 0.f; charzAnimIdx = CA_IDLE;
+                            charzBobAmp   = 0.08f;
+                            admCamYaw   = 0.f;
+                            admCamPitch = 0.55f;  // look slightly down so world is visible
+                            gameAudio.play("reveal", 90.f);
+                        } else if (adminInput == "admin1234") {          // déverrouillage Mew
                             adminMode = true;
                             mewPos = glm::vec3(cx, camTargetY + 4.f, cz);
                             mewYaw = camYaw;
@@ -774,13 +846,14 @@ int GuiApp::run(int argc, char** argv)
 
             if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::Escape)
                 window.close();
-            if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::A && !adminMode) {
-                adminPrompt = true; adminInput.clear(); adminEatNext = true;  // ouvrir le prompt
+            if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::A && !adminMode && !charzMode) {
+                adminPrompt = true; adminInput.clear(); adminEatNext = true;
                 continue;
             }
-            if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::Q && adminMode) {
-                adminMode = false;                                       // quitter le mode admin
-                gameAudio.stopLoop();                                    // couper le bourdon de vol
+            if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::Q && (adminMode || charzMode)) {
+                adminMode = false;
+                charzMode = false;
+                gameAudio.stopLoop();
             }
             // scrub de la pose idle (O / P) pour choisir la frame de repos
             if (adminMode && ev.type == sf::Event::KeyPressed &&
@@ -793,7 +866,7 @@ int GuiApp::run(int argc, char** argv)
             }
 
             if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::R) {
-                if (adminMode) {                       // reset the 3rd-person view
+                if (adminMode || charzMode) {          // reset the 3rd-person view
                     admCamYaw = 0.f; admCamPitch = 0.32f;
                 } else {
                     camYaw = 45.f * 3.14159f / 180.f;
@@ -831,7 +904,7 @@ int GuiApp::run(int argc, char** argv)
 
             if (ev.type == sf::Event::MouseMoved && dragging) {
                 sf::Vector2i cur = sf::Mouse::getPosition(window);
-                if (adminMode) {                              // look around Mew
+                if (adminMode || charzMode) {                 // orbit around Mew / Charizard
                     admCamYaw   -= (cur.x - lastMouse.x) * 0.008f;
                     admCamPitch += (cur.y - lastMouse.y) * 0.006f;
                     admCamPitch  = glm::clamp(admCamPitch, -1.20f, 1.40f);
@@ -912,6 +985,124 @@ int GuiApp::run(int argc, char** argv)
             }
 
         }
+        // ── Charizard control: realistic takeoff / flight / landing ────────
+        if (charzMode) {
+            const float turn = 2.0f;
+            glm::vec3 fwd(std::sin(charzYaw), 0.f, std::cos(charzYaw));
+            bool fwd_k = sf::Keyboard::isKeyPressed(sf::Keyboard::Up)   || sf::Keyboard::isKeyPressed(sf::Keyboard::W);
+            bool bck_k = sf::Keyboard::isKeyPressed(sf::Keyboard::Down);
+            bool run_k = sf::Keyboard::isKeyPressed(sf::Keyboard::Space);
+            bool up_k  = sf::Keyboard::isKeyPressed(sf::Keyboard::Z);
+            bool dn_k  = sf::Keyboard::isKeyPressed(sf::Keyboard::S);
+            bool moving = fwd_k || bck_k;
+
+            // turning is always allowed
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left))  charzYaw += turn * dt;
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) charzYaw -= turn * dt;
+
+            bool lft_k = sf::Keyboard::isKeyPressed(sf::Keyboard::Left);
+            bool rgt_k = sf::Keyboard::isKeyPressed(sf::Keyboard::Right);
+
+            switch (charzMove) {
+            case CharzMove::GROUNDED: {
+                float spd = run_k ? 18.f : 6.f;
+                if (fwd_k) charzPos += fwd * spd * dt;
+                if (bck_k) charzPos -= fwd * spd * dt;
+                charzPos.y = CHARZ_GROUND_Y;
+                if      (moving && run_k) { charzAnimIdx = CA_RUN;    charzBobAmp = 0.02f; }
+                else if (moving)          { charzAnimIdx = CA_WALK;   charzBobAmp = 0.03f; }
+                else if (lft_k)           { charzAnimIdx = CA_TURN_L; charzBobAmp = 0.01f; }
+                else if (rgt_k)           { charzAnimIdx = CA_TURN_R; charzBobAmp = 0.01f; }
+                else                      { charzAnimIdx = CA_IDLE;   charzBobAmp = 0.04f; }
+                if (up_k) {
+                    charzMove = CharzMove::TAKEOFF; charzMoveT = 0.f;
+                    charzAnimIdx = CA_TAKEOFF; charzAnimTime = 0.f; charzBobAmp = 0.f;
+                }
+                break;
+            }
+            case CharzMove::TAKEOFF: {
+                charzMoveT += dt;
+                charzBobAmp = 0.f;
+                if (charzMoveT < caTakeoffDur) {
+                    // crouch-prep pose, still planted on the ground
+                    charzPos.y    = CHARZ_GROUND_Y;
+                    charzAnimIdx  = CA_TAKEOFF;
+                    charzAnimTime = std::min(charzMoveT, caTakeoffDur - 0.01f);
+                } else {
+                    // ascent: jumpup loop while easing up to flight altitude
+                    float k = glm::clamp((charzMoveT - caTakeoffDur) / caClimbDur,
+                                         0.f, 1.f);
+                    k = k * k * (3.f - 2.f * k);           // smoothstep launch
+                    charzPos.y    = CHARZ_GROUND_Y + (CHARZ_FLY_Y - CHARZ_GROUND_Y) * k;
+                    charzAnimIdx  = CA_FLY;                 // jumpup01_loop
+                    charzAnimTime = charzMoveT - caTakeoffDur;
+                }
+                if (charzMoveT >= caTakeoffDur + caClimbDur) {
+                    charzMove = CharzMove::FLYING; charzAnimTime = 0.f;
+                }
+                break;
+            }
+            case CharzMove::FLYING: {
+                float spd = run_k ? 30.f : 18.f, vspd = 14.f;
+                if (fwd_k) charzPos += fwd * spd * dt;
+                if (bck_k) charzPos -= fwd * spd * dt;
+                if (up_k)  charzPos.y += vspd * dt;
+                if (dn_k)  charzPos.y -= vspd * dt;
+                if      (moving && run_k) { charzAnimIdx = CA_AIR_RUN;   charzBobAmp = 0.04f; }
+                else if (moving)          { charzAnimIdx = CA_AIR_WALK;  charzBobAmp = 0.06f; }
+                else if (dn_k)            { charzAnimIdx = CA_FALL;      charzBobAmp = 0.04f; }
+                else if (up_k)            { charzAnimIdx = CA_FLY;       charzBobAmp = 0.04f; }
+                else if (lft_k)           { charzAnimIdx = CA_AIR_TURN_L;charzBobAmp = 0.04f; }
+                else if (rgt_k)           { charzAnimIdx = CA_AIR_TURN_R;charzBobAmp = 0.04f; }
+                else                      { charzAnimIdx = CA_FLY_IDLE;  charzBobAmp = 0.08f; }
+                if (charzPos.y <= CHARZ_GROUND_Y) {
+                    charzPos.y = CHARZ_GROUND_Y;
+                    charzMove = CharzMove::LANDING_A; charzMoveT = 0.f;
+                    charzAnimIdx = CA_LAND_A; charzAnimTime = 0.f; charzBobAmp = 0.f;
+                }
+                break;
+            }
+            case CharzMove::LANDING_A: {  // aerial land phase (plays first)
+                charzMoveT += dt;
+                charzPos.y = CHARZ_GROUND_Y;
+                charzAnimIdx = CA_LAND_A;
+                charzAnimTime = std::min(charzMoveT, caLandADur - 0.01f);
+                charzBobAmp = 0.f;
+                if (charzMoveT >= caLandADur) {
+                    charzMove = CharzMove::LANDING_B; charzMoveT = 0.f;
+                    charzAnimIdx = CA_LAND_B; charzAnimTime = 0.f;
+                }
+                break;
+            }
+            case CharzMove::LANDING_B: {  // ground land phase (plays second)
+                charzMoveT += dt;
+                charzPos.y = CHARZ_GROUND_Y;
+                charzAnimIdx = CA_LAND_B;
+                charzAnimTime = std::min(charzMoveT, caLandBDur - 0.01f);
+                charzBobAmp = 0.f;
+                if (charzMoveT >= caLandBDur) {
+                    charzMove = CharzMove::GROUNDED; charzAnimTime = 0.f;
+                }
+                break;
+            }
+            }
+
+            if (charzMove == CharzMove::GROUNDED || charzMove == CharzMove::FLYING) {
+                // reset clock on animation change so every clip starts from frame 0
+                if (charzAnimIdx != charzPrevAnim) {
+                    charzAnimTime = 0.f;
+                    charzPrevAnim = charzAnimIdx;
+                }
+                charzAnimTime += dt * CHARZ_ANIM_SPEED;
+                // wrap to keep time in [0, duration) for a clean loop
+                if (haveCharz && charzMesh.animCount() > charzAnimIdx) {
+                    float dur = charzMesh.animDuration(charzAnimIdx);
+                    if (dur > 0.01f && charzAnimTime >= dur)
+                        charzAnimTime = std::fmod(charzAnimTime, dur);
+                }
+            }
+        }
+
         constellation.tick(sf::Keyboard::isKeyPressed(sf::Keyboard::Space) && !adminPrompt,
                             adminMode, dt);
 
@@ -937,6 +1128,20 @@ int GuiApp::run(int argc, char** argv)
             camPos = glm::vec3(mewPos.x - std::sin(ay) * horiz,
                                by + 1.0f + dist * std::sin(ap),
                                mewPos.z - std::cos(ay) * horiz);
+            view = glm::lookAt(camPos, target, glm::vec3(0, 1, 0));
+        }
+        if (charzMode) {   // camera follows the dragon
+            bool onGround = charzPos.y <= CHARZ_GROUND_Y + 0.05f;
+            float by = charzPos.y;
+            float headH = onGround ? 1.8f : 2.5f;
+            target = glm::vec3(charzPos.x, by + headH, charzPos.z);
+            float ay = charzYaw + admCamYaw;
+            float ap = glm::clamp(admCamPitch, -1.20f, 1.40f);
+            float camD = 16.f;
+            float horiz = camD * std::cos(ap);
+            camPos = glm::vec3(charzPos.x - std::sin(ay) * horiz,
+                               by + headH + camD * std::sin(ap),
+                               charzPos.z - std::cos(ay) * horiz);
             view = glm::lookAt(camPos, target, glm::vec3(0, 1, 0));
         }
 
@@ -1009,6 +1214,9 @@ int GuiApp::run(int argc, char** argv)
                 tiers, playerAnims, sparks,
                 testMode, netConnected, testPlayers, netClient, map, EVO_DUR, gameAudio,
                 adminMode, haveMew, mewMesh, mewAnimTime, mewMoving, mewPos, mewYaw, MEW_SCALE,
+                (haveCharz && charzMode), charzMesh, charzAnimIdx, charzAnimTime,
+                (charzMove == CharzMove::GROUNDED || charzMove == CharzMove::FLYING),
+                charzBobAmp, charzPos, charzYaw, CHARZ_SCALE,
                 haveMoon, moonMesh, moonDir,
                 eggMeshTex.get(),
                 hud, constellation
@@ -1084,6 +1292,18 @@ int GuiApp::run(int argc, char** argv)
                 mewIdlePose);
             h.setString(hb);
             h.setCharacterSize(16); h.setFillColor(sf::Color(150, 220, 255, 220));
+            sf::FloatRect b = h.getLocalBounds();
+            h.setPosition(ws.x / 2.f - b.width / 2.f, 42.f);
+            window.draw(h);
+        }
+        if (charzMode) {
+            sf::Text h; h.setFont(hudFont);
+            bool onGround = charzPos.y <= CHARZ_GROUND_Y + 0.05f;
+            const char* hint = onGround
+                ? "CHARIZARD  -  fleches: marcher   Space: courir   Z: s'envoler   Q: quitter"
+                : "CHARIZARD  -  fleches: voler   Space: turbo   Z/S: altitude   Q: quitter";
+            h.setString(hint);
+            h.setCharacterSize(16); h.setFillColor(sf::Color(255, 140, 60, 230));
             sf::FloatRect b = h.getLocalBounds();
             h.setPosition(ws.x / 2.f - b.width / 2.f, 42.f);
             window.draw(h);

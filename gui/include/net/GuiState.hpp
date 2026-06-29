@@ -32,6 +32,7 @@ struct GuiPlayer {
     int         level       = 1;
     std::string team;
     bool        incanting   = false;
+    bool        ejected     = false;
     std::array<int, GUI_RES_COUNT> inv{};   // last-known inventory (from pin)
     bool        invKnown    = false;
 };

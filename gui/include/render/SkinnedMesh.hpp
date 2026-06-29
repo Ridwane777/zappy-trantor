@@ -27,6 +27,15 @@ struct LocalTRS {
     glm::vec3 s{1,1,1};
 };
 
+// A contiguous range of the index buffer drawn with one material texture.
+// Used for multi-material GLBs (e.g. Charizard: body_a/body_b/eyes/fire).
+struct SubMesh {
+    GLsizei start = 0;    // first index (element offset)
+    GLsizei count = 0;    // number of indices
+    int     material = -1;
+    GLuint  tex = 0;      // embedded base-color texture (0 = use texId_ fallback)
+};
+
 class SkinnedMesh {
 public:
     SkinnedMesh() = default;
@@ -45,7 +54,8 @@ public:
     void loadAnimFrom(const std::string& path);
 
     void computeBones(int animIndex, float t, glm::mat4 boneMats[MAX_BONES],
-                      bool loop = true, bool reversed = false) const;
+                      bool loop = true, bool reversed = false,
+                      bool stripRootMotion = false) const;
 
     void draw() const;
 
@@ -79,6 +89,8 @@ private:
     glm::mat4              skinRootXform_{1.f}; // ancestor-node transforms above the root joint
 
     std::vector<Animation> animations_;
+    std::vector<SubMesh>   subMeshes_;     // per-material index ranges (multi-tex models)
+    std::vector<GLuint>    matTextures_;   // owned embedded textures, freed in dtor
 
     glm::vec3 bmin_{0}, bmax_{0};
 

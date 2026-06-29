@@ -336,6 +336,7 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
             sf::Color ac = e.kind == 1 ? sf::Color(150, 240, 160)
                          : e.kind == 2 ? sf::Color(245, 120, 110)
                          : e.kind == 3 ? sf::Color(190, 160, 255)
+                         : e.kind == 4 ? sf::Color(110,  70, 160)
                          :               sf::Color(208, 211, 220);
             ac.a = (sf::Uint8)alpha;
             sf::Text at; at.setFont(font);
