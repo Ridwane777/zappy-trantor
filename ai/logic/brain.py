@@ -187,9 +187,16 @@ class Brain:
                 self.player.rally_seen = 0
                 prev_level = self.player.level
 
-            # 4) Objectif atteint : on a fini.
+            # 4) Niveau 8 atteint (max). On NE quitte PAS la partie : si le joueur se
+            # déconnectait, il "disparaîtrait" du jeu (le serveur envoie pdi à la
+            # fermeture de la socket) et ne compterait plus pour la victoire
+            # (seg = 6 joueurs niveau 8 de la MÊME équipe connectés en même temps).
+            # On reste donc connecté et on se contente de survivre, comme la reine :
+            # manger quand la food est basse, sinon rester immobile sur place.
             if self.player.level >= 8:
-                break
+                if self.player.inventory["food"] < QUEEN_FOOD_MIN:
+                    survive(self.client, self.player)
+                continue
 
             # --- Préparer la décision ---
             missing = self.player.missing_for_elevation()
