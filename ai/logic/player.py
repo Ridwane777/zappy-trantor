@@ -44,6 +44,11 @@ class Player:
     # Volontairement modéré : assez pour tenir au rendez-vous sans famine, mais pas
     # trop, sinon le joueur passe son temps à manger au lieu de monter de niveau.
     FOOD_RALLY_TARGET = 25
+    # Patience max (en tours de boucle) qu'un joueur VERROUILLÉ accorde au rendez-
+    # vous avant d'abandonner : si le quorum ne se forme pas dans ce délai, il se
+    # déverrouille, repart se ravitailler, puis retentera. Évite qu'un joueur reste
+    # figé pour toujours sur un groupe qui ne se complète jamais. ~60 tours ≈ 15 s.
+    LOCK_TIMEOUT = 60
 
     def __init__(self):
         # Niveau courant : démarre à 1, objectif 8.
@@ -70,6 +75,28 @@ class Player:
         #           je reste immobile et je sers de point de rendez-vous.
         #   False = je suis un suiveur → je me dirige vers l'ancre.
         self.is_anchor = False
+
+        # VERROUILLAGE au rendez-vous (expérience co-localisation). Une fois prêt ET
+        # arrivé sur la case de l'ancre (ou si je SUIS l'ancre), je me verrouille :
+        #   - je ne bouge plus ;
+        #   - je ne repars JAMAIS manger (je ne consomme que la food de ma case).
+        # But : empêcher l'orbite autour de l'ancre et les départs pour cause de
+        # faim qui empêchaient 6 joueurs de tenir ensemble sur la même case. Le
+        # verrou est levé à chaque changement de niveau (il faut re-collecter pour
+        # le niveau suivant) ou si une MEILLEURE ancre est entendue ailleurs.
+        self.locked = False
+
+        # Nombre de tours consécutifs passés VERROUILLÉ SANS PROGRÈS (sans nouvelle
+        # arrivée sur la case). Sert au déverrouillage de sécurité (voir LOCK_TIMEOUT)
+        # avec patience PROGRESSIVE : le compteur se remet à zéro dès qu'un joueur de
+        # plus arrive (le groupe grossit) ; on n'abandonne que si plus personne
+        # n'arrive depuis LOCK_TIMEOUT tours. Ça distingue "groupe qui se complète
+        # lentement" (on attend) de "rendez-vous mort" (on abandonne).
+        self.locked_ticks = 0
+        # Nombre de joueurs vu sur la case au dernier Look (rempli par elevate) et
+        # plus grand nombre vu depuis le verrouillage courant (filigrane de progrès).
+        self.here_count = 0
+        self.rally_seen = 0
 
         # "Poids" de ralliement : un grand nombre aléatoire FIXE, tiré une fois.
         # À chaque niveau, le joueur ayant le plus grand poids (toutes équipes
