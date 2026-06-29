@@ -47,12 +47,16 @@ ServerConfig parseArgs(int argc, char **argv)
         std::cerr << "Error: port must be between 1 and 65535\n";
         usage(argv[0]);
     }
-    if (config.width <= 0 || config.height <= 0) {
-        std::cerr << "Error: width and height must be > 0\n";
+    if (config.width < 1 || config.width > 1000) {
+        std::cerr << "Error: width must be between 1 and 1000\n";
         usage(argv[0]);
     }
-    if (config.clients <= 0) {
-        std::cerr << "Error: clientsNb must be > 0\n";
+    if (config.height < 1 || config.height > 1000) {
+        std::cerr << "Error: height must be between 1 and 1000\n";
+        usage(argv[0]);
+    }
+    if (config.clients < 1 || config.clients > 100) {
+        std::cerr << "Error: clientsNb must be between 1 and 100\n";
         usage(argv[0]);
     }
     if (config.freq <= 0) {
