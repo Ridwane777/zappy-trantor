@@ -285,8 +285,8 @@ void Server::run()
         double remaining = tickDuration - std::chrono::duration<double>(
             std::chrono::steady_clock::now() - _lastTick).count();
         int timeoutMs = static_cast<int>(remaining * 1000.0);
-        if (timeoutMs < 0)
-            timeoutMs = 0;
+        if (timeoutMs < 1)
+            timeoutMs = 1;
 
         if (poll(_fds.data(), _fds.size(), timeoutMs) == -1)
             throw std::runtime_error("poll() failed");
