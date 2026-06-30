@@ -47,13 +47,21 @@ ServerConfig parseArgs(int argc, char **argv)
         std::cerr << "Error: port must be between 1 and 65535\n";
         usage(argv[0]);
     }
-    if (config.width < 1 || config.width > 1000) {
-        std::cerr << "Error: width must be between 1 and 1000\n";
+    if (config.width < 1) {
+        std::cerr << "Error: width must be > 0\n";
         usage(argv[0]);
     }
-    if (config.height < 1 || config.height > 1000) {
-        std::cerr << "Error: height must be between 1 and 1000\n";
+    if (config.width > 42) {
+        std::cerr << "Warning: width clamped to 42\n";
+        config.width = 42;
+    }
+    if (config.height < 1) {
+        std::cerr << "Error: height must be > 0\n";
         usage(argv[0]);
+    }
+    if (config.height > 42) {
+        std::cerr << "Warning: height clamped to 42\n";
+        config.height = 42;
     }
     if (config.clients < 1) {
         std::cerr << "Error: clientsNb must be > 0\n";
@@ -62,6 +70,10 @@ ServerConfig parseArgs(int argc, char **argv)
     if (config.freq <= 0) {
         std::cerr << "Error: freq must be > 0\n";
         usage(argv[0]);
+    }
+    if (config.freq > 500) {
+        std::cerr << "Warning: freq clamped to 500\n";
+        config.freq = 500;
     }
     return config;
 }
