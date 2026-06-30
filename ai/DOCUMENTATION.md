@@ -151,8 +151,9 @@ Nos messages d'équipe ont le format `TYPE:donnees` (ex. `NEED:team1:4:837421`).
 - `FOOD_THRESHOLD = 18` : seuil normal en dessous duquel un joueur **en collecte** va manger.
 - `CRITICAL_FOOD = 12` : seuil critique (un joueur au rendez-vous ne repart manger qu'en dessous).
 - `FOOD_RALLY_TARGET = 25` : niveau de food jusqu'auquel on fait le **plein** (hystérésis) avant de se figer au rendez-vous.
+- `LOCK_TIMEOUT = 60` : patience max (en tours) d'un joueur verrouillé sans progrès avant d'abandonner le rendez-vous.
 
-**Attributs clés :** `level`, `inventory`, `need_fuel` (hystérésis food), `is_anchor` (suis-je l'ancre de mon niveau ?), `rally_weight` (poids aléatoire fixe pour l'élection d'ancre), `explore_steps` (compteur pour l'exploration en zig-zag).
+**Attributs clés :** `level`, `inventory`, `need_fuel` (hystérésis food), `is_anchor` (suis-je l'ancre de mon niveau ?), `rally_weight` (poids aléatoire fixe pour l'élection d'ancre), `explore_steps` (compteur pour l'exploration en zig-zag), `locked` (verrouillé au rendez-vous ?), `locked_ticks` (tours sans progrès depuis le verrou), `here_count` (joueurs sur ma case actuellement), `rally_seen` (max de joueurs vus depuis le verrou).
 
 | Méthode | Rôle |
 |---|---|
@@ -178,13 +179,16 @@ Nos messages d'équipe ont le format `TYPE:donnees` (ex. `NEED:team1:4:837421`).
 | Méthode | Rôle |
 |---|---|
 | `__init__(client)` | Crée le `Player`. |
-| `_handle_broadcasts()` | **Ralliement (homing).** Lit tous les sons reçus. Pour les `NEED` **de notre niveau** (toutes équipes confondues, car une incantation réunit les joueurs de même niveau quelle que soit l'équipe), repère le **plus haut `weight`** entendu (élection d'ancre). Si quelqu'un a un poids supérieur au nôtre, on est un **suiveur** → on se dirige vers lui. Sinon **on est l'ancre** (`is_anchor = True`). On retient le plus haut poids **même en direction 0** (sur notre case) → un suiveur déjà arrivé **reste** au lieu d'être réaspiré ailleurs. On ne se déplace que si on est **`ready`** (plus rien à collecter pour le niveau courant, food OK, niveau ≥ 2 joueurs). |
-| `run()` | **Boucle principale** (voir §4). Crée le `TeamManager`. Si ce process est la **reine** (`is_recruiter`) : il se contente de survivre (manger sous `QUEEN_FOOD_MIN`) + `team.tick()`. Sinon (ouvrier), à chaque tour : `team.tick()` → `_handle_broadcasts()` → maj niveau → `Inventory` → arrêt si niveau 8 → diffusion du **beacon `NEED`** (si niveau de groupe) → **décision** : si on est l'ancre on se **fige** (rendez-vous), sinon `survive`/`collect`/`elevate`. |
+| `_handle_broadcasts()` | **Ralliement (homing).** Lit tous les sons reçus. Pour les `NEED` **de notre niveau** (toutes équipes confondues, car une incantation réunit les joueurs de même niveau quelle que soit l'équipe), repère le **plus haut `weight`** entendu (élection d'ancre). Si quelqu'un a un poids supérieur au nôtre, on est un **suiveur** → on se dirige vers lui. Sinon **on est l'ancre** (`is_anchor = True`). On retient le plus haut poids **même en direction 0** (sur notre case) → un suiveur déjà arrivé **reste** au lieu d'être réaspiré ailleurs. On ne se déplace que si on est **`ready`** (plus rien à collecter pour le niveau courant, food OK, niveau ≥ 2 joueurs). Dès qu'on est prêt et au rendez-vous (ancre ou direction 0), on se **verrouille** (`locked = True`). |
+| `run()` | **Boucle principale** (voir §4). Crée le `TeamManager`. Si ce process est la **reine** (`is_recruiter`) : il se contente de survivre (manger sous `QUEEN_FOOD_MIN=30`) + `team.tick()`. Sinon (ouvrier), à chaque tour : `team.tick()` → `_handle_broadcasts()` → maj niveau → `Inventory` → arrêt si niveau 8 → diffusion du **beacon `NEED`** (si niveau de groupe) → maj hystérésis food → **patience progressive du verrou** → **décision** : verrouillé → `elevate` ; ancre → `elevate` (ou `survive` si famine critique) ; sinon `survive`/`collect`/`elevate`. |
 
 **Logique de décision (dans `run`)** :
-- **Ancre** d'un niveau de groupe (`is_anchor`) : se **fige** comme point de rendez-vous (`elevate`), et ne part manger (`survive`) que sous `CRITICAL_FOOD`.
+- **Verrouillé** au rendez-vous (`locked`) : on ne bouge plus et on n'part jamais manger → `elevate()` (incante dès quorum).
+- **Ancre** non verrouillée : se **fige** comme point de rendez-vous (`elevate`), et ne part manger (`survive`) que sous `CRITICAL_FOOD`.
 - `need_fuel` passe à `True` sous `CRITICAL_FOOD`, à `False` à `FOOD_RALLY_TARGET`, et **garde son état entre les deux** (hystérésis) → un suiveur engagé au rendez-vous n'en repart pas dès qu'il perd 1 food.
 - Suiveur **prêt** (pierres OK, niveau multi-joueurs) : `must_eat = need_fuel` ; sinon `must_eat = needs_food()` (seuil normal). Puis `survive` / `collect` / `elevate`.
+
+**Patience progressive du verrou** : tant que `locked`, si `here_count > rally_seen` (un joueur de plus vient d'arriver) → `locked_ticks = 0` (le groupe grossit, on attend). Sinon `locked_ticks += 1` ; au-delà de `LOCK_TIMEOUT (60)` tours sans progrès → abandon : `locked = False`, `need_fuel = True`, on repart se ravitailler et on retentera. Un changement de niveau lève automatiquement le verrou.
 
 ---
 
@@ -241,11 +245,13 @@ Nos messages d'équipe ont le format `TYPE:donnees` (ex. `NEED:team1:4:837421`).
 
 ## 6. Concepts clés (stratégies)
 
-- **Ralliement par élection d'ancre.** Chaque joueur a un `rally_weight` aléatoire fixe. Les joueurs prêts diffusent `NEED:team:level:weight`. Celui du **plus haut poids** reste immobile (ancre) ; les autres se dirigent vers lui grâce à la **direction du son** (`DIRECTION_MOVES`). Un seul attracteur → convergence sans oscillation.
+- **Ralliement par élection d'ancre.** Chaque joueur a un `rally_weight` aléatoire fixe. Les joueurs prêts diffusent `NEED:team:level:weight`. Celui du **plus haut poids** reste immobile (ancre) ; les autres se dirigent vers lui grâce à la **direction du son** (`DIRECTION_MOVES`). Un seul attracteur stable → convergence sans oscillation.
+
+- **Verrouillage au rendez-vous (lock).** Dès qu'un joueur est prêt et sur la case de l'ancre, il se verrouille : il ne bouge plus et ne repart jamais manger. La patience est **progressive** : si le groupe grossit (`here_count` augmente), le compteur repart à zéro. Si personne n'arrive depuis `LOCK_TIMEOUT (60)` tours → abandon + ravitaillement + réessai. Évite l'orbite autour de l'ancre et les départs prématurés pour manger qui empêchaient le quorum de se former.
 
 - **Beacon continu.** Le `NEED` est diffusé **à chaque tour** : la direction d'un son (numéro de tuile) dépend de la position/orientation **courante** du récepteur ; une vieille direction est inutilisable. Émettre en continu donne au suiveur une direction fraîche à chaque pas.
 
-- **Stockpile-ahead.** On collecte d'avance le **cumul** des pierres de tous les niveaux → une fois stocké, plus besoin de repartir collecter entre deux incantations.
+- **Collecte au niveau courant seulement.** On ne collecte que les pierres du niveau courant (`missing_for_elevation()`). La collecte reste courte → le joueur rejoint rapidement le rendez-vous, incante, puis recommence pour le niveau suivant.
 
 - **Hystérésis de food.** Deux seuils (`CRITICAL_FOOD=12`, `FOOD_RALLY_TARGET=25`) : on fait le plein, puis on **reste** au rendez-vous tant qu'on n'est pas retombé au seuil bas → évite l'oscillation « manger ↔ rallier ».
 
@@ -257,9 +263,11 @@ Nos messages d'équipe ont le format `TYPE:donnees` (ex. `NEED:team1:4:837421`).
 
 ---
 
-## 7. Limites connues
+## 7. Résultats et limites
 
-- **Plafond ~niveau 6-7.** Le point dur de Zappy est de réunir **4 à 6 joueurs du même niveau sur une même case exacte, au même instant**. Le son ne donne qu'une **direction approximative** et `Look` ne distingue ni le niveau ni l'équipe d'un joueur. En pratique, le niveau atteint dépend du **nombre d'équipes** (plusieurs tentatives en parallèle) et de la **durée** : l'équipe la plus chanceuse atteint 6-7 sur un run long.
+- **Niveau 8 atteint.** Le système de verrouillage au rendez-vous + patience progressive a permis d'atteindre le niveau 8 (9 joueurs ont atteint le niveau 8 lors d'un run live avec 4 équipes, carte 10×10, f=100).
+- **Correctif serveur.** La food n'est plus consommée pendant les 300 ticks de gel de l'incantation (`isIncanting` dans World.cpp) → évite les morts de faim pendant le rituel 7→8.
+- **Point dur résiduel.** Réunir 6 joueurs de même niveau sur une case exacte via le son (direction approximative à 1 parmi 8) reste aléatoire. Le succès dépend de la taille de la carte et de la variance des runs.
 
 ---
 

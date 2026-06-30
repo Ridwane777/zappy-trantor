@@ -21,7 +21,6 @@ BUILD_FORK_COOLDOWN = 2.0
 
 def _spawn(client: Client) -> subprocess.Popen:
     """Lance un nouveau process zappy_ai et renvoie son handle (pour supervision).
-
     L'enfant reçoit la variable d'env ZAPPY_CHILD=1 : c'est un simple RÔLE de
     lancement (renforcement de l'équipe), pas une donnée de jeu. Il NE recrute pas (seul le
     recruteur gère l'effectif) ; il joue normalement. Aucune info de jeu (taille
@@ -46,15 +45,9 @@ def _spawn(client: Client) -> subprocess.Popen:
 
 class TeamManager:
     """La REINE : construit et MAINTIENT l'effectif de l'équipe (par équipe).
-
-    Un seul process est « recruteur » / reine (celui lancé à la main, sans
-    ZAPPY_CHILD) ; les autres (lancés par _spawn, avec ZAPPY_CHILD) ne recrutent
-    pas, ce sont les ouvriers qui évoluent. La reine crée les coéquipiers jusqu'au
-    plafond TEAM_CAP, puis SURVEILLE leurs process : dès que l'effectif retombe
-    sous REFORK_BELOW (morts cumulées), elle rebâtit jusqu'au plafond (hystérésis).
-    Tout passe par des commandes de jeu légales (Fork) + la gestion locale de ses
-    sous-process ; aucune donnée de jeu n'est échangée hors du serveur.
-    """
+    La reine est le premier joueur de l'équipe à se connecter (le recruteur). Elle
+    ne joue pas, elle supervise. Elle crée des enfants (ouvriers) pour atteindre le
+    plafond d'effectif, puis les supervise et les remplace si nécessaire."""
 
     def __init__(self, client: Client):
         self.client = client
