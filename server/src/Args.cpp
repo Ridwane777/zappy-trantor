@@ -55,8 +55,8 @@ ServerConfig parseArgs(int argc, char **argv)
         std::cerr << "Error: height must be between 1 and 1000\n";
         usage(argv[0]);
     }
-    if (config.clients < 1 || config.clients > 100) {
-        std::cerr << "Error: clientsNb must be between 1 and 100\n";
+    if (config.clients < 1) {
+        std::cerr << "Error: clientsNb must be > 0\n";
         usage(argv[0]);
     }
     if (config.freq <= 0) {
