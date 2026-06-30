@@ -6,11 +6,11 @@ in vec2 vUV;
 uniform sampler2D uTex;
 uniform vec3  uDirLightDir;
 uniform vec3  uDirLightColor;
-uniform vec3  uPointPos;     // explosion flash position
-uniform vec3  uPointColor;   // flash colour * intensity
+uniform vec3  uPointPos;
+uniform vec3  uPointColor;
 uniform float uAmbient;
-uniform float uAlpha;        // for the reflection fade
-uniform float uBright;       // overall brightness multiplier (reflection dims it)
+uniform float uAlpha;
+uniform float uBright;
 
 out vec4 FragColor;
 
@@ -23,7 +23,6 @@ void main() {
 
     vec3 col = base * uAmbient + base * uDirLightColor * diff;
 
-    // point-light flash from the explosion
     vec3  PL    = uPointPos - vPos;
     float pdiff = max(dot(N, normalize(PL)), 0.0);
     float atten = 1.0 / (1.0 + 0.08 * dot(PL, PL));

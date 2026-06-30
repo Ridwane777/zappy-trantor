@@ -20,7 +20,7 @@ out vec3  vVertColor;
 out vec2  vTexCoord;
 
 void main() {
-    // weighted sum of bone transforms
+
     mat4 skin = aWeights.x * uBones[int(aJoints.x)]
               + aWeights.y * uBones[int(aJoints.y)]
               + aWeights.z * uBones[int(aJoints.z)]

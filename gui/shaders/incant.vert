@@ -14,6 +14,6 @@ void main() {
     vec4 wp   = uModel * vec4(aPos, 1.0);
     vWorldPos = wp.xyz;
     vNormal   = normalize(mat3(transpose(inverse(uModel))) * aNormal);
-    vUV       = vec2(aPos.x + 0.5, aPos.y);   // pillar: (0→1 horiz, 0→1 vert)
+    vUV       = vec2(aPos.x + 0.5, aPos.y);
     gl_Position = uProj * uView * wp;
 }

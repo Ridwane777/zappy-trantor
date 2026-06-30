@@ -5,34 +5,18 @@
 
 class Shader;
 
-// The night-sky feature: scattered background stars + the Big Dipper, plus the
-// admin "constellation channel" — hold Space near Mew to charge a purple-energy
-// aura that, after 5 s, releases a wave and lights the constellation for 5 s.
-//
-// State (charge / activation / illumination timers + the energy motes) lives
-// here; GuiApp drives it each frame via tick()/updateMewEnergy() and draws it
-// with renderNightSky()/renderMewEnergy(). Placement is env-tunable
-// (ZAPPY_CONST_AZ / _EL / _S).
 class Constellation {
 public:
-    Constellation();   // generates the star field + Big Dipper directions
+    Constellation();
 
-    // Charge/illumination timers. spaceHeld charges while in adminMode; releasing
-    // fades it; reaching 5 s triggers the wave + a 5 s lit envelope.
     void tick(bool spaceHeld, bool adminMode, float dt);
 
-    // Spawn + integrate the purple energy motes around Mew (gather while charging,
-    // a dome burst on activation). mewPos is Mew's current world position.
     void updateMewEnergy(bool adminMode, float dt, const glm::vec3& mewPos, float elapsed);
 
-    // Additive pass: scattered stars + the Big Dipper (brightens with charge,
-    // flashes on the activation wave). Caller sets up additive blending; only
-    // drawn when nightF > ~0.
     void renderNightSky(Shader& star, unsigned vao, const glm::mat4& view,
                         const glm::mat4& proj, const glm::vec3& camPos,
                         float elapsed, float nightF) const;
 
-    // Additive pass: the purple energy motes around Mew (self-contained GL state).
     void renderMewEnergy(Shader& star, unsigned vao, const glm::mat4& view,
                          const glm::mat4& proj, float elapsed) const;
 
@@ -41,10 +25,10 @@ private:
     std::vector<SkyStar> _stars;
     glm::vec3 _dipperDir[7];
     glm::vec3 _dipperCenter{0.f};
-    float _charge   = 0.f;   // seconds Space held (0..5) -> progressive aura
-    bool  _active   = false; // constellation lit (stars + links glow)
-    float _waveT    = -1.f;  // activation-wave timer (>= 0 once triggered)
-    float _litT     = -1.f;  // 5 s illumination timer (fade in/out) while active
+    float _charge   = 0.f;
+    bool  _active   = false;
+    float _waveT    = -1.f;
+    float _litT     = -1.f;
     std::vector<Spark> _motes;
-    float _wavePrev = -2.f;  // edge-detect the activation burst
+    float _wavePrev = -2.f;
 };

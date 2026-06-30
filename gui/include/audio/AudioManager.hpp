@@ -1,7 +1,4 @@
 #pragma once
-// Lightweight audio layer: streamed background music + a small pool of one-shot
-// sound-effect voices. Clips live in assets/audio/ as .ogg/.wav/.flac. Missing
-// files are simply silent — the hooks can be wired before the audio exists.
 
 #include <SFML/Audio.hpp>
 #include <string>
@@ -10,33 +7,35 @@
 
 class AudioManager {
 public:
-    // Load whatever known SFX clips exist under `dir` (assets/audio).
+
     void init(const std::string &dir);
 
-    // Streamed looping/one-shot music (only one music track at a time).
     void playMusic(const std::string &name, bool loop = true, float volume = 55.f);
     void stopMusic();
 
-    // Fire-and-forget sound effect (no-op if the clip is missing).
     void play(const std::string &name, float volume = 100.f);
 
-    // Looping sound effect on a dedicated voice (e.g. a sustained sparkle held
-    // across a phase). Call stopLoop() to end it. Only one loop voice at a time.
     void playLoop(const std::string &name, float volume = 100.f);
-    void setLoopVolume(float volume);          // live-adjust the loop (e.g. a swell)
+    void setLoopVolume(float volume);
     void stopLoop();
 
     void setMuted(bool m) { _muted = m; if (m) stopMusic(); }
     bool muted() const { return _muted; }
 
+    void  setMusicVolume(float v);
+    float musicVolume() const { return _musicMaster; }
+    void  setSfxVolume(float v) { _sfxMaster = v < 0.f ? 0.f : v > 100.f ? 100.f : v; }
+    float sfxVolume()   const { return _sfxMaster; }
+
 private:
     std::string _dir;
-    bool        _muted = false;
-    std::unordered_map<std::string, sf::SoundBuffer> _buffers;  // SFX clips
-    std::vector<sf::Sound> _voices;                             // playback pool
-    sf::Sound   _loopVoice;                                     // sustained looping sfx
+    bool        _muted      = false;
+    float       _musicMaster = 35.f;
+    float       _sfxMaster   = 80.f;
+    std::unordered_map<std::string, sf::SoundBuffer> _buffers;
+    std::vector<sf::Sound> _voices;
+    sf::Sound   _loopVoice;
     sf::Music   _music;
 
-    // Resolve `name` to an existing file (tries .ogg/.wav/.flac). false if none.
     bool _resolve(const std::string &name, std::string &outPath) const;
 };

@@ -1,9 +1,10 @@
 #include "app/WorldRender.hpp"
+#include "app/Frustum.hpp"
 #include "app/Islands.hpp"
 #include "render/Shader.hpp"
 #include "render/Mesh.hpp"
 #include "render/TexturedMesh.hpp"
-#include "world/World.hpp"        // TILE, MapData, getMesh, colorFor, drawMesh
+#include "world/World.hpp"
 
 #include <GL/glew.h>
 #include <glm/gtc/matrix_transform.hpp>
@@ -42,7 +43,7 @@ void drawGround(Shader& toon, Shader& waterShader, unsigned int waterTex,
         glm::vec2 c   = islandCenter(i, n, cx, cz, baseR);
         glm::vec2 off = c - glm::vec2(cx, cz);
         glm::mat4 M  = glm::translate(glm::mat4(1.f), {off.x, 0.f, off.y});
-        glm::mat3 NM = glm::mat3(1.f);   // pure translation: normals unchanged
+        glm::mat3 NM = glm::mat3(1.f);
         toon.setMat4("uModel",     glm::value_ptr(M));
         toon.setMat3("uNormalMat", glm::value_ptr(NM));
 
@@ -100,7 +101,7 @@ void drawProps(Shader& toon, Shader& outline, const MapData& map,
             toon.setBool("uSway", sway);
 
             if (p.model == "tree_of_life" && pm.hasVertexColor()) {
-                // ambient ramps up while charging, fades out after release rather than snapping off
+
                 float pulse = 0.22f + 0.12f * std::sin(elapsed * 0.7f)
                             + treeGlow * 0.40f;
                 toon.use();
@@ -153,6 +154,7 @@ void drawResources(Shader& egg, const std::unique_ptr<TexturedMesh>* gemTex,
     egg.setFloat("uBright",  1.15f);
     glDisable(GL_CULL_FACE);
 
+    const Frustum frustum = Frustum::fromVP(proj * view);
     const float spreadR = 0.30f;
     const float baseR = map.w * TILE * 0.455f;
     const int   n     = std::max(1, teamCount);
@@ -165,6 +167,7 @@ void drawResources(Shader& egg, const std::unique_ptr<TexturedMesh>* gemTex,
 
         float wx = tile.x * TILE + TILE * 0.5f + ioff.x;
         float wz = tile.y * TILE + TILE * 0.5f + ioff.y;
+        if (!frustum.sphereVisible({wx, 0.5f, wz}, TILE)) continue;
         float tileHash = float(tile.x * 17 + tile.y * 31);
 
         int slot = 0;
@@ -215,12 +218,16 @@ void drawFood(Shader& egg, const std::unique_ptr<TexturedMesh>* foodMesh,
     egg.setFloat("uAlpha",   1.f);
     egg.setFloat("uBright",  1.f);
     glDisable(GL_CULL_FACE);
+    const Frustum frustum = Frustum::fromVP(proj * view);
     const float baseR = map.w * TILE * 0.455f;
     const int   n     = std::max(1, teamCount);
     for (int isl = 0; isl < n; ++isl) {
     glm::vec2 ioff = islandCenter(isl, n, cx, cz, baseR) - glm::vec2(cx, cz);
     for (auto& tile : map.tiles) {
         if (tile.res[0] <= 0) continue;
+        float wx = tile.x * TILE + TILE * 0.5f + ioff.x;
+        float wz = tile.y * TILE + TILE * 0.5f + ioff.y;
+        if (!frustum.sphereVisible({wx, 0.5f, wz}, TILE)) continue;
         int v = ((tile.x * 7 + tile.y * 13) % 3 + 3) % 3;
         TexturedMesh* fm = foodMesh[v] ? foodMesh[v].get()
                          : foodMesh[0] ? foodMesh[0].get()
@@ -228,8 +235,6 @@ void drawFood(Shader& egg, const std::unique_ptr<TexturedMesh>* foodMesh,
         if (!fm) continue;
         float r  = fm->boundingRadius();
         float s  = (r > 1e-4f) ? 0.175f / r : 0.175f;
-        float wx = tile.x * TILE + TILE * 0.5f + ioff.x;
-        float wz = tile.y * TILE + TILE * 0.5f + ioff.y;
         float bob = 0.30f + 0.05f * std::sin(elapsed * 1.5f + (tile.x * 17 + tile.y * 31) * 0.1f);
         glm::mat4 M = glm::translate(glm::mat4(1.f), {wx, bob, wz});
         M = glm::rotate(M, elapsed * 0.5f, {0.f, 1.f, 0.f});
@@ -259,7 +264,7 @@ void drawClouds(Shader& toon, const MapData& map, float elapsed)
         M = glm::scale(M, glm::vec3(s));
         M = glm::translate(M, -cloudMesh.centroid());
         glm::mat3 N = glm::mat3(glm::transpose(glm::inverse(M)));
-        // no outline: white clouds with outline would render as black blobs
+
         toon.use();
         toon.setMat4("uModel",     glm::value_ptr(M));
         toon.setMat3("uNormalMat", glm::value_ptr(N));

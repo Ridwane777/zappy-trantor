@@ -1,7 +1,7 @@
 #include "app/IncantationFx.hpp"
 #include "render/Shader.hpp"
 #include "render/Mesh.hpp"
-#include "world/World.hpp"        // TILE, buildDashedRingMesh, buildVQuadMesh
+#include "world/World.hpp"
 
 #include <GL/glew.h>
 #include <glm/gtc/matrix_transform.hpp>

@@ -1,7 +1,5 @@
 #version 330 core
-// Shore-water ripple shader for the map ground meshes (same VAO layout as
-// phong.vert: pos/normal/vertcolor), kept separate so the texture/sun-glitter
-// sampling in the fragment stage doesn't have to branch inside phong.frag.
+
 layout(location = 0) in vec3 aPos;
 layout(location = 1) in vec3 aNormal;
 layout(location = 2) in vec3 aVertColor;
@@ -21,8 +19,7 @@ void main() {
     vec3 norm = aNormal;
 
     if (uWave) {
-        // Same overlapping-sine ripple as phong.vert's ocean wave, so the
-        // shore water's geometry motion matches the deep ocean around it.
+
         float wx = pos.x * 0.9 + uTime * 1.6;
         float wz = pos.z * 0.7 + uTime * 1.1 + 1.3;
         float wd = (pos.x + pos.z) * 0.5 + uTime * 2.0;

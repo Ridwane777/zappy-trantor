@@ -6,10 +6,10 @@ uniform vec3  uSkyTop;
 uniform vec3  uSkyHorizon;
 uniform mat4  uInvViewProj;
 uniform vec3  uCamPos;
-uniform vec3  uSunDir;        // normalized, points FROM scene TO sun (world space)
-uniform vec3  uMoonDir;       // points FROM scene TO moon
-uniform float uSunStrength;   // 1 day, 0 night
-uniform float uMoonStrength;  // 0 day, 1 night
+uniform vec3  uSunDir;
+uniform vec3  uMoonDir;
+uniform float uSunStrength;
+uniform float uMoonStrength;
 
 out vec4 FragColor;
 
@@ -26,7 +26,6 @@ void main() {
     world /= world.w;
     vec3 rayDir = normalize(world.xyz - uCamPos);
 
-    // ── sun (fades out at night) ──
     float cosA   = dot(rayDir, uSunDir);
     float disc   = smoothstep(0.9985, 0.9998, cosA);
     float corona = smoothstep(0.975,  0.9985, cosA) * 0.55;
@@ -37,7 +36,6 @@ void main() {
     sky += glowColor * corona * uSunStrength;
     sky  = mix(sky, sunColor, disc * uSunStrength);
 
-    // ── moon halo (the disc itself is a 3D mesh; this is just the glow) ──
     float cosM  = dot(rayDir, uMoonDir);
     float mglow = smoothstep(0.93, 0.9985, cosM) * 0.28;
     sky += vec3(0.55, 0.62, 0.85) * mglow * uMoonStrength;

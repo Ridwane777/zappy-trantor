@@ -1,14 +1,4 @@
 #pragma once
-// Lien repo <-> CDN, en streaming RAM : un asset absent en local n'est PAS écrit
-// sur le disque — ses octets sont lus depuis le CDN public (R2) directement en
-// mémoire et passés au loader (loadFromMemory / parse depuis une string).
-//
-// Pour éviter le freeze + accélérer : un store mémoire thread-safe + un préfetch
-// PARALLÈLE. On télécharge tous les assets en parallèle (plusieurs curl en même
-// temps) dans le store au démarrage ; ensuite chaque loader lit le store en RAM,
-// instantané. Rien n'est jamais écrit sur le disque.
-//
-// URL de base configurable via la variable d'environnement ZAPPY_CDN_URL.
 
 #include <string>
 #include <cstdio>
@@ -42,14 +32,26 @@ inline std::unordered_map<std::string, std::string> &store()
     return s;
 }
 
-// Lecture brute : fichier local si présent, sinon stream depuis le CDN en RAM
-// (curl vers stdout), SANS écrire de fichier.
+inline bool localAssetsAvailable()
+{
+    static const bool ok = [] {
+        if (const char *f = std::getenv("ZAPPY_FORCE_CDN"); f && *f && *f != '0')
+            return false;
+        std::ifstream probe("assets/fonts/GAMEDAY.ttf", std::ios::binary);
+        return probe.good();
+    }();
+    return ok;
+}
+
 inline std::string fetchRaw(const std::string &path)
 {
     std::ifstream f(path, std::ios::binary);
     if (f.good())
         return std::string((std::istreambuf_iterator<char>(f)),
                             std::istreambuf_iterator<char>());
+
+    if (localAssetsAvailable())
+        return {};
 
     const std::string prefix = "assets/";
     if (path.rfind(prefix, 0) != 0)
@@ -69,10 +71,8 @@ inline std::string fetchRaw(const std::string &path)
         std::cerr << "[cdn] WARN: échec du chargement de " << rel << "\n";
     return out;
 }
-} // namespace detail
+}
 
-// Référence stable vers les octets de `path` (mis en cache RAM la 1re fois).
-// Stable car les références d'éléments d'unordered_map survivent au rehash.
 inline const std::string &assetBytesKept(const std::string &path)
 {
     auto &st = detail::store();
@@ -82,24 +82,20 @@ inline const std::string &assetBytesKept(const std::string &path)
         auto it = st.find(path);
         if (it != st.end()) return it->second;
     }
-    std::string data = detail::fetchRaw(path);     // hors lock (réseau)
-    if (data.empty()) {                            // NE PAS cacher un échec :
-        static const std::string empty;            // un appel ultérieur réessaiera
+    std::string data = detail::fetchRaw(path);
+    if (data.empty()) {
+        static const std::string empty;
         return empty;
     }
     std::lock_guard<std::mutex> lk(mx);
     return st.emplace(path, std::move(data)).first->second;
 }
 
-// Copie des octets de `path` (local ou CDN, caché en RAM). Vide si introuvable.
 inline std::string assetBytes(const std::string &path)
 {
     return assetBytesKept(path);
 }
 
-// NON-BLOQUANT : renvoie les octets seulement s'ils sont DÉJÀ en RAM (préfetchés),
-// sinon vide — ne déclenche jamais de téléchargement. Pour le thread principal
-// (ex. l'écran de chargement) qui ne doit jamais bloquer sur le réseau.
 inline std::string assetBytesIfCached(const std::string &path)
 {
     auto &st = detail::store();
@@ -108,10 +104,6 @@ inline std::string assetBytesIfCached(const std::string &path)
     return (it != st.end()) ? it->second : std::string();
 }
 
-// Télécharge `paths` EN PARALLÈLE dans le store RAM (`concurrency` curl à la
-// fois). `done` est incrémenté à chaque fichier terminé (pour une barre de
-// progression). Bloquant : à lancer sur un thread de fond pendant que le thread
-// principal anime l'écran de chargement et pompe les événements fenêtre.
 inline void prefetch(const std::vector<std::string> &paths,
                      std::atomic<size_t> *done, int concurrency = 12)
 {
@@ -119,8 +111,7 @@ inline void prefetch(const std::vector<std::string> &paths,
     auto worker = [&] {
         size_t i;
         while ((i = idx.fetch_add(1)) < paths.size()) {
-            // retry transient failures so the asset is REALLY cached before we
-            // report it done — otherwise the main thread re-streams it and freezes
+
             for (int tries = 0; tries < 4; ++tries)
                 if (!assetBytesKept(paths[i]).empty()) break;
             if (done) done->fetch_add(1);
@@ -132,4 +123,4 @@ inline void prefetch(const std::vector<std::string> &paths,
     for (auto &t : ts) t.join();
 }
 
-} // namespace zappy
+}

@@ -1,16 +1,14 @@
 #version 330 core
-// Same rippling-texture + sun-glitter look as the intro's water.frag, reused
-// here for the actual map's shore water (world-space UVs instead of a fixed
-// billboard quad, so it tiles correctly across every island).
+
 in vec3 vWorldPos;
 in vec3 vNormal;
 
 uniform sampler2D uTex;
 uniform float     uTime;
 uniform float     uAlpha;
-uniform vec2      uSunXZ;   // horizontal direction toward the sun
-uniform vec3      uSunCol;  // warm sun colour
-uniform vec3      uColor;   // base shore-water tint
+uniform vec2      uSunXZ;
+uniform vec3      uSunCol;
+uniform vec3      uColor;
 
 out vec4 FragColor;
 

@@ -15,7 +15,6 @@ using json = nlohmann::json;
 #include <cstdlib>
 #include <sys/stat.h>
 
-// Mesh is move-only (no default ctor), so store by unique_ptr.
 static std::unordered_map<std::string, std::unique_ptr<Mesh>> g_meshes;
 
 Mesh &getMesh(const std::string &model)
@@ -189,9 +188,9 @@ Mesh buildGroundMesh(const std::vector<Tile> &tiles, const std::string &groundTy
     return Mesh(verts, idx);
 }
 
-void drawMesh(Shader &toon, Shader & /*unused*/, Mesh &mesh,
+void drawMesh(Shader &toon, Shader & , Mesh &mesh,
               const glm::mat4 &model, const glm::mat3 &normalMat, const glm::vec3 &color,
-              const glm::mat4 & /*view*/, const glm::mat4 & /*proj*/,
+              const glm::mat4 & , const glm::mat4 & ,
               float elapsed, bool sway)
 {
     toon.use();

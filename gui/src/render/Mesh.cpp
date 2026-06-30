@@ -6,7 +6,7 @@
 Mesh::Mesh(const std::vector<float>& verts, const std::vector<unsigned int>& indices)
     : indexCount((int)indices.size())
 {
-    // Stride: 9 floats (pos + normal + vertColor) or 6 floats (pos + normal)
+
     const int stride = ((int)verts.size() % 9 == 0 && (int)verts.size() % 6 != 0)
                        ? 9 : 6;
     _stride = stride;
@@ -57,15 +57,12 @@ Mesh::Mesh(const std::vector<float>& verts, const std::vector<unsigned int>& ind
 
     GLsizei byteStride = stride * sizeof(float);
 
-    // Position: layout 0, vec3
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, byteStride, (void*)0);
     glEnableVertexAttribArray(0);
 
-    // Normal: layout 1, vec3
     glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, byteStride, (void*)(3*sizeof(float)));
     glEnableVertexAttribArray(1);
 
-    // Vertex color: layout 2, vec3 (only present when stride==9)
     if (stride == 9) {
         glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, byteStride, (void*)(6*sizeof(float)));
         glEnableVertexAttribArray(2);

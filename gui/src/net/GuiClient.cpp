@@ -9,7 +9,6 @@
 #include <cstring>
 #include <sstream>
 
-// Parse a player/egg id token, tolerating an optional leading '#'.
 static int parseId(const std::string &tok)
 {
     if (!tok.empty() && tok[0] == '#')
@@ -56,7 +55,7 @@ void GuiClient::send(const std::string &line)
     std::string out = line;
     out.push_back('\n');
     ssize_t n = ::write(_fd, out.data(), out.size());
-    (void)n;   // best-effort; non-blocking, GUI requests are idempotent
+    (void)n;
 
     _state.rawFeed.push_back(">> " + line);
     if (_state.rawFeed.size() > 200)
@@ -83,7 +82,6 @@ bool GuiClient::connect(const std::string &host, int port, std::string &err)
         return false;
     }
 
-    // bound handshake timeout so a wrong host/port can't hang the menu
     struct timeval tv{};
     tv.tv_sec = 5;
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
@@ -155,17 +153,27 @@ void GuiClient::poll()
         return;
     }
 
+    static const int MAX_LINES = 3000;
+    int processed = 0;
     std::size_t nl;
-    while ((nl = _readBuf.find('\n')) != std::string::npos) {
+    while (processed < MAX_LINES &&
+           (nl = _readBuf.find('\n')) != std::string::npos) {
         std::string line = _readBuf.substr(0, nl);
         _readBuf.erase(0, nl + 1);
         if (!line.empty() && line.back() == '\r')
             line.pop_back();
         if (!line.empty()) {
-            _state.rawFeed.push_back("<< " + line);
-            if (_state.rawFeed.size() > 200)
-                _state.rawFeed.pop_front();
+
+            bool isHF = (line.size() >= 3 &&
+                        ((line[0]=='b' && line[1]=='c' && line[2]=='t') ||
+                         (line[0]=='p' && line[1]=='p' && line[2]=='o')));
+            if (!isHF) {
+                _state.rawFeed.push_back("<< " + line);
+                if (_state.rawFeed.size() > 200)
+                    _state.rawFeed.pop_front();
+            }
             _processLine(line);
+            ++processed;
         }
     }
 }
@@ -202,6 +210,7 @@ void GuiClient::_processLine(const std::string &line)
             GuiTile &t = _state.tileAt(x, y);
             for (int i = 0; i < GUI_RES_COUNT; ++i)
                 iss >> t.res[i];
+            _state.resDirty = true;
         }
 
     } else if (cmd == "pnw") {
@@ -258,7 +267,7 @@ void GuiClient::_processLine(const std::string &line)
         std::string idTok;
         if (iss >> idTok) {
             int id = parseId(idTok);
-            _logEvent(id, "died", 2);   // log before erasing so the team name is still available
+            _logEvent(id, "died", 2);
             _state.players.erase(id);
         }
 

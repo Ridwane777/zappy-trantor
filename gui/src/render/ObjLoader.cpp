@@ -11,8 +11,6 @@
 #include <stdexcept>
 #include <cmath>
 
-// Interleave pos + normal into flat float buffer and build index list.
-// Keyed by (pos_idx, nrm_idx) pair.
 struct VertKey {
     int pi, ni;
     bool operator==(const VertKey& o) const { return pi==o.pi && ni==o.ni; }
@@ -24,16 +22,15 @@ struct VertKeyHash {
 };
 
 Mesh ObjLoader::load(const std::string& path) {
-    std::string src = zappy::assetBytes(path);   // local or streamed from CDN (no disk write)
+    std::string src = zappy::assetBytes(path);
     if (src.empty())
         throw GUIException("ObjLoader: cannot open " + path);
     std::istringstream file(src);
 
     std::vector<std::array<float,3>> positions;
     std::vector<std::array<float,3>> normals;
-    std::vector<std::array<float,3>> vertColors;  // per-vertex RGB baked color (optional)
+    std::vector<std::array<float,3>> vertColors;
 
-    // Parsed face corners: (pos_idx, nrm_idx)  — -1 means absent
     struct FaceCorner { int pi, ni; };
     std::vector<std::array<FaceCorner,3>> faces;
 
@@ -55,12 +52,12 @@ Mesh ObjLoader::load(const std::string& path) {
             ss >> x >> y >> z;
             normals.push_back({x, y, z});
         } else if (token == "f") {
-            // Collect all corners in this face polygon
+
             std::vector<FaceCorner> polygon;
             std::string cornerStr;
             while (ss >> cornerStr) {
                 FaceCorner fc{-1, -1};
-                // Formats: v, v//vn, v/vt/vn, v/vt
+
                 auto p1 = cornerStr.find('/');
                 if (p1 == std::string::npos) {
                     fc.pi = std::stoi(cornerStr) - 1;
@@ -68,7 +65,7 @@ Mesh ObjLoader::load(const std::string& path) {
                     fc.pi = std::stoi(cornerStr.substr(0, p1)) - 1;
                     auto p2 = cornerStr.find('/', p1+1);
                     if (p2 == std::string::npos) {
-                        // v/vt — no normal
+
                     } else {
                         std::string nStr = cornerStr.substr(p2+1);
                         if (!nStr.empty()) {
@@ -78,17 +75,16 @@ Mesh ObjLoader::load(const std::string& path) {
                 }
                 polygon.push_back(fc);
             }
-            // Fan triangulate
+
             for (size_t i = 1; i + 1 < polygon.size(); ++i) {
                 faces.push_back({polygon[0], polygon[i], polygon[i+1]});
             }
         }
     }
 
-    // If no normals were supplied, compute face normals
     bool computeNormals = normals.empty();
     if (computeNormals) {
-        // Compute per-face normals and assign to each corner
+
         normals.resize(faces.size());
         for (size_t fi = 0; fi < faces.size(); ++fi) {
             auto& f = faces[fi];
@@ -107,12 +103,10 @@ Mesh ObjLoader::load(const std::string& path) {
         }
     }
 
-    // Detect whether vertex colors were baked in (all non-white = real colors)
     bool hasVCol = false;
     for (auto& c : vertColors)
         if (c[0] < 0.999f || c[1] < 0.999f || c[2] < 0.999f) { hasVCol = true; break; }
 
-    // Build interleaved vertex buffer (stride 9 with colors, 6 without)
     const int stride = hasVCol ? 9 : 6;
     std::vector<float>        verts;
     std::vector<unsigned int> indices;
@@ -145,7 +139,7 @@ Mesh ObjLoader::load(const std::string& path) {
     }
 
     if (verts.empty()) {
-        // Return a minimal dummy mesh
+
         verts   = {0,0,0, 0,1,0, 1,0,0, 0,1,0, 0,0,1, 0,1,0};
         indices = {0,1,2};
     }

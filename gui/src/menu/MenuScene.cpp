@@ -22,17 +22,15 @@
 
 namespace {
 
-// fallback to procedural block if missing so the menu always renders
 const char *LOGO_PATH = "assets/screen/zappy_logo.obj";
 const char *LOGO_TEX  = "assets/screen/zappy_logo.png";
 
-// UV sphere, interleaved pos+normal (stride 6).
 Mesh buildSphere(float radius, int segs, int rings)
 {
     std::vector<float>        v;
     std::vector<unsigned int> idx;
     for (int i = 0; i <= rings; ++i) {
-        float phi = float(M_PI) * float(i) / float(rings);     // 0..pi
+        float phi = float(M_PI) * float(i) / float(rings);
         float y   = std::cos(phi);
         float r   = std::sin(phi);
         for (int j = 0; j <= segs; ++j) {
@@ -65,12 +63,12 @@ Mesh buildPlaceholderLogo()
     };
     glm::vec3 p000(-x, -y, -z), p001(-x, -y, z), p010(-x, y, -z), p011(-x, y, z);
     glm::vec3 p100(x, -y, -z),  p101(x, -y, z),  p110(x, y, -z),  p111(x, y, z);
-    quad(p001, p101, p111, p011, {0, 0, 1});    // front
-    quad(p100, p000, p010, p110, {0, 0, -1});   // back
-    quad(p011, p111, p110, p010, {0, 1, 0});    // top
-    quad(p000, p100, p101, p001, {0, -1, 0});   // bottom
-    quad(p101, p100, p110, p111, {1, 0, 0});    // right
-    quad(p000, p001, p011, p010, {-1, 0, 0});   // left
+    quad(p001, p101, p111, p011, {0, 0, 1});
+    quad(p100, p000, p010, p110, {0, 0, -1});
+    quad(p011, p111, p110, p010, {0, 1, 0});
+    quad(p000, p100, p101, p001, {0, -1, 0});
+    quad(p101, p100, p110, p111, {1, 0, 0});
+    quad(p000, p001, p011, p010, {-1, 0, 0});
     return Mesh(v, idx);
 }
 
@@ -80,7 +78,7 @@ struct Particle {
     glm::vec3 pos, vel;
     float life, maxLife, size;
     glm::vec3 color;
-    float phase, twFreq;   // per-mote twinkle phase + frequency (uncanny flicker)
+    float phase, twFreq;
 };
 
 static void drawGradientRect(sf::RenderWindow &w, float x, float y, float ww, float hh,
@@ -96,7 +94,7 @@ static void drawGradientRect(sf::RenderWindow &w, float x, float y, float ww, fl
 
 struct Button {
     sf::Vector2f size;
-    sf::Vector2f pos;          // top-left
+    sf::Vector2f pos;
     sf::Text     label;
     bool hovered = false;
 
@@ -146,7 +144,6 @@ struct Button {
         outline.setOutlineColor(hovered ? sf::Color(180, 215, 255) : sf::Color(90, 110, 150));
         w.draw(outline);
 
-        // embossed label: dark shadow offset + bright text on top
         sf::Vector2f lp = label.getPosition();
         label.setPosition(lp.x + 1.5f, lp.y + 1.5f);
         label.setFillColor(sf::Color(0, 0, 0, 160));
@@ -234,7 +231,7 @@ void setPhongDefaults(Shader &sh)
     sh.setFloat("uAlpha", 1.f);
 }
 
-} // namespace
+}
 
 bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,
              MenuConfig &out)
@@ -254,7 +251,7 @@ bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,
         phoenixMesh.loadTexture("assets/screen/phoenix/textures/MatI_Ride_FengHuang_01a_baseColor.png");
         havePhoenix = true;
     } catch (const std::exception &e) { std::cerr << "Phoenix load: " << e.what() << "\n"; }
-    float phoenixTimer  = 27.f;   // first flyby ~3 s after logo appears
+    float phoenixTimer  = 27.f;
     bool  phoenixFlying = false;
     float phoenixProg   = 0.f;
 
@@ -350,7 +347,7 @@ bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,
         logoCenter = useTexLogo ? texLogo->centroid() : plainLogo->centroid();
     }
 
-    const glm::vec3 LOGO_POS(0.f, 1.6f, 0.f);   // above the reflection plane y=0
+    const glm::vec3 LOGO_POS(0.f, 1.6f, 0.f);
     const float     LIGHT_START_Y = 4.6f;
     const float     IMPACT_Y      = LOGO_POS.y;
 
@@ -400,10 +397,10 @@ bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,
     bool fullscreen = false;
 
     bool showParams = false;
-    int  focusField = -1;   // 0 = host, 1 = port
+    int  focusField = -1;
     float camYaw   = 0.f;
     float camPitch = 0.18f;
-    // scene stays fixed; dragging spins only the logo so the backdrop feels like a diorama
+
     float logoYaw   = 0.f;
     float logoPitch = 0.f;
     float camDist  = 9.0f;
@@ -427,26 +424,25 @@ bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,
             p.vel = dir * speed;
             p.maxLife = frand(0.8f, 1.8f);
             p.life = p.maxLife;
-            p.size = frand(0.015f, 0.06f);             // small motes of light
-            p.color = glm::mix(glm::vec3(0.45f, 0.70f, 1.0f),   // blue
-                               glm::vec3(0.90f, 0.95f, 1.0f),   // near-white
+            p.size = frand(0.015f, 0.06f);
+            p.color = glm::mix(glm::vec3(0.45f, 0.70f, 1.0f),
+                               glm::vec3(0.90f, 0.95f, 1.0f),
                                frand(0.f, 1.f));
-            p.phase  = frand(0.f, 6.2832f);            // random twinkle phase
-            p.twFreq = frand(10.f, 26.f);              // irregular flicker rates
+            p.phase  = frand(0.f, 6.2832f);
+            p.twFreq = frand(10.f, 26.f);
             particles.push_back(p);
         }
     };
 
-    // ── intro audio: music bed + per-phase cues (missing files are silent) ──────
     AudioManager audio;
     audio.init("assets/audio");
-    audio.playMusic("intro", false, 32.f);     // quiet bed so the star effects carry
-    audio.playLoop("sparkle", 0.f);            // starts silent on window open, swells with the fall
-    int lastBounce = -1;                        // tracks floor contacts during FLOATING
+    audio.playMusic("intro", false, 32.f);
+    audio.playLoop("sparkle", 0.f);
+    int lastBounce = -1;
 
     while (window.isOpen()) {
         float dt = clock.restart().asSeconds();
-        if (dt > 0.05f) dt = 0.05f;            // clamp big hitches (asset load)
+        if (dt > 0.05f) dt = 0.05f;
         phaseT += dt;
         animT  += dt;
 
@@ -466,7 +462,7 @@ bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,
             }
             if (ev.type == sf::Event::Resized) {
                 glViewport(0, 0, ev.size.width, ev.size.height);
-                // SFML 2D view doesn't track WM-driven resizes; reset or UI drifts
+
                 window.setView(sf::View(sf::FloatRect(0.f, 0.f,
                     (float)ev.size.width, (float)ev.size.height)));
             }
@@ -523,7 +519,7 @@ bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,
             if (ev.type == sf::Event::TextEntered && showParams && focusField >= 0) {
                 std::string &f = (focusField == 0) ? hostStr : portStr;
                 char c = static_cast<char>(ev.text.unicode);
-                if (ev.text.unicode == 8) {                 // backspace
+                if (ev.text.unicode == 8) {
                     if (!f.empty()) f.pop_back();
                 } else if (ev.text.unicode >= 32 && ev.text.unicode < 127) {
                     if (focusField == 1) {
@@ -552,7 +548,7 @@ bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,
             float decay  = 1.f - std::min(phaseT / FLOAT_DUR, 1.f);
             float bounce = std::fabs(std::sin(phaseT * 5.5f)) * 0.6f * decay;
             lightY = IMPACT_Y + bounce;
-            // each time the light returns to the floor (|sin| hits 0) -> a bounce sfx
+
             int bIdx = (int)(phaseT * 5.5f / 3.14159265f);
             if (bIdx != lastBounce) {
                 lastBounce = bIdx;
@@ -587,7 +583,7 @@ bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,
         particles.erase(std::remove_if(particles.begin(), particles.end(),
             [](const Particle &p) { return p.life <= 0.f; }), particles.end());
         flashStr = std::max(0.f, flashStr - dt * 2.0f);
-        flash2D  = std::max(0.f, flash2D  - dt * 0.667f);   // ~1.5 s fade
+        flash2D  = std::max(0.f, flash2D  - dt * 0.667f);
 
         sf::Vector2u ws = window.getSize();
         float aspect = (ws.y > 0) ? float(ws.x) / float(ws.y) : 1.7f;
@@ -825,7 +821,7 @@ bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,
             glBindVertexArray(glowVAO);
             for (auto &p : fireflies) {
                 float s  = 0.5f + 0.5f * std::sin(animT * p.twFreq + p.phase);
-                float tw = 0.15f + 0.85f * s * s * s;   // firefly blink: mostly off, soft peak
+                float tw = 0.15f + 0.85f * s * s * s;
                 starShader.setVec3 ("uCenter", p.pos.x, p.pos.y, p.pos.z);
                 starShader.setFloat("uSize",   p.size * 2.2f);
                 starShader.setVec3 ("uColor",  p.color.r, p.color.g, p.color.b);
@@ -914,7 +910,6 @@ bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,
 
         window.resetGLStates();
 
-        // sqrt curve holds the flash bright initially then fades over ~4 s
         if (flash2D > 0.001f) {
             sf::RectangleShape flash(sf::Vector2f((float)ws.x, (float)ws.y));
             float f = std::sqrt(std::min(1.f, flash2D));
@@ -1003,7 +998,7 @@ void drawLoadingScreen(sf::RenderWindow &window, sf::Font &font,
     while (window.pollEvent(ev)) {
         if (ev.type == sf::Event::Closed)
             window.close();
-        // SFML 2D view doesn't track WM-driven resizes; reset or progress bar drifts
+
         if (ev.type == sf::Event::Resized) {
             glViewport(0, 0, ev.size.width, ev.size.height);
             window.setView(sf::View(sf::FloatRect(0.f, 0.f,
@@ -1023,7 +1018,7 @@ void drawLoadingScreen(sf::RenderWindow &window, sf::Font &font,
 
     static sf::Texture bgTex;
     static bool bgLoaded = false;
-    if (!bgLoaded) {   // picks up the image only once the prefetch has completed
+    if (!bgLoaded) {
         std::string b = zappy::assetBytesIfCached("assets/screen/loading_bg.png");
         if (!b.empty() && bgTex.loadFromMemory(b.data(), b.size())) {
             bgTex.setSmooth(true);
@@ -1095,12 +1090,12 @@ void drawLoadingScreen(sf::RenderWindow &window, sf::Font &font,
     window.display();
 }
 
-static float g_loadShown = 0.f;   // persisted across calls so progress bar transitions are smooth
+static float g_loadShown = 0.f;
 
 void advanceLoadingTo(sf::RenderWindow &window, sf::Font &font,
                       float target, const std::string &status, float duration)
 {
-    if (target < g_loadShown)   // new loading sequence — restart from 0
+    if (target < g_loadShown)
         g_loadShown = 0.f;
     if (target > 1.f) target = 1.f;
 
@@ -1109,7 +1104,7 @@ void advanceLoadingTo(sf::RenderWindow &window, sf::Font &font,
     while (window.isOpen()) {
         float t = (duration > 0.f) ? clock.getElapsedTime().asSeconds() / duration : 1.f;
         if (t >= 1.f) t = 1.f;
-        float e = t * t * (3.f - 2.f * t);   // smoothstep
+        float e = t * t * (3.f - 2.f * t);
         g_loadShown = start + (target - start) * e;
         drawLoadingScreen(window, font, g_loadShown, status);
         if (t >= 1.f) break;

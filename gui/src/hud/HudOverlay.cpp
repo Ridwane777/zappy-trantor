@@ -19,18 +19,22 @@ bool HudOverlay::handleClick(sf::Vector2i mouse)
 {
     for (const auto &h : _hits) {
         if (!h.rect.contains((float)mouse.x, (float)mouse.y)) continue;
-        if (h.kind == 4) {                                // fullscreen icon
+        if (h.kind == 4) {
             _fullscreenClicked = true;
             return true;
         }
-        if (h.kind == 2)                                  // toggle tab
+        if (h.kind == 5) {
+            _settingsClicked = true;
+            return true;
+        }
+        if (h.kind == 2)
             _open = !_open;
-        else if (h.kind == 0) {                           // team header
+        else if (h.kind == 0) {
             _selTeam = (_selTeam == h.team) ? std::string() : h.team;
             _selPlayer = -1;
-        } else if (h.kind == 1)                           // player row
+        } else if (h.kind == 1)
             _selPlayer = (_selPlayer == h.pid) ? -1 : h.pid;
-        return true;                                      // kind 3 (panel) also consumes
+        return true;
     }
     return false;
 }
@@ -39,6 +43,13 @@ bool HudOverlay::consumeFullscreenClick()
 {
     bool c = _fullscreenClicked;
     _fullscreenClicked = false;
+    return c;
+}
+
+bool HudOverlay::consumeSettingsClick()
+{
+    bool c = _settingsClicked;
+    _settingsClicked = false;
     return c;
 }
 
@@ -54,7 +65,7 @@ int HudOverlay::inventoryPollTarget(float dt)
 
 bool HudOverlay::handleScroll(sf::Vector2i mouse, float wheelDelta)
 {
-    if (_anim < 0.5f || (float)mouse.x < _panelX)   // only when over the open panel
+    if (_anim < 0.5f || (float)mouse.x < _panelX)
         return false;
     _scroll = std::min(std::max(_scroll - wheelDelta * 34.f, 0.f), _maxScroll);
     return true;
@@ -69,24 +80,32 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
     _hits.clear();
 
     {
-        const float fsSize = 16.f, fsPad = 12.f;
-        sf::RectangleShape fsIcon(sf::Vector2f(fsSize, fsSize));
-        fsIcon.setPosition(fsPad, fsPad);
+        const float iconSz = 16.f, pad = 12.f, gap = 8.f;
+
+        sf::RectangleShape fsIcon(sf::Vector2f(iconSz, iconSz));
+        fsIcon.setPosition(pad, pad);
         fsIcon.setFillColor(sf::Color::Transparent);
         fsIcon.setOutlineColor(sf::Color(220, 228, 240, 210));
         fsIcon.setOutlineThickness(1.6f);
         win.draw(fsIcon);
-        _hits.push_back({sf::FloatRect(fsPad - 4.f, fsPad - 4.f, fsSize + 8.f, fsSize + 8.f),
+        _hits.push_back({sf::FloatRect(pad - 4.f, pad - 4.f, iconSz + 8.f, iconSz + 8.f),
                          4, "", -1});
-    }
 
-    sf::Text hint;
-    hint.setFont(font);
-    hint.setString("Drag: orbit   Scroll: zoom   R: reset");
-    hint.setCharacterSize(18);
-    hint.setFillColor(sf::Color(220, 220, 220, 160));
-    hint.setPosition(14.f, 38.f);
-    win.draw(hint);
+        float gx = pad + iconSz + gap;
+        sf::RectangleShape gearOuter(sf::Vector2f(iconSz, iconSz));
+        gearOuter.setPosition(gx, pad);
+        gearOuter.setFillColor(sf::Color(30, 36, 50, 200));
+        gearOuter.setOutlineColor(sf::Color(170, 195, 230, 210));
+        gearOuter.setOutlineThickness(1.6f);
+        win.draw(gearOuter);
+
+        sf::RectangleShape gearInner(sf::Vector2f(6.f, 6.f));
+        gearInner.setPosition(gx + 5.f, pad + 5.f);
+        gearInner.setFillColor(sf::Color(170, 195, 230, 200));
+        win.draw(gearInner);
+        _hits.push_back({sf::FloatRect(gx - 4.f, pad - 4.f, iconSz + 8.f, iconSz + 8.f),
+                         5, "", -1});
+    }
 
     sf::Text info;
     info.setFont(font);
@@ -161,8 +180,6 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
             win.draw(ev);
             y += 38.f;
 
-            // Server <-> client raw protocol traffic, inside the EVENTS section,
-            // as two separate feeds (not just two colors of the same list).
             auto drawFeed = [&](const char *label, const char *prefix,
                                  sf::Color color, int maxLines) {
                 sf::Text lbl; lbl.setFont(font); lbl.setString(label);
@@ -183,7 +200,7 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
                 bg.setFillColor(sf::Color(0, 0, 0, 110));
                 win.draw(bg);
                 for (int k = 0; k < shown; ++k) {
-                    const std::string &raw = *matches[shown - 1 - k];   // oldest first
+                    const std::string &raw = *matches[shown - 1 - k];
                     sf::Text lt; lt.setFont(font);
                     lt.setString(raw.size() > 30 ? raw.substr(0, 27) + "..." : raw);
                     lt.setCharacterSize(11);
@@ -302,7 +319,7 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
         } else if (_selPlayer >= 0) {
             _selPlayer = -1;
         }
-        // panel background catch-all (last so row hits take priority)
+
         _hits.push_back({sf::FloatRect(panelX, 0.f, WIDTH, (float)ws.y), 3, "", -1});
     }
 

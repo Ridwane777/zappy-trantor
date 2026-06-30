@@ -2,11 +2,6 @@
 #include <X11/Xlib.h>
 #include <X11/Xatom.h>
 
-// Demande au window manager de (dé)maximiser la fenêtre — le même effet que
-// cliquer sur le bouton "agrandir/restaurer" d'une barre de titre. On envoie
-// un ClientMessage _NET_WM_STATE avec les deux atomes MAXIMIZED_VERT/HORZ à
-// la racine. Le WM redimensionne la fenêtre existante (décoration conservée) :
-// le contexte GL n'est PAS recréé.
 void setWindowFullscreen(unsigned long x11Window, bool on)
 {
     Display* d = XOpenDisplay(nullptr);
@@ -21,10 +16,10 @@ void setWindowFullscreen(unsigned long x11Window, bool on)
     e.xclient.window       = (Window)x11Window;
     e.xclient.message_type = wmState;
     e.xclient.format       = 32;
-    e.xclient.data.l[0]    = on ? 1 : 0;       // 1 = _NET_WM_STATE_ADD, 0 = _REMOVE
+    e.xclient.data.l[0]    = on ? 1 : 0;
     e.xclient.data.l[1]    = (long)maxVert;
     e.xclient.data.l[2]    = (long)maxHorz;
-    e.xclient.data.l[3]    = 1;                 // source : application normale
+    e.xclient.data.l[3]    = 1;
 
     XSendEvent(d, DefaultRootWindow(d), False,
                SubstructureNotifyMask | SubstructureRedirectMask, &e);

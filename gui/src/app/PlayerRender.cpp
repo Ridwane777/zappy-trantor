@@ -9,6 +9,7 @@
 #include "hud/HudOverlay.hpp"
 #include "app/Constellation.hpp"
 #include "app/Particle.hpp"
+#include "app/Frustum.hpp"
 #include "audio/AudioManager.hpp"
 
 #include <algorithm>
@@ -55,7 +56,7 @@ static float scaleOf(PlayerRenderCtx& ctx, int level) {
 }
 
 static glm::mat4 playerModel(PlayerRenderCtx& ctx, const GuiPlayer& p) {
-    glm::vec2 w = ctx.playerAnims[p.id].curWorld;     // smooth-interpolated
+    glm::vec2 w = ctx.playerAnims[p.id].curWorld;
     glm::mat4 M = glm::translate(glm::mat4(1.f), {w.x, 0.f, w.y});
     M = glm::rotate(M, glm::radians(orientationYaw(p.orientation)), {0.f,1.f,0.f});
     M = glm::scale(M, glm::vec3(scaleOf(ctx, p.level)));
@@ -66,7 +67,7 @@ static void updatePlayerStates(PlayerRenderCtx& ctx,
                                const std::vector<const GuiPlayer*>& drawList,
                                float dt) {
     const float MOVE_DUR = 0.50f;
-    // smaller WALK_CYCLE_DIST = legs cycle faster / more steps per tile; override via env
+
     static const float WALK_CYCLE_DIST = std::getenv("ZAPPY_STRIDE")
         ? std::max(0.2f, (float)std::atof(std::getenv("ZAPPY_STRIDE"))) : TILE;
     for (const GuiPlayer* pp : drawList) {
@@ -80,7 +81,7 @@ static void updatePlayerStates(PlayerRenderCtx& ctx,
             const GuiState& gs2 = ctx.netClient.state();
             int W = gs2.sizeKnown ? gs2.width : ctx.map.w;
             int H = gs2.sizeKnown ? gs2.height : ctx.map.h;
-            // torus map: large coord delta means wrapping — snap rather than glide
+
             bool wrap = std::abs(p.x - pa.px) > W / 2 ||
                         std::abs(p.y - pa.py) > H / 2;
             bool snap = wrap || const_cast<GuiPlayer&>(p).ejected;
@@ -95,7 +96,7 @@ static void updatePlayerStates(PlayerRenderCtx& ctx,
         if (!frozen && p.orientation != pa.po) {
             if (pa.po != -1) {
                 int diff = (p.orientation - pa.po + 4) % 4;
-                pa.turnAnim = (diff == 3) ? 3 : 4;   // CCW=left, else right
+                pa.turnAnim = (diff == 3) ? 3 : 4;
                 pa.turnT = 0.4f;
             }
             pa.po = p.orientation;
@@ -103,7 +104,7 @@ static void updatePlayerStates(PlayerRenderCtx& ctx,
         glm::vec2 beforeC = pa.curWorld;
         if (!frozen) {
             pa.moveLerp = std::min(1.f, pa.moveLerp + dt / MOVE_DUR);
-            float sm = pa.moveLerp * pa.moveLerp * (3.f - 2.f * pa.moveLerp);  // smoothstep
+            float sm = pa.moveLerp * pa.moveLerp * (3.f - 2.f * pa.moveLerp);
             pa.curWorld = glm::mix(pa.prevWorld, target, sm);
         }
         pa.moveT = std::max(0.f, pa.moveT - dt);
@@ -121,7 +122,7 @@ static void updatePlayerStates(PlayerRenderCtx& ctx,
         }
         pa.blendT = std::max(0.f, pa.blendT - dt);
         pa.anim = a;
-        // sync walk animation to ground distance to prevent foot sliding
+
         if (a == 1) {
             float frameDist = glm::length(pa.curWorld - beforeC);
             float cyc = ctx.tiers[tierOf(ctx.tiers, p.level)].mesh.animDuration(1);
@@ -132,7 +133,7 @@ static void updatePlayerStates(PlayerRenderCtx& ctx,
         if (p.level != pa.prevLevel) {
             if (pa.prevLevel >= 0 && p.level >= 1) {
                 pa.evoT = ctx.evoDur;
-                pa.freezeT = ctx.evoDur;   // hold still for the level-up anim
+                pa.freezeT = ctx.evoDur;
                 ctx.gameAudio.play(pa.prevLevel == 0 ? "hatch" : "levelup", 90.f);
                 float wx = pa.curWorld.x, wz = pa.curWorld.y;
                 for (int i = 0; i < 30; ++i) {
@@ -165,6 +166,12 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
                              float nightF, float elapsed, float dt) {
     glm::mat4 pBones[MAX_BONES];
 
+    const Frustum frustum = Frustum::fromVP(proj * view);
+    const float CULL_R = TILE * 2.0f;
+    auto cullW = [&](const glm::vec2& w) {
+        return !frustum.sphereVisible(glm::vec3(w.x, 0.5f, w.y), CULL_R);
+    };
+
     skinShader.use();
     skinShader.setMat4("uView", glm::value_ptr(view));
     skinShader.setMat4("uProj", glm::value_ptr(proj));
@@ -192,7 +199,8 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
     skinShader.setBool ("uMultiColor",     false);
     for (const GuiPlayer* pp : drawList) {
         const GuiPlayer& p = *pp;
-        if (p.level == 0) continue;   // unhatched egg drawn separately below
+        if (p.level == 0) continue;
+        if (cullW(ctx.playerAnims[p.id].curWorld)) continue;
         SkinnedMesh& m = ctx.tiers[tierOf(ctx.tiers, p.level)].mesh;
         static const float ANIM_BLEND_DUR = 0.18f;
         const PlayerAnim& pa2 = ctx.playerAnims[p.id];
@@ -215,7 +223,7 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
     if (ctx.adminMode && ctx.haveMew) {
         ctx.mewMesh.computeBones(0, ctx.mewAnimTime, pBones, true, false);
         skinShader.setMat4Array("uBones[0]", MAX_BONES, glm::value_ptr(pBones[0]));
-        // bigger bounce when idle, reduced while moving to avoid fighting the travel motion
+
         float bobAmp = ctx.mewMoving ? 0.12f : 0.32f;
         float by = ctx.mewPos.y + std::sin(elapsed * 2.2f) * bobAmp;
         glm::mat4 M = glm::translate(glm::mat4(1.f), glm::vec3(ctx.mewPos.x, by, ctx.mewPos.z));
@@ -230,7 +238,7 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
     if (ctx.haveCharz) {
         ctx.charzMesh.computeBones(ctx.charzAnimIdx, ctx.charzAnimTime, pBones, true, false, ctx.charzStripRoot);
         skinShader.setMat4Array("uBones[0]", MAX_BONES, glm::value_ptr(pBones[0]));
-        // reset shader uniforms — previous player pass leaves wrong state
+
         skinShader.setBool ("uUseTexture",     true);
         skinShader.setBool ("uAlphaCutout",    false);
         skinShader.setInt  ("uTexture",        0);
@@ -238,8 +246,7 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
         skinShader.setBool ("uMultiColor",     false);
         skinShader.setBool ("uEmissive",       false);
         skinShader.setBool ("uCrystal",        false);
-        // Lower, so the directional diffuse shapes the body instead of the flat
-        // warm ambient washing this grey/cream skin out to a uniform tan.
+
         skinShader.setFloat("uAmbientStrength",0.32f * ambScale);
         skinShader.setFloat("uShininess",      24.f);
         skinShader.setFloat("uAlpha",          1.f);
@@ -250,7 +257,7 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
         float by = ctx.charzPos.y + std::sin(elapsed * 1.6f) * ctx.charzBobAmp;
         glm::mat4 M = glm::translate(glm::mat4(1.f), glm::vec3(ctx.charzPos.x, by, ctx.charzPos.z));
         M = glm::rotate(M, ctx.charzYaw, glm::vec3(0, 1, 0));
-        M = glm::rotate(M, glm::radians(90.f), glm::vec3(1, 0, 0));  // GLB is Z-up
+        M = glm::rotate(M, glm::radians(90.f), glm::vec3(1, 0, 0));
         M = glm::scale(M, glm::vec3(ctx.charzScale));
         glm::mat3 N3 = glm::mat3(glm::transpose(glm::inverse(M)));
         skinShader.setMat4("uModel",     glm::value_ptr(M));
@@ -269,7 +276,7 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
         skinShader.setMat4 ("uModel",           glm::value_ptr(M));
         skinShader.setMat3 ("uNormalMat",       glm::value_ptr(N3));
         skinShader.setBool ("uUseTexture",      true);
-        skinShader.setFloat("uAmbientStrength", 1.5f);   // self-lit moon
+        skinShader.setFloat("uAmbientStrength", 1.5f);
         skinShader.setVec3 ("uDirLightColor",   0.f, 0.f, 0.f);
         skinShader.setFloat("uAlpha",           nightF);
         glEnable(GL_BLEND);
@@ -334,6 +341,7 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
             const GuiPlayer& p = *pp;
             if (p.level != 0) continue;
             glm::vec2 ew = ctx.playerAnims[p.id].curWorld;
+            if (cullW(ew)) continue;
             float wx  = ew.x;
             float wz  = ew.y;
             float wob = std::sin(elapsed * 3.f + p.id) * 0.06f;
@@ -358,6 +366,7 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
                 const GuiEgg& egg = kv.second;
                 float wx = (insetT + (egg.x + 0.5f) * landX / W) * TILE;
                 float wz = (insetT + (egg.y + 0.5f) * landY / H) * TILE;
+                if (cullW({wx, wz})) continue;
                 float wob = std::sin(elapsed * 3.f + egg.id) * 0.06f;
                 glm::mat4 M = glm::translate(glm::mat4(1.f), {wx, es * r, wz});
                 M = glm::rotate(M, wob, {0.f, 0.f, 1.f});
@@ -385,8 +394,10 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
     for (const GuiPlayer* pp : drawList) {
         const GuiPlayer& p = *pp;
         if (p.level == 0) continue;
-        glm::vec3 base = (p.level % 2 == 1) ? glm::vec3(0.60f, 0.20f, 1.0f)   // odd → purple
-                                            : glm::vec3(1.0f, 1.0f, 1.0f);    // even → white
+        glm::vec2 rw0 = ctx.playerAnims[p.id].curWorld;
+        if (cullW(rw0)) continue;
+        glm::vec3 base = (p.level % 2 == 1) ? glm::vec3(0.60f, 0.20f, 1.0f)
+                                            : glm::vec3(1.0f, 1.0f, 1.0f);
         glm::vec3 col = base * ringPulse;
         glm::vec2 rw = ctx.playerAnims[p.id].curWorld;
         float wx = rw.x;
@@ -417,7 +428,7 @@ static void drawPlayerPasses(PlayerRenderCtx& ctx,
         PlayerAnim& pa = ctx.playerAnims[p.id];
         if (pa.evoT <= 0.f || p.level < 1) continue;
         float e    = 1.f - pa.evoT / ctx.evoDur;
-        float glow = std::sin(e * 3.14159f);   // peak at mid-effect
+        float glow = std::sin(e * 3.14159f);
         SkinnedMesh& m = ctx.tiers[tierOf(ctx.tiers, p.level)].mesh;
         m.computeBones(0, pa.animTime, pBones, true, false);
         auraShader.setMat4Array("uBones[0]", MAX_BONES, glm::value_ptr(pBones[0]));

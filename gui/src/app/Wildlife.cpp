@@ -13,7 +13,7 @@ static float frand(float lo, float hi)
 
 static glm::vec3 randomTarget(const WildlifeEntity &e, float cx, float cz, float radius)
 {
-    // uniform point in a disk around the island cluster
+
     float ang = frand(0.f, 6.2831853f);
     float r   = radius * std::sqrt(frand(0.f, 1.f));
     return { cx + r * std::cos(ang), frand(e.minY, e.maxY), cz + r * std::sin(ang) };
@@ -36,10 +36,9 @@ void updateWildlife(WildlifeGroup &g, float dt, float cx, float cz, float radius
         glm::vec3 dir = diff / dist;
         e.pos += dir * e.speed * dt;
 
-        // smoothly rotate toward movement direction (yaw only)
         float targetYaw = std::atan2(dir.x, dir.z) * (180.f / 3.14159265f);
         float delta = targetYaw - e.rotY;
-        // wrap delta to [-180, 180]
+
         while (delta >  180.f) delta -= 360.f;
         while (delta < -180.f) delta += 360.f;
         e.rotY += delta * std::min(1.f, dt * 4.f);
@@ -56,8 +55,6 @@ void drawWildlife(WildlifeGroup &g, Shader &skin,
 
     glm::mat4 boneMats[MAX_BONES];
 
-    // decorative meshes have thin, single-sided geometry (legs, wing membrane);
-    // render two-sided so culling can't drop a leg or a wing face
     glDisable(GL_CULL_FACE);
 
     skin.use();
@@ -105,5 +102,5 @@ void drawWildlife(WildlifeGroup &g, Shader &skin,
         g.mesh.draw();
     }
 
-    glEnable(GL_CULL_FACE);   // restore for the rest of the scene
+    glEnable(GL_CULL_FACE);
 }

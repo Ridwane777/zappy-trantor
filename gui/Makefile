@@ -34,10 +34,14 @@ SRCS = src/render/Shader.cpp \
        src/app/TreeMotes.cpp \
        src/app/IncantationFx.cpp \
        src/app/WorldRender.cpp \
+       src/app/TileDebug.cpp \
        src/app/Islands.cpp \
        src/app/CharacterRender.cpp \
        src/app/Wildlife.cpp \
        src/app/PlayerRender.cpp \
+       src/app/BillMesh.cpp \
+       src/app/SettingsOverlay.cpp \
+       src/app/OutroScene.cpp \
        src/app/Fullscreen.cpp \
        src/app/GuiApp.cpp \
        src/main.cpp

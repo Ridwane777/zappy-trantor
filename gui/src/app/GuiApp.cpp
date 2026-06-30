@@ -1,4 +1,3 @@
-
 #include <GL/glew.h>
 #include <SFML/Graphics.hpp>
 #include <SFML/Window.hpp>
@@ -18,12 +17,16 @@
 #include "app/TreeMotes.hpp"
 #include "app/IncantationFx.hpp"
 #include "app/WorldRender.hpp"
+#include "app/TileDebug.hpp"
+#include "app/SettingsOverlay.hpp"
+#include "app/OutroScene.hpp"
 #include "app/Character.hpp"
 #include "app/CharacterRender.hpp"
 #include "app/Fullscreen.hpp"
 #include "app/Islands.hpp"
 #include "app/PlayerRender.hpp"
 #include "app/Wildlife.hpp"
+#include "app/BillMesh.hpp"
 #include "render/ObjLoader.hpp"
 #include "render/SkinnedMesh.hpp"
 #include "render/TexturedMesh.hpp"
@@ -70,9 +73,10 @@ int GuiApp::run(int argc, char** argv)
     glCullFace(GL_BACK);
 
     const char* SYS_FONT = "/usr/share/fonts/truetype/freefont/FreeSansBold.ttf";
-    // assetBytesKept keeps the buffer alive — sf::Font reads from it after loadFromMemory
+
     const std::string& mfBytes = zappy::assetBytesKept("assets/fonts/GamersDemoBold.ttf");
     const std::string& hfBytes = zappy::assetBytesKept("assets/fonts/GAMEDAY.ttf");
+    const std::string& efBytes = zappy::assetBytesKept("assets/fonts/ENDOR.ttf");
     sf::Font menuFont;
     if (!(mfBytes.size() && menuFont.loadFromMemory(mfBytes.data(), mfBytes.size())) &&
         !menuFont.loadFromFile(SYS_FONT))
@@ -81,6 +85,10 @@ int GuiApp::run(int argc, char** argv)
     if (!(hfBytes.size() && hudFont.loadFromMemory(hfBytes.data(), hfBytes.size())) &&
         !hudFont.loadFromFile(SYS_FONT))
         std::cerr << "Warning: HUD font not loaded\n";
+    sf::Font endorFont;
+    if (!(efBytes.size() && endorFont.loadFromMemory(efBytes.data(), efBytes.size())) &&
+        !endorFont.loadFromFile(SYS_FONT))
+        std::cerr << "Warning: ENDOR font not loaded\n";
 
     auto A = [](const std::string& s) { return "assets/" + s; };
     std::vector<std::string> introAssets = {
@@ -120,8 +128,7 @@ int GuiApp::run(int argc, char** argv)
         gameAssets.push_back(A(std::string("models/") + f + ".obj"));
         gameAssets.push_back(A(std::string("models/") + f + ".png"));
     }
-    // huntress was never prepared with run/turn_left/turn_right anims (neither on
-    // the CDN bucket nor in the source-prep folder) — don't try to fetch them.
+
     for (const char* d : {"woodsprite","nomad","nyxara"})
         for (const char* f : {"idle.glb","walk.glb","run.glb","turn_left.glb","turn_right.glb","player.png"})
             gameAssets.push_back(A(std::string("characters/") + d + "/" + f));
@@ -129,32 +136,33 @@ int GuiApp::run(int argc, char** argv)
         gameAssets.push_back(A(std::string("characters/huntress/") + f));
     for (const char* p : {"boat","cliff_rock","flower_1","flower_2","lily_pad","mapletree_1",
                           "normaltree_1","rock_1","rock_2","rock_3","tree_of_life"})
-        gameAssets.push_back(A(std::string("models/") + p + ".obj"));   // audio prefetched in intro
+        gameAssets.push_back(A(std::string("models/") + p + ".obj"));
 
-    // loFrac/hiFrac map the wait onto a bar slice so it flows into advanceLoadingTo's range
     auto waitBar = [&](std::atomic<size_t>& done, size_t total, const char* label,
                         float loFrac = 0.f, float hiFrac = 1.f) {
         float shown = loFrac;
         while (done.load() < total) {
             float target = loFrac + (total ? (float)done.load() / total : 1.f) * (hiFrac - loFrac);
-            shown += (target - shown) * 0.20f + 0.0035f;       // ease + creep
-            if (shown > target + 0.08f) shown = target + 0.08f; // don't run too far ahead
+            shown += (target - shown) * 0.20f + 0.0035f;
+            if (shown > target + 0.08f) shown = target + 0.08f;
             if (shown > hiFrac - 0.015f) shown = hiFrac - 0.015f;
             drawLoadingScreen(window, hudFont, shown, label);
             std::this_thread::sleep_for(std::chrono::milliseconds(16));
         }
-        drawLoadingScreen(window, hudFont, hiFrac, label);     // snap to the slice's top
+        drawLoadingScreen(window, hudFont, hiFrac, label);
     };
+
+    // Load the loading-screen background immediately so it appears on the
+    // very first frame of the loading bar (assetBytesIfCached returns empty
+    // until the asset is in RAM; loading it synchronously here fixes that).
+    zappy::assetBytesKept("assets/screen/loading_bg.png");
 
     std::atomic<size_t> gameDone{0};
     std::thread gamePrefetch([&] { zappy::prefetch(gameAssets, &gameDone, 6); });
-
-    {   // intro set: responsive loading bar (no freeze)
-        std::atomic<size_t> d{0};
-        std::thread t([&] { zappy::prefetch(introAssets, &d, 6); });
-        waitBar(d, introAssets.size(), "Chargement de l'intro...");
-        t.join();
-    }
+    // Intro assets stream silently in the background — no separate loading
+    // screen; they finish long before the player clicks START.
+    std::thread introPrefetch([introAssets] { zappy::prefetch(introAssets, nullptr, 4); });
+    introPrefetch.detach();
 
     MenuConfig menuCfg;
     for (int i = 1; i < argc; ++i) {
@@ -172,7 +180,7 @@ int GuiApp::run(int argc, char** argv)
     } else {
         proceed = runMenu(window, menuFont, hudFont, menuCfg);
     }
-    if (!proceed) { gamePrefetch.join(); return 0; }   // window closed / quit
+    if (!proceed) { gamePrefetch.join(); return 0; }
 
     GuiClient netClient;
     std::string netErr;
@@ -186,12 +194,11 @@ int GuiApp::run(int argc, char** argv)
     std::cout << "[menu] start -> server " << menuCfg.host << ":"
               << menuCfg.port << "\n";
     window.setTitle("Zappy Map — Sadida");
-    // restore the GL state the game renderer expects after the menu
+
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
     glCullFace(GL_BACK);
 
-    // Fullscreen quad for sky gradient (NDC coords, no depth)
     float skyQuadV[] = { -1,-1, 1,-1, 1,1, -1,1 };
     unsigned int skyQuadI[] = { 0,1,2, 0,2,3 };
     unsigned int skyVAO, skyVBO, skyEBO;
@@ -206,7 +213,6 @@ int GuiApp::run(int argc, char** argv)
     glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 2*sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
     glBindVertexArray(0);
-
 
     Shader skyShader ("shaders/sky.vert",         "shaders/sky.frag");
     Shader toon      ("shaders/phong.vert",        "shaders/phong.frag");
@@ -238,7 +244,6 @@ int GuiApp::run(int argc, char** argv)
         }
     }
 
-    // textured egg model (unhatched players)
     std::unique_ptr<TexturedMesh> eggMeshTex;
     try {
         eggMeshTex = std::make_unique<TexturedMesh>(
@@ -247,7 +252,6 @@ int GuiApp::run(int argc, char** argv)
         std::cerr << "Egg texture load: " << e.what() << "\n";
     }
 
-    // textured food variants (apple / grapes / mushroom)
     std::unique_ptr<TexturedMesh> foodMesh[3];
     const char* foodName[3] = { "food1", "food2", "food3" };
     for (int i = 0; i < 3; ++i) {
@@ -260,7 +264,6 @@ int GuiApp::run(int argc, char** argv)
         }
     }
 
-    // textured gemstones, one per stone type (indices 1..6, matching RES_NAMES)
     std::unique_ptr<TexturedMesh> gemTex[7];
     {
         const char* gemName[7] = { nullptr, "linemate", "deraumere", "sibur",
@@ -276,7 +279,6 @@ int GuiApp::run(int argc, char** argv)
         }
     }
 
-    // billboard quad for evolution sparkles (corners -1..1)
     unsigned int sparkVAO = 0, sparkVBO = 0;
     {
         const float quad[] = { -1.f,-1.f,  1.f,-1.f,  1.f,1.f,  -1.f,1.f };
@@ -293,7 +295,7 @@ int GuiApp::run(int argc, char** argv)
     std::vector<Character> characters;
     const float CHAR_HEIGHT = 0.01f;
     std::vector<IncantationEffect> incantations;
-    float incantCooldown = 25.f;  // first demo fires at 25s
+    float incantCooldown = 25.f;
 
     const std::string CHAR_DIR   = "assets/characters/";
     const std::string FEMALE_DIR = CHAR_DIR + "female/Meshy_AI_Huntress_of_the_Wild_biped_Animation_";
@@ -301,11 +303,10 @@ int GuiApp::run(int argc, char** argv)
 
     advanceLoadingTo(window, hudFont, 0.10f, "Loading characters...");
 
-
     try {
         Character c;
         c.mesh     = SkinnedMesh::load(FEMALE_DIR + "Idle_15_withSkin.glb");
-        c.mesh.loadAnimFrom(FEMALE_DIR + "Walking_withSkin.glb");           // anim index 1
+        c.mesh.loadAnimFrom(FEMALE_DIR + "Walking_withSkin.glb");
         c.worldPos = {14*TILE+TILE*.5f, 0.f, 13*TILE+TILE*.5f};
         c.rotY     = 180.f;
         float meshH = c.mesh.boundsMax().y - c.mesh.boundsMin().y;
@@ -317,11 +318,10 @@ int GuiApp::run(int argc, char** argv)
     } catch (std::exception& e) { std::cerr << "Female load: " << e.what() << "\n"; }
     advanceLoadingTo(window, hudFont, 0.35f, "Loaded Huntress");
 
-
     try {
         Character c;
-        c.mesh     = SkinnedMesh::load(MALE_DIR + "Idle_11_withSkin.glb");  // 0 idle
-        c.mesh.loadAnimFrom(MALE_DIR + "Walking_withSkin.glb");            // 1 walk
+        c.mesh     = SkinnedMesh::load(MALE_DIR + "Idle_11_withSkin.glb");
+        c.mesh.loadAnimFrom(MALE_DIR + "Walking_withSkin.glb");
         c.mesh.loadTexture(CHAR_DIR + "male/player_male.png");
         c.worldPos = {13*TILE+TILE*.5f, 0.f, 13*TILE+TILE*.5f};
         c.rotY     = 200.f;
@@ -331,10 +331,9 @@ int GuiApp::run(int argc, char** argv)
     } catch (std::exception& e) { std::cerr << "Male load: " << e.what() << "\n"; }
     advanceLoadingTo(window, hudFont, 0.55f, "Loaded Wanderer");
 
-    // anim slots: 0=idle 1=walk 2=run 3=turn-left 4=turn-right (run/turn optional)
     PlayerTier tiers[4];
     const char* tierDir[4] = { "woodsprite", "nomad", "nyxara", "huntress" };
-    // huntress has no run/turn_left/turn_right source files (CDN nor local prep) — skip
+
     bool tierHasExtraAnims[4] = { true, true, true, false };
     float globalPScale = std::getenv("ZAPPY_PSCALE")
                        ? (float)std::atof(std::getenv("ZAPPY_PSCALE")) : 0.05f / 6.f;
@@ -343,7 +342,7 @@ int GuiApp::run(int argc, char** argv)
         try {
             tiers[t].mesh = SkinnedMesh::load(dir + "idle.glb");
             tiers[t].mesh.loadAnimFrom(dir + "walk.glb");
-            // optional extra anims — only attempt the fetch for tiers known to have them
+
             if (tierHasExtraAnims[t])
                 for (const char* a : {"run.glb", "turn_left.glb", "turn_right.glb"})
                     if (!zappy::assetBytes(dir + a).empty())
@@ -357,20 +356,17 @@ int GuiApp::run(int argc, char** argv)
     }
     advanceLoadingTo(window, hudFont, 0.70f, "Loaded players");
 
-    characters.clear(); // demo chars removed — only live server players are shown
-
+    characters.clear();
 
     MapData map;
     try { map = loadMap(MAP_FILE); }
     catch (std::exception& e) { std::cerr << e.what() << "\n"; return 1; }
     time_t lastMtime = fileMtime(MAP_FILE);
 
-    // Build seamless flat ground meshes (no OBJ tile seams)
     auto landMesh  = buildGroundMesh(map.tiles, "tile",  false);
     auto cliffMesh = buildGroundMesh(map.tiles, "tile",  true);
     auto waterMesh = buildGroundMesh(map.tiles, "water", false);
 
-    // Infinite ocean plane — large quad so no sky bleeds past the map edge
     auto oceanMesh = []() {
         const float S = 4000.f, Y = -1.82f;
         std::vector<float> v = {
@@ -383,7 +379,6 @@ int GuiApp::run(int argc, char** argv)
 
     advanceLoadingTo(window, hudFont, 0.85f, "Building terrain...");
 
-    // Pre-warm prop mesh cache
     for (auto& t : map.tiles)
         for (auto& p : t.props) getMesh(p.model);
 
@@ -401,17 +396,12 @@ int GuiApp::run(int argc, char** argv)
         std::cerr << "[net] connect failed: " << netErr
                   << " - running as offline viewer\n";
 
-    // (font already loaded above for the startup menu)
-
-    // per-player animation state (movement/turn detection from discrete updates)
     std::unordered_map<int, PlayerAnim> playerAnims;
 
-    // evolution sparkles + tree motes (Spark defined in app/Particle.hpp)
     std::vector<Spark> sparks;
-    // one independent mote pool per team island (each Tree of Life copy
-    // charges/pulses on its own, same green energy, never shared/mixed)
+
     std::vector<std::vector<Spark>> treeMotes;
-    const float EVO_DUR = 2.0f;    // length of the evolution flash (matches level-up sfx)
+    const float EVO_DUR = 2.0f;
 
     bool testMode = std::getenv("ZAPPY_TESTPLAYERS") != nullptr;
     std::vector<GuiPlayer> testPlayers;
@@ -419,7 +409,7 @@ int GuiApp::run(int argc, char** argv)
     if (testMode) {
         int n = std::atoi(std::getenv("ZAPPY_TESTPLAYERS"));
         if (n <= 0) n = 4;
-        // a horizontal row toward the front-left of the island (clear of the tree)
+
         int rowY = map.h / 2 + 4;
         int startX = map.w / 2 - n;
         for (int i = 0; i < n; ++i) {
@@ -427,7 +417,7 @@ int GuiApp::run(int argc, char** argv)
             p.id = 1000 + i;
             p.x = startX + i * 2;
             p.y = rowY;
-            p.orientation = 3;                  // face the camera (south)
+            p.orientation = 3;
             p.level = 1;
             p.team = "demo";
             testPlayers.push_back(p);
@@ -439,22 +429,25 @@ int GuiApp::run(int argc, char** argv)
     float cz = map.h * TILE * 0.5f;
     float camYaw   = 45.f  * 3.14159f / 180.f;
     float camPitch = 35.f  * 3.14159f / 180.f;
-    int   nightOverride = 0;   // 0=auto, 1=night, 2=day
+    int   nightOverride = 0;
     bool  fullscreen    = false;
-    float camDist  = std::max(map.w, map.h) * TILE * 1.1f; // re-framed once team count is known
+    float camDist  = std::max(map.w, map.h) * TILE * 1.1f;
     bool  camFramedForTeams = false;
     float camTargetY = 0.f;
-    if (testMode && !testPlayers.empty()) {            // frame the demo row
+    if (testMode && !testPlayers.empty()) {
         int n = (int)testPlayers.size();
-        cx = (map.w / 2) * TILE;                       // centre of the row
+        cx = (map.w / 2) * TILE;
         cz = (map.h / 2 + 4) * TILE;
-        camTargetY = 1.6f;                             // look at body height
+        camTargetY = 1.6f;
         camDist  = 12.f + n * 3.f;
-        camPitch = 16.f * 3.14159f / 180.f;            // lower, more side-on
+        camPitch = 16.f * 3.14159f / 180.f;
     }
 
     bool  dragging = false;
     sf::Vector2i lastMouse;
+    bool  showTileGrid = false;
+    bool  povMode          = false;
+    sf::FloatRect seeBtnRect;
 
     SkinnedMesh mewMesh;
     bool  haveMew = false;
@@ -468,7 +461,7 @@ int GuiApp::run(int argc, char** argv)
     bool  haveCharz = false;
     try {
         charzMesh = SkinnedMesh::load("assets/characters/charizard/scene.glb");
-        // body_a/body_b/eyes/fire come from the GLB's embedded per-material maps
+
         haveCharz = true;
     } catch (std::exception& e) { std::cerr << "Charizard load: " << e.what() << "\n"; }
 
@@ -480,19 +473,17 @@ int GuiApp::run(int argc, char** argv)
         haveMoon = true;
     } catch (std::exception& e) { std::cerr << "Moon load: " << e.what() << "\n"; }
 
-    // ── wildlife (pterodactyl + butterfly) ────────────────────────────────────
     const float TILE_F   = TILE;
     auto wfrand = [](float lo, float hi) {
         return lo + (hi - lo) * (std::rand() / (float)RAND_MAX);
     };
 
-    // spawn helper: a point in a disk of `rad` around the island centre (cx,cz)
     auto spawnXZ = [&](float rad) {
         float a = wfrand(0.f, 6.2831853f);
         float r = rad * std::sqrt(wfrand(0.f, 1.f));
         return glm::vec2(cx + r * std::cos(a), cz + r * std::sin(a));
     };
-    const float spawnR = map.w * TILE_F * 0.455f;   // ~one island radius; roaming expands later
+    const float spawnR = map.w * TILE_F * 0.455f;
 
     WildlifeGroup ptero, butterfly;
     try {
@@ -503,7 +494,7 @@ int GuiApp::run(int argc, char** argv)
         for (int i = 0; i < 6; ++i) {
             WildlifeEntity e;
             glm::vec2 p = spawnXZ(spawnR);
-            e.minY   = TILE_F * 3.0f;   // soar well above the islands
+            e.minY   = TILE_F * 3.0f;
             e.maxY   = TILE_F * 5.5f;
             e.pos    = { p.x, wfrand(e.minY, e.maxY), p.y };
             e.target = e.pos;
@@ -516,18 +507,16 @@ int GuiApp::run(int argc, char** argv)
     try {
         butterfly.mesh = SkinnedMesh::load("assets/wildlife/butterfly/scene.gltf");
         butterfly.mesh.loadTexture("assets/wildlife/butterfly/textures/butterflyMAT_baseColor.png");
-        // This asset is authored flat: wide in X (wingspan), thin in Y. Normalise
-        // by the wingspan so it isn't blown up, and roll it upright so the wings
-        // face outward instead of lying flat to the ground.
+
         glm::vec3 bsz = butterfly.mesh.boundsMax() - butterfly.mesh.boundsMin();
         float span = std::max(bsz.x, bsz.z);
         butterfly.scale     = (span > 0.001f) ? (TILE_F * 0.28f) / span : 0.005f;
         butterfly.baseRoll  = 90.f;
-        butterfly.alphaCutout = true;   // wing silhouette is in the texture alpha
+        butterfly.alphaCutout = true;
         for (int i = 0; i < 25; ++i) {
             WildlifeEntity e;
             glm::vec2 p = spawnXZ(spawnR);
-            e.minY   = TILE_F * 0.10f;  // flit just above ground level
+            e.minY   = TILE_F * 0.10f;
             e.maxY   = TILE_F * 0.55f;
             e.pos    = { p.x, wfrand(e.minY, e.maxY), p.y };
             e.target = e.pos;
@@ -537,14 +526,12 @@ int GuiApp::run(int argc, char** argv)
         }
     } catch (std::exception& e) { std::cerr << "Butterfly load: " << e.what() << "\n"; }
 
-    // lowest Mew may descend to — keeps his whole body above the map surface
     const float MEW_FLOOR = std::getenv("ZAPPY_MEW_FLOOR")
                           ? (float)std::atof(std::getenv("ZAPPY_MEW_FLOOR")) : 1.0f;
     const float MEW_SCALE = std::getenv("ZAPPY_MEW_SCALE")
                           ? (float)std::atof(std::getenv("ZAPPY_MEW_SCALE")) : 0.27f;
     const glm::vec3 TREE_POS = {22*TILE, 0.f, 22*TILE};
 
-    // pose figée à l'arrêt : une frame de vol (pas la frame 0 qui est verticale)
     float       mewIdlePose = std::getenv("ZAPPY_MEW_POSE")
                           ? (float)std::atof(std::getenv("ZAPPY_MEW_POSE")) : 2.0f;
     const float mewAnimDur = (haveMew && mewMesh.animCount() > 0)
@@ -552,7 +539,7 @@ int GuiApp::run(int argc, char** argv)
     bool        adminPrompt = false;
     bool        adminEatNext = false;
     bool        adminMode   = false;
-    bool        charzMode   = false;   // player has control of Charizard
+    bool        charzMode   = false;
     std::string adminInput;
     glm::vec3   mewPos(cx, 6.f, cz);
     float       mewYaw = 0.f, mewAnimTime = mewIdlePose;
@@ -560,41 +547,34 @@ int GuiApp::run(int argc, char** argv)
     float       mewFlyTimer = 0.f;
     float       mewMeowTimer = 10.f;
 
-    // ── Charizard admin mount ──────────────────────────────────────────────────
-    // Behaves exactly like Mew (password -> control it), the difference being it
-    // can land and walk/run on the ground instead of only flying.
     const float CHARZ_SCALE    = std::getenv("ZAPPY_CHARZ_SCALE")
                                ? (float)std::atof(std::getenv("ZAPPY_CHARZ_SCALE")) : 0.9f;
     const float CHARZ_GROUND_Y = std::getenv("ZAPPY_CHARZ_GROUND_Y")
                               ? (float)std::atof(std::getenv("ZAPPY_CHARZ_GROUND_Y")) : 0.0f;
-    // anim indices (verified against scene.glb's 83 clips)
-    // NB: anim 0 (defaultwait) is a *hovering* pose for Charizard, so the
-    // grounded idle defaults to battlewait01_loop (1, upright stance). Override
+
     const int CA_IDLE     = std::getenv("ZAPPY_CHARZ_IDLE")
-                         ? std::atoi(std::getenv("ZAPPY_CHARZ_IDLE")) : 1;  // ground idle: battlewait01_loop
+                         ? std::atoi(std::getenv("ZAPPY_CHARZ_IDLE")) : 1;
     const int CA_FLY_IDLE = std::getenv("ZAPPY_CHARZ_FLY_IDLE")
-                         ? std::atoi(std::getenv("ZAPPY_CHARZ_FLY_IDLE")) : 49; // flying idle: battlewait01_loop (hover)
+                         ? std::atoi(std::getenv("ZAPPY_CHARZ_FLY_IDLE")) : 49;
     const float CHARZ_ANIM_SPEED = std::getenv("ZAPPY_CHARZ_ANIM_SPEED")
                          ? (float)std::atof(std::getenv("ZAPPY_CHARZ_ANIM_SPEED")) : 1.5f;
-    const int CA_WALK       = 7;   // ground walk01_loop
-    const int CA_RUN        = 8;   // ground run01_loop
-    const int CA_TURN_L     = 4;   // ground turn left
-    const int CA_TURN_R     = 5;   // ground turn right
-    const int CA_AIR_WALK   = 54;  // air walk01_loop
-    const int CA_AIR_RUN    = 55;  // air run01_loop
-    const int CA_AIR_TURN_L = 53;  // air turn left
-    const int CA_AIR_TURN_R = 52;  // air turn right
-    const int CA_TAKEOFF    = 12;  // jumpup01_start        (one-shot)
-    const int CA_FLY        = 13;  // jumpup01_loop         (airborne)
-    const int CA_FALL       = 62;  // 20153_jumpdown01_loop (aerial descent)
-    const int CA_LAND_A     = 63;  // 20155_land02          (aerial phase, plays first)
-    const int CA_LAND_B     = 16;  // 00155_land02          (ground phase, plays second)
+    const int CA_WALK       = 7;
+    const int CA_RUN        = 8;
+    const int CA_TURN_L     = 4;
+    const int CA_TURN_R     = 5;
+    const int CA_AIR_WALK   = 54;
+    const int CA_AIR_RUN    = 55;
+    const int CA_AIR_TURN_L = 53;
+    const int CA_AIR_TURN_R = 52;
+    const int CA_TAKEOFF    = 12;
+    const int CA_FLY        = 13;
+    const int CA_FALL       = 62;
+    const int CA_LAND_A     = 63;
+    const int CA_LAND_B     = 16;
     const float CHARZ_FLY_Y = CHARZ_GROUND_Y + 6.f;
     const float caTakeoffDur = (haveCharz && charzMesh.animCount() > CA_TAKEOFF)
                              ? charzMesh.animDuration(CA_TAKEOFF) : 0.8f;
-    // jumpup01_start is only ~0.12s (a crouch-prep pose); the actual ascent lives
-    // in jumpup01_loop. Spread the 6-unit climb over a longer window so it reads
-    // as a launch instead of teleporting straight up.
+
     const float caClimbDur = 0.9f;
     const float caLandADur   = (haveCharz && charzMesh.animCount() > CA_LAND_A)
                              ? charzMesh.animDuration(CA_LAND_A) : 0.5f;
@@ -602,7 +582,7 @@ int GuiApp::run(int argc, char** argv)
                              ? charzMesh.animDuration(CA_LAND_B) : 0.7f;
     enum class CharzMove { GROUNDED, TAKEOFF, FLYING, LANDING_A, LANDING_B };
     CharzMove   charzMove     = CharzMove::GROUNDED;
-    float       charzMoveT    = 0.f;   // time inside a one-shot transition
+    float       charzMoveT    = 0.f;
     glm::vec3   charzPos      (cx, CHARZ_GROUND_Y, cz);
     float       charzYaw      = 0.f;
     float       charzAnimTime = 0.f;
@@ -611,45 +591,45 @@ int GuiApp::run(int argc, char** argv)
     float       charzBobAmp   = 0.f;
 
     Constellation constellation;
-    float admCamYaw = 0.f, admCamPitch = 0.32f; // 3rd-person cam offset around Mew
-
+    float admCamYaw = 0.f, admCamPitch = 0.32f;
 
     AudioManager gameAudio;
     gameAudio.init("assets/audio");
     if (netConnected) gameAudio.playMusic("game_music", true, 35.f);
-    unsigned long lastLogTotal = 0;   // for draining new action events into SFX
-    float pickupCooldown = 0.f;       // throttles the (frequent) grab blip
+    unsigned long lastLogTotal = 0;
+    float pickupCooldown = 0.f;
 
     sf::Clock clock;
     float elapsed  = 0.f;
-    const float CHARGE_DURATION  =  8.f;   // seconds to charge up
-    const float IDLE_DURATION    = 52.f;   // seconds idle before next charge
-    const float WAVE_SPEED       = 14.f;   // world units / second
+    const float CHARGE_DURATION  =  8.f;
+    const float IDLE_DURATION    = 52.f;
+    const float WAVE_SPEED       = 14.f;
     const float WAVE_MAXR        = map.w * TILE * 1.1f;
 
     enum class PulseState { IDLE, CHARGING, RELEASING };
     PulseState pulseState  = PulseState::IDLE;
-    PulseState prevPulse   = PulseState::IDLE;   // edge-detect charge→release
-    float      pulseTimer  = 0.f;   // time spent in current state
-    float      chargeT     = 0.f;   // 0→1 charge progress
-    float      treeGlow    = 0.f;   // foliage emissive: tracks charge, fades out after release
+    PulseState prevPulse   = PulseState::IDLE;
+    float      pulseTimer  = 0.f;
+    float      chargeT     = 0.f;
+    float      treeGlow    = 0.f;
     float      waveRadius  = 0.f;
 
     HudOverlay hud;
     hud.init(hudFont);
+    SettingsOverlay settings;
+    settings.init(hudFont);
+    OutroScene outro;
 
     while (window.isOpen()) {
         float dt = clock.restart().asSeconds();
         elapsed  += dt;
 
-        hud.update(dt);                         // smooth sidebar slide
+        hud.update(dt);
 
-        // tick down the resource-reset countdown (server resyncs it via "sst")
         if (netConnected && netClient.state().secondsToReset > 0.f)
             netClient.state().secondsToReset =
                 std::max(0.f, netClient.state().secondsToReset - dt);
 
-        // while a player popup is open, poll its inventory (~3×/s) so counts stay live
         int pollId = hud.inventoryPollTarget(dt);
         if (pollId >= 0 && netConnected)
             netClient.send("pin #" + std::to_string(pollId));
@@ -662,9 +642,9 @@ int GuiApp::run(int argc, char** argv)
             if (newCount > gs.log.size()) newCount = (unsigned long)gs.log.size();
             for (std::size_t i = gs.log.size() - newCount; i < gs.log.size(); ++i) {
                 int k = gs.log[i].kind;
-                if (k == 2)      gameAudio.play("death",  85.f);   // pdi
-                else if (k == 3) gameAudio.play("incant", 80.f);   // pic
-                else if (k == 0 && pickupCooldown <= 0.f) {        // pgt — subtle, throttled
+                if (k == 2)      gameAudio.play("death",  85.f);
+                else if (k == 3) gameAudio.play("incant", 80.f);
+                else if (k == 0 && pickupCooldown <= 0.f) {
                     gameAudio.play("pickup", 32.f);
                     pickupCooldown = 0.18f;
                 }
@@ -676,12 +656,12 @@ int GuiApp::run(int argc, char** argv)
             netClient.poll();
             netConnected = netClient.connected();
             const GuiState& gs = netClient.state();
-            if (!camFramedForTeams && !gs.teams.empty()) { // re-frame once team count is known
+            if (!camFramedForTeams && !gs.teams.empty()) {
                 float ext = worldExtentRadius(1, map.w * TILE * 0.455f);
                 camDist = ext * 2.42f;
                 camFramedForTeams = true;
             }
-            if (gs.sizeKnown) {
+            if (gs.sizeKnown && gs.resDirty) {
                 for (auto& t : map.tiles)
                     for (int i = 0; i < 7; ++i) t.res[i] = 0;
                 const int insetT = 7;
@@ -697,7 +677,10 @@ int GuiApp::run(int argc, char** argv)
                         for (int i = 0; i < 7; ++i)
                             map.tiles[it->second].res[i] += st.res[i];
                     }
+                netClient.state().resDirty = false;
             }
+            if (!outro.active() && !gs.winner.empty())
+                outro.start(gs.winner);
             static bool dbg = (std::getenv("ZAPPY_DEBUG") != nullptr);
             static int dbgFrame = 0;
             if (dbg && (++dbgFrame % 120 == 0)) {
@@ -711,11 +694,16 @@ int GuiApp::run(int argc, char** argv)
             }
         }
 
-        if (testMode) { // ZAPPY_TESTSEC controls seconds per level phase
+        if (povMode && (!netConnected || !netClient.state().players.count(hud.selectedPlayer())))
+            { povMode = false; hud.setSelectedPlayer(-1); }
+        if (povMode && hud.selectedPlayer() < 0)
+            povMode = false;
+
+        if (testMode) {
             static float phaseSec = std::getenv("ZAPPY_TESTSEC")
                                   ? (float)std::atof(std::getenv("ZAPPY_TESTSEC")) : 1.f;
             testTimer += dt;
-            int lvl = ((int)(testTimer / phaseSec)) % 9;   // 0(egg),1,...,8, loop
+            int lvl = ((int)(testTimer / phaseSec)) % 9;
             for (auto& p : testPlayers) p.level = lvl;
         }
 
@@ -723,7 +711,7 @@ int GuiApp::run(int argc, char** argv)
         switch (pulseState) {
         case PulseState::IDLE: {
             chargeT = 0.f;
-            // online: charge on last CHARGE_DURATION seconds before resource reset; offline: self-timed
+
             float sr = netConnected ? netClient.state().secondsToReset : -1.f;
             bool trigger = (sr >= 0.f) ? (sr <= CHARGE_DURATION)
                                        : (pulseTimer >= IDLE_DURATION);
@@ -764,7 +752,7 @@ int GuiApp::run(int argc, char** argv)
         if (pulseState == PulseState::CHARGING)
             treeGlow = chargeT;
         else
-            treeGlow = std::max(0.f, treeGlow - dt * 0.5f);   // ~2s fade-out
+            treeGlow = std::max(0.f, treeGlow - dt * 0.5f);
 
         for (auto& ch : characters)
             if (ch.auraTimer > 0.f) ch.auraTimer -= dt;
@@ -793,20 +781,16 @@ int GuiApp::run(int argc, char** argv)
         while (window.pollEvent(ev)) {
             if (ev.type == sf::Event::Closed)
                 window.close();
-            // The window manager can resize the window out-of-band (maximize
-            // toggle, dragged edge): SFML's 2D view does NOT auto-follow, so
-            // without this the HUD stays mapped to the old size and drifts
-            // off-screen. The 3D pass already re-reads window.getSize() each
-            // frame for glViewport, so only the 2D view needs resetting here.
+
             if (ev.type == sf::Event::Resized)
                 window.setView(sf::View(sf::FloatRect(0.f, 0.f,
                     (float)ev.size.width, (float)ev.size.height)));
 
             if (adminPrompt) {
                 if (ev.type == sf::Event::TextEntered) {
-                    if (adminEatNext) {                                  // le 'a' d'ouverture
+                    if (adminEatNext) {
                         adminEatNext = false;
-                    } else if (ev.text.unicode == 8) {                   // backspace
+                    } else if (ev.text.unicode == 8) {
                         if (!adminInput.empty()) adminInput.pop_back();
                     } else if (ev.text.unicode >= 32 && ev.text.unicode < 127 &&
                                adminInput.size() < 32) {
@@ -815,7 +799,7 @@ int GuiApp::run(int argc, char** argv)
                 }
                 if (ev.type == sf::Event::KeyPressed) {
                     if (ev.key.code == sf::Keyboard::Enter) {
-                        if (adminInput == "char6006") {                  // déverrouillage Charizard
+                        if (adminInput == "char6006") {
                             charzMode = true;
                             charzMove = CharzMove::FLYING; charzMoveT = 0.f;
                             charzPos  = glm::vec3(
@@ -826,26 +810,30 @@ int GuiApp::run(int argc, char** argv)
                             charzAnimTime = 0.f; charzAnimIdx = CA_IDLE;
                             charzBobAmp   = 0.08f;
                             admCamYaw   = 0.f;
-                            admCamPitch = 0.55f;  // look slightly down so world is visible
+                            admCamPitch = 0.55f;
                             gameAudio.play("reveal", 90.f);
-                        } else if (adminInput == "admin1234") {          // déverrouillage Mew
+                            gameAudio.playLoop("wings_flapping", 70.f);
+                        } else if (adminInput == "admin1234") {
                             adminMode = true;
                             mewPos = glm::vec3(cx, camTargetY + 4.f, cz);
                             mewYaw = camYaw;
                             gameAudio.play("reveal", 90.f);
-                            gameAudio.play("mew_cry", 80.f);               // little chirp on reveal
-                            gameAudio.playLoop("mew_float", 80.f);         // ethereal hover hum
+                            gameAudio.play("mew_cry", 80.f);
+                            gameAudio.playLoop("mew_float", 80.f);
                         }
                         adminPrompt = false; adminInput.clear();
                     } else if (ev.key.code == sf::Keyboard::Escape) {
                         adminPrompt = false; adminInput.clear();
                     }
                 }
-                continue;                                                // on avale la saisie
+                continue;
             }
 
-            if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::Escape)
-                window.close();
+            if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::Escape) {
+                if (povMode)                        povMode = false;
+                else if (hud.selectedPlayer() >= 0) hud.setSelectedPlayer(-1);
+                else                                window.close();
+            }
             if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::A && !adminMode && !charzMode) {
                 adminPrompt = true; adminInput.clear(); adminEatNext = true;
                 continue;
@@ -855,19 +843,21 @@ int GuiApp::run(int argc, char** argv)
                 charzMode = false;
                 gameAudio.stopLoop();
             }
-            // scrub de la pose idle (O / P) pour choisir la frame de repos
+
             if (adminMode && ev.type == sf::Event::KeyPressed &&
                 (ev.key.code == sf::Keyboard::O || ev.key.code == sf::Keyboard::P)) {
                 mewIdlePose += (ev.key.code == sf::Keyboard::P ? 0.5f : -0.5f);
                 if (mewIdlePose < 0.f)         mewIdlePose = 0.f;
                 if (mewIdlePose > mewAnimDur)  mewIdlePose = mewAnimDur;
-                mewAnimTime = mewIdlePose;                               // applique tout de suite
+                mewAnimTime = mewIdlePose;
                 std::cerr << "[mew] pose=" << mewIdlePose << "\n";
             }
 
             if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::R) {
-                if (adminMode || charzMode) {          // reset the 3rd-person view
+                if (adminMode || charzMode) {
                     admCamYaw = 0.f; admCamPitch = 0.32f;
+                } else if (povMode) {
+                    admCamYaw = 0.f; admCamPitch = 0.32f; camDist = 6.f;
                 } else {
                     camYaw = 45.f * 3.14159f / 180.f;
                     camPitch = 35.f * 3.14159f / 180.f;
@@ -877,6 +867,8 @@ int GuiApp::run(int argc, char** argv)
             }
             if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::Tab)
                 hud.toggle();
+            if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::G)
+                showTileGrid = !showTileGrid;
             if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::N)
                 nightOverride = (nightOverride + 1) % 3;
             if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::F11) {
@@ -885,26 +877,41 @@ int GuiApp::run(int argc, char** argv)
             }
 
             if (ev.type == sf::Event::MouseButtonPressed)
-                gameAudio.play("click", 65.f);                       // son à chaque clic
+                gameAudio.play("click", 65.f);
 
             if (ev.type == sf::Event::MouseButtonPressed &&
                 ev.mouseButton.button == sf::Mouse::Left) {
                 sf::Vector2i mp = sf::Mouse::getPosition(window);
-                if (!hud.handleClick(mp)) {                          // empty space → orbit
-                    dragging = true;
-                    lastMouse = mp;
-                }
-                if (hud.consumeFullscreenClick()) {                  // top-left square icon
-                    fullscreen = !fullscreen;
-                    setWindowFullscreen(window.getSystemHandle(), fullscreen);
+                if (settings.handlePress(mp, gameAudio)) {
+
+                } else {
+                    bool hitSeeBtn = (hud.selectedPlayer() >= 0 &&
+                                      seeBtnRect.contains((float)mp.x, (float)mp.y));
+                    if (hitSeeBtn) {
+                        if (povMode) { povMode = false; }
+                        else { povMode = true; admCamYaw = 0.f; admCamPitch = 0.32f; camDist = 6.f; }
+                    } else if (!hud.handleClick(mp)) {
+                        dragging = true; lastMouse = mp;
+                    }
+                    if (hud.consumeFullscreenClick()) {
+                        fullscreen = !fullscreen;
+                        setWindowFullscreen(window.getSystemHandle(), fullscreen);
+                    }
+                    if (hud.consumeSettingsClick())
+                        settings.toggle();
                 }
             }
-            if (ev.type == sf::Event::MouseButtonReleased)
+            if (ev.type == sf::Event::MouseButtonReleased) {
+                settings.handleRelease();
                 dragging = false;
+            }
 
+            if (ev.type == sf::Event::MouseMoved && settings.isDragging()) {
+                settings.handleMove(sf::Mouse::getPosition(window), gameAudio);
+            }
             if (ev.type == sf::Event::MouseMoved && dragging) {
                 sf::Vector2i cur = sf::Mouse::getPosition(window);
-                if (adminMode || charzMode) {                 // orbit around Mew / Charizard
+                if (adminMode || charzMode || povMode) {
                     admCamYaw   -= (cur.x - lastMouse.x) * 0.008f;
                     admCamPitch += (cur.y - lastMouse.y) * 0.006f;
                     admCamPitch  = glm::clamp(admCamPitch, -1.20f, 1.40f);
@@ -918,13 +925,22 @@ int GuiApp::run(int argc, char** argv)
 
             if (ev.type == sf::Event::MouseWheelScrolled) {
                 sf::Vector2i mp = sf::Mouse::getPosition(window);
-                if (!hud.handleScroll(mp, ev.mouseWheelScroll.delta)) {
+                if (settings.handleScroll(mp, ev.mouseWheelScroll.delta)) {
+
+                } else if (!hud.handleScroll(mp, ev.mouseWheelScroll.delta)) {
                     float ext = worldExtentRadius(1, map.w * TILE * 0.455f);
                     float maxDist = std::max(120.f, ext * 3.0f);
                     camDist = glm::clamp(camDist - ev.mouseWheelScroll.delta * 1.5f,
                                          4.f, maxDist);
                 }
             }
+        }
+
+        if (outro.active()) {
+            outro.update(dt);
+            outro.draw(window, endorFont, hudFont);
+            window.display();
+            continue;
         }
 
         time_t mt = fileMtime(MAP_FILE);
@@ -954,18 +970,18 @@ int GuiApp::run(int argc, char** argv)
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Down)) { mewPos -= fwd * spd * dt; mewMoving = true; }
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left))  mewYaw += turn * dt;
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) mewYaw -= turn * dt;
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Z)) { mewPos.y += vspd * dt; mewMoving = true; }  // up
-            if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) { mewPos.y -= vspd * dt; mewMoving = true; }  // down
-            if (mewPos.y < MEW_FLOOR) mewPos.y = MEW_FLOOR;   // can't go under the map
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::Z)) { mewPos.y += vspd * dt; mewMoving = true; }
+            if (sf::Keyboard::isKeyPressed(sf::Keyboard::S)) { mewPos.y -= vspd * dt; mewMoving = true; }
+            if (mewPos.y < MEW_FLOOR) mewPos.y = MEW_FLOOR;
             if (mewMoving) {
                 mewAnimTime += dt;
             } else {
                 float dur   = mewAnimDur > 0.01f ? mewAnimDur : 11.f;
                 float phase = std::fmod(mewAnimTime, dur); if (phase < 0) phase += dur;
                 float toTarget = std::fmod(mewIdlePose - phase + dur, dur);
-                float step = dt * 3.f;                            // retour ~3x plus rapide
-                if (toTarget <= step) mewAnimTime = mewIdlePose;  // arrivé : on fige
-                else                  mewAnimTime += step;        // continue l'anim, vite
+                float step = dt * 3.f;
+                if (toTarget <= step) mewAnimTime = mewIdlePose;
+                else                  mewAnimTime += step;
             }
 
             if (mewMoving) {
@@ -981,11 +997,11 @@ int GuiApp::run(int argc, char** argv)
             if (mewMeowTimer <= 0.f) {
                 const char* meows[3] = { "mew_meow_a", "mew_meow_b", "mew_meow_c" };
                 gameAudio.play(meows[std::rand() % 3], 80.f);
-                mewMeowTimer = 9.f + (std::rand() % 40) / 10.f;   // ~9-13 s
+                mewMeowTimer = 9.f + (std::rand() % 40) / 10.f;
             }
 
         }
-        // ── Charizard control: realistic takeoff / flight / landing ────────
+
         if (charzMode) {
             const float turn = 2.0f;
             glm::vec3 fwd(std::sin(charzYaw), 0.f, std::cos(charzYaw));
@@ -996,7 +1012,6 @@ int GuiApp::run(int argc, char** argv)
             bool dn_k  = sf::Keyboard::isKeyPressed(sf::Keyboard::S);
             bool moving = fwd_k || bck_k;
 
-            // turning is always allowed
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Left))  charzYaw += turn * dt;
             if (sf::Keyboard::isKeyPressed(sf::Keyboard::Right)) charzYaw -= turn * dt;
 
@@ -1024,21 +1039,22 @@ int GuiApp::run(int argc, char** argv)
                 charzMoveT += dt;
                 charzBobAmp = 0.f;
                 if (charzMoveT < caTakeoffDur) {
-                    // crouch-prep pose, still planted on the ground
+
                     charzPos.y    = CHARZ_GROUND_Y;
                     charzAnimIdx  = CA_TAKEOFF;
                     charzAnimTime = std::min(charzMoveT, caTakeoffDur - 0.01f);
                 } else {
-                    // ascent: jumpup loop while easing up to flight altitude
+
                     float k = glm::clamp((charzMoveT - caTakeoffDur) / caClimbDur,
                                          0.f, 1.f);
-                    k = k * k * (3.f - 2.f * k);           // smoothstep launch
+                    k = k * k * (3.f - 2.f * k);
                     charzPos.y    = CHARZ_GROUND_Y + (CHARZ_FLY_Y - CHARZ_GROUND_Y) * k;
-                    charzAnimIdx  = CA_FLY;                 // jumpup01_loop
+                    charzAnimIdx  = CA_FLY;
                     charzAnimTime = charzMoveT - caTakeoffDur;
                 }
                 if (charzMoveT >= caTakeoffDur + caClimbDur) {
                     charzMove = CharzMove::FLYING; charzAnimTime = 0.f;
+                    gameAudio.playLoop("wings_flapping", 70.f);
                 }
                 break;
             }
@@ -1059,10 +1075,11 @@ int GuiApp::run(int argc, char** argv)
                     charzPos.y = CHARZ_GROUND_Y;
                     charzMove = CharzMove::LANDING_A; charzMoveT = 0.f;
                     charzAnimIdx = CA_LAND_A; charzAnimTime = 0.f; charzBobAmp = 0.f;
+                    gameAudio.stopLoop();
                 }
                 break;
             }
-            case CharzMove::LANDING_A: {  // aerial land phase (plays first)
+            case CharzMove::LANDING_A: {
                 charzMoveT += dt;
                 charzPos.y = CHARZ_GROUND_Y;
                 charzAnimIdx = CA_LAND_A;
@@ -1074,7 +1091,7 @@ int GuiApp::run(int argc, char** argv)
                 }
                 break;
             }
-            case CharzMove::LANDING_B: {  // ground land phase (plays second)
+            case CharzMove::LANDING_B: {
                 charzMoveT += dt;
                 charzPos.y = CHARZ_GROUND_Y;
                 charzAnimIdx = CA_LAND_B;
@@ -1088,13 +1105,13 @@ int GuiApp::run(int argc, char** argv)
             }
 
             if (charzMove == CharzMove::GROUNDED || charzMove == CharzMove::FLYING) {
-                // reset clock on animation change so every clip starts from frame 0
+
                 if (charzAnimIdx != charzPrevAnim) {
                     charzAnimTime = 0.f;
                     charzPrevAnim = charzAnimIdx;
                 }
                 charzAnimTime += dt * CHARZ_ANIM_SPEED;
-                // wrap to keep time in [0, duration) for a clean loop
+
                 if (haveCharz && charzMesh.animCount() > charzAnimIdx) {
                     float dur = charzMesh.animDuration(charzAnimIdx);
                     if (dur > 0.01f && charzAnimTime >= dur)
@@ -1113,7 +1130,7 @@ int GuiApp::run(int argc, char** argv)
             camDist * std::cos(camPitch) * std::cos(camYaw));
 
         sf::Vector2u ws = window.getSize();
-        glViewport(0, 0, ws.x, ws.y);   // suit la taille (fenêtré <-> plein écran)
+        glViewport(0, 0, ws.x, ws.y);
         float aspect = (float)ws.x / ws.y;
         glm::mat4 proj = glm::perspective(glm::radians(38.f), aspect, 0.1f, 8000.f);
 
@@ -1130,7 +1147,7 @@ int GuiApp::run(int argc, char** argv)
                                mewPos.z - std::cos(ay) * horiz);
             view = glm::lookAt(camPos, target, glm::vec3(0, 1, 0));
         }
-        if (charzMode) {   // camera follows the dragon
+        if (charzMode) {
             bool onGround = charzPos.y <= CHARZ_GROUND_Y + 0.05f;
             float by = charzPos.y;
             float headH = onGround ? 1.8f : 2.5f;
@@ -1144,9 +1161,33 @@ int GuiApp::run(int argc, char** argv)
                                charzPos.z - std::cos(ay) * horiz);
             view = glm::lookAt(camPos, target, glm::vec3(0, 1, 0));
         }
+        if (povMode) {
+            auto pait = playerAnims.find(hud.selectedPlayer());
+            if (pait == playerAnims.end() || !pait->second.posInit) {
+                povMode = false; hud.setSelectedPlayer(-1);
+            } else {
+                glm::vec2 pw2 = pait->second.curWorld;
+                glm::vec3 ptarget = {pw2.x, 1.5f, pw2.y};
+                float baseYaw = 0.f;
+                if (netConnected) {
+                    auto plit = netClient.state().players.find(hud.selectedPlayer());
+                    if (plit != netClient.state().players.end()) {
+                        int o = plit->second.orientation;
+                        float deg = (o==1)?180.f:(o==2)?90.f:(o==3)?0.f:(o==4)?270.f:0.f;
+                        baseYaw = glm::radians(deg);
+                    }
+                }
+                float ay = baseYaw + admCamYaw + 3.14159265f;
+                float ap = glm::clamp(admCamPitch, -0.50f, 1.20f);
+                float dist = camDist;
+                float horiz = dist * std::cos(ap);
+                camPos = {pw2.x - std::sin(ay)*horiz, 1.5f + dist*std::sin(ap), pw2.y - std::cos(ay)*horiz};
+                view = glm::lookAt(camPos, ptarget, {0.f, 1.f, 0.f});
+            }
+        }
 
         DayNight dn = computeDayNight(elapsed, nightOverride);
-        float     nightF   = dn.nightF,   ambScale = dn.ambScale;
+        float     nightF   = dn.nightF,   ambScale = dn.ambScale * settings.ambientMult();
         glm::vec3 skySunDir = dn.skySunDir, moonDir = dn.moonDir, sunDir = dn.sunDir;
         glm::vec3 lightCol  = dn.lightCol,  skyTop  = dn.skyTop,  skyHor = dn.skyHor;
 
@@ -1229,6 +1270,69 @@ int GuiApp::run(int argc, char** argv)
         drawCharacters(characters, skinShader, auraShader, view, proj,
                        camPos, sunDir, lightCol, ambScale, elapsed, dt);
 
+        if (hud.selectedPlayer() >= 0 && netConnected) {
+            auto bpait = playerAnims.find(hud.selectedPlayer());
+            if (bpait != playerAnims.end() && bpait->second.posInit) {
+                static Mesh beamMesh = []() -> Mesh {
+
+                    const int N = 32;
+                    const float rBot = 0.65f, rTop = 0.04f, H = 16.f;
+                    std::vector<float> v;
+                    std::vector<unsigned int> idx;
+                    v.reserve(N * 4 * 6);
+                    idx.reserve(N * 6);
+                    for (int i = 0; i < N; ++i) {
+                        float a0 = (float)i       / N * 6.28318f;
+                        float a1 = (float)(i + 1) / N * 6.28318f;
+                        auto push = [&](float r, float y, float a) {
+                            float nx = std::cos(a), nz = std::sin(a);
+                            float slope = (rBot - rTop) / H;
+                            float nl = std::sqrt(nx*nx + slope*slope + nz*nz);
+                            v.push_back(r * nx); v.push_back(y); v.push_back(r * nz);
+                            v.push_back(nx/nl);  v.push_back(slope/nl); v.push_back(nz/nl);
+                        };
+                        unsigned b = (unsigned)v.size() / 6;
+                        push(rBot, 0.f, a0); push(rBot, 0.f, a1);
+                        push(rTop, H,   a1); push(rTop, H,   a0);
+                        idx.push_back(b);   idx.push_back(b+1); idx.push_back(b+2);
+                        idx.push_back(b);   idx.push_back(b+2); idx.push_back(b+3);
+                    }
+                    return Mesh(v, idx);
+                }();
+
+                glm::vec2 bw = bpait->second.curWorld;
+                glDisable(GL_CULL_FACE);
+                glDepthMask(GL_FALSE);
+                glEnable(GL_BLEND);
+                glBlendFunc(GL_ONE, GL_ONE);
+                toon.use();
+                toon.setBool ("uEmissive",   true);
+                toon.setBool ("uCircleClip", false);
+                toon.setBool ("uShoreBlend", false);
+                toon.setBool ("uWave",       false);
+                toon.setBool ("uSway",       false);
+                toon.setFloat("uAlpha",      1.f);
+                glm::mat4 Bm = glm::translate(glm::mat4(1.f), {bw.x, 0.f, bw.y});
+                glm::mat3 Bn = glm::mat3(1.f);
+                toon.setMat3("uNormalMat", glm::value_ptr(Bn));
+
+                float pulse = 0.14f + 0.05f * std::sin(elapsed * 2.2f);
+                toon.setMat4("uModel", glm::value_ptr(Bm));
+                toon.setVec3("uColor", pulse * 1.1f, pulse * 0.9f, pulse * 0.4f);
+                beamMesh.draw();
+
+                glm::mat4 Bc = glm::scale(Bm, glm::vec3(0.28f, 1.f, 0.28f));
+                toon.setMat4("uModel", glm::value_ptr(Bc));
+                float pulse2 = 0.38f + 0.12f * std::sin(elapsed * 3.1f);
+                toon.setVec3("uColor", pulse2, pulse2 * 0.97f, pulse2 * 0.80f);
+                beamMesh.draw();
+                glDepthMask(GL_TRUE);
+                glEnable(GL_CULL_FACE);
+                glDisable(GL_BLEND);
+                toon.setBool("uEmissive", false);
+            }
+        }
+
         {
             bool charging     = (pulseState == PulseState::CHARGING);
             bool justReleased = (pulseState == PulseState::RELEASING &&
@@ -1245,7 +1349,12 @@ int GuiApp::run(int argc, char** argv)
         drawIncantations(incantations, incantShader, view, proj, camPos, elapsed);
         drawClouds(toon, map, elapsed);
 
-        // keep the wildlife roaming over the island cluster, not the open ocean
+        if (showTileGrid) {
+            static const GuiState emptyGs2{};
+            const GuiState& gs2 = netConnected ? netClient.state() : emptyGs2;
+            drawTileGridGL(view, proj, map, gs2, cx, cz);
+        }
+
         float wfRadius = worldExtentRadius(1, map.w * TILE * 0.455f);
         updateWildlife(ptero,     dt, cx, cz, wfRadius);
         updateWildlife(butterfly, dt, cx, cz, wfRadius);
@@ -1253,8 +1362,54 @@ int GuiApp::run(int argc, char** argv)
         drawWildlife(butterfly, skinShader, view, proj, camPos, skySunDir, lightCol, ambScale, elapsed);
 
         window.resetGLStates();
+        if (showTileGrid) {
+            static const GuiState emptyGs{};
+            const GuiState& gs = netConnected ? netClient.state() : emptyGs;
+            sf::Vector2i mp = sf::Mouse::getPosition(window);
+            drawTileGridHUD(view, proj, map, gs, cx, cz,
+                            window, hudFont, ws.x, ws.y, mp.x, mp.y);
+        }
         hud.draw(window, netConnected ? &netClient.state() : nullptr,
                  menuCfg.host, menuCfg.port, map.w, map.h);
+
+        if (hud.selectedPlayer() >= 0 && netConnected) {
+            const GuiState& gss = netClient.state();
+            auto spit = gss.players.find(hud.selectedPlayer());
+            if (spit == gss.players.end()) {
+                hud.setSelectedPlayer(-1); povMode = false;
+            } else {
+                const GuiPlayer& sp = spit->second;
+                const float PW = 300.f, PH = 78.f;
+                float px = ws.x / 2.f - PW / 2.f, py = (float)ws.y - PH - 18.f;
+                sf::RectangleShape bg(sf::Vector2f(PW, PH));
+                bg.setPosition(px, py);
+                bg.setFillColor(sf::Color(10, 14, 24, 215));
+                bg.setOutlineColor(sf::Color(100, 160, 255, 210)); bg.setOutlineThickness(2.f);
+                window.draw(bg);
+
+                sf::Text lbl; lbl.setFont(hudFont);
+                lbl.setString("Player #" + std::to_string(sp.id)
+                              + "  [" + sp.team + "]  Lv." + std::to_string(sp.level));
+                lbl.setCharacterSize(15); lbl.setFillColor(sf::Color(190, 215, 255));
+                lbl.setPosition(px + 14.f, py + 10.f); window.draw(lbl);
+
+                const float BW = 110.f, BH = 30.f;
+                float bx = px + PW / 2.f - BW / 2.f, by2 = py + PH - BH - 10.f;
+                seeBtnRect = sf::FloatRect(bx, by2, BW, BH);
+                sf::RectangleShape btn(sf::Vector2f(BW, BH));
+                btn.setPosition(bx, by2);
+                btn.setFillColor(povMode ? sf::Color(50, 140, 230, 230)
+                                         : sf::Color(30, 90, 180, 230));
+                btn.setOutlineColor(sf::Color(150, 195, 255, 220)); btn.setOutlineThickness(1.5f);
+                window.draw(btn);
+                sf::Text btxt; btxt.setFont(hudFont);
+                btxt.setString(povMode ? "EXIT POV" : "SEE");
+                btxt.setCharacterSize(16); btxt.setFillColor(sf::Color(230, 240, 255));
+                sf::FloatRect tb = btxt.getLocalBounds();
+                btxt.setPosition(bx + BW/2.f - tb.width/2.f - tb.left, by2 + 5.f);
+                window.draw(btxt);
+            }
+        }
 
         if (adminPrompt) {
             sf::RectangleShape dim(sf::Vector2f((float)ws.x, (float)ws.y));
@@ -1308,9 +1463,7 @@ int GuiApp::run(int argc, char** argv)
             h.setPosition(ws.x / 2.f - b.width / 2.f, 42.f);
             window.draw(h);
         }
-        glEnable(GL_DEPTH_TEST);
-        glEnable(GL_CULL_FACE);
-        glCullFace(GL_BACK);
+        settings.draw(window, ws.x, ws.y);
 
         window.display();
     }

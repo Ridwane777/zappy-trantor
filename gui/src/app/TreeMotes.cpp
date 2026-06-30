@@ -1,6 +1,6 @@
 #include "app/TreeMotes.hpp"
 #include "render/Shader.hpp"
-#include "world/World.hpp"        // frnd(a, b)
+#include "world/World.hpp"
 
 #include <GL/glew.h>
 #include <glm/gtc/type_ptr.hpp>

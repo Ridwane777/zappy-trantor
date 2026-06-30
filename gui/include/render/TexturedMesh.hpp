@@ -1,7 +1,4 @@
 #pragma once
-// A static mesh that carries UVs and a diffuse texture, for OBJ models exported
-// with texture coordinates (e.g. the menu logo). Separate from Mesh, which only
-// stores pos+normal and is used by the game world.
 
 #include <string>
 #include <glm/glm.hpp>
@@ -16,11 +13,9 @@ public:
     TexturedMesh(TexturedMesh &&other) noexcept;
     TexturedMesh &operator=(TexturedMesh &&other) noexcept;
 
-    // Load geometry (v/vt/vn) from `objPath` and the diffuse map from `texPath`.
-    // Throws std::runtime_error on failure.
     static TexturedMesh load(const std::string &objPath, const std::string &texPath);
 
-    void draw() const;   // binds texture (unit 0) + VAO, issues the draw
+    void draw() const;
 
     glm::vec3 centroid()       const { return _centroid; }
     float     boundingRadius() const { return _radius; }

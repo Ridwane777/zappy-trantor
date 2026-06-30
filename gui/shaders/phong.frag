@@ -8,15 +8,15 @@ in vec2  vTexCoord;
 
 uniform vec3  uCamPos;
 uniform vec3  uColor;
-uniform vec3  uColor2;     // mid-zone color
-uniform vec3  uColor3;     // bottom-zone color
-uniform float uSplit1;     // world Y: above = uColor, below = uColor2
-uniform float uSplit2;     // world Y: below = uColor3
-uniform bool  uMultiColor;    // enable zone coloring
+uniform vec3  uColor2;
+uniform vec3  uColor3;
+uniform float uSplit1;
+uniform float uSplit2;
+uniform bool  uMultiColor;
 uniform bool      uUseVertexColor;
 uniform sampler2D uTexture;
 uniform bool      uUseTexture;
-uniform bool      uAlphaCutout;   // butterfly wings: shape lives in texture alpha
+uniform bool      uAlphaCutout;
 uniform float uShininess;
 uniform float uAmbientStrength;
 uniform bool  uEmissive;
@@ -46,14 +46,13 @@ void main() {
         return;
     }
 
-    // pick base color: texture > vertex-baked > zone > uniform
     vec3 baseColor = uColor;
     float texAlpha = 1.0;
     if      (uUseTexture) {
         vec4 t = texture(uTexture, vTexCoord);
         baseColor = t.rgb;
         texAlpha  = t.a;
-        if (uAlphaCutout && texAlpha < 0.15) discard;  // carve wing shape from alpha
+        if (uAlphaCutout && texAlpha < 0.15) discard;
     }
     else if (uUseVertexColor) baseColor = vVertColor;
     if (!uUseTexture && !uUseVertexColor && uMultiColor) {
@@ -65,27 +64,24 @@ void main() {
     vec3 L = normalize(-uDirLightDir);
     vec3 V = normalize(uCamPos - vPos);
 
-    // Lambert diffuse
     float diff   = max(dot(N, L), 0.0);
     vec3  diffuse = baseColor * uDirLightColor * diff;
-    vec3  ambient = baseColor * uAmbientStrength * vec3(1.10, 0.88, 0.65); // warm shadow tint
+    vec3  ambient = baseColor * uAmbientStrength * vec3(1.10, 0.88, 0.65);
     vec3  col     = ambient + diffuse;
-    // Contrast + slight saturation boost
+
     col = pow(clamp(col, 0.0, 1.0), vec3(0.88));
     col = mix(vec3(dot(col, vec3(0.299, 0.587, 0.114))), col, 1.25);
 
     if (uCrystal) {
-        // Blinn-Phong specular
+
         vec3  H    = normalize(L + V);
         float spec = pow(max(dot(N, H), 0.0), uShininess);
         vec3 specColor = mix(vec3(1.0), baseColor, 0.25);
         col += specColor * spec * 2.0;
 
-        // Fresnel rim
         float fresnel = pow(1.0 - max(dot(N, V), 0.0), 2.5);
         col += baseColor * fresnel * 0.9;
 
-        // Inner glow
         col += baseColor * 0.15;
 
         FragColor = vec4(clamp(col, 0.0, 1.0), uAlpha);
@@ -98,7 +94,7 @@ void main() {
     }
 
     float alpha = uAlpha;
-    if (uAlphaCutout) alpha *= texAlpha;   // soft wing edges
+    if (uAlphaCutout) alpha *= texAlpha;
     if (uCircleClip) {
         float d    = length(vPos.xz - uClipCenter);
         float fade = clamp((uClipRadius - d) / (uClipRadius * 0.06), 0.0, 1.0);

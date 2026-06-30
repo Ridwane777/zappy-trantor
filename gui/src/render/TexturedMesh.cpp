@@ -47,7 +47,7 @@ Key parseCorner(const std::string &s)
     return k;
 }
 
-} // namespace
+}
 
 TexturedMesh::~TexturedMesh() { cleanup(); }
 
@@ -113,7 +113,7 @@ TexturedMesh TexturedMesh::load(const std::string &objPath, const std::string &t
             std::vector<Key> corners;
             std::string c;
             while (iss >> c) corners.push_back(parseCorner(c));
-            // triangulate fan
+
             for (std::size_t i = 1; i + 1 < corners.size(); ++i) {
                 for (Key k : {corners[0], corners[i], corners[i + 1]}) {
                     auto it = seen.find(k);
@@ -171,7 +171,6 @@ TexturedMesh TexturedMesh::load(const std::string &objPath, const std::string &t
     glEnableVertexAttribArray(2);
     glBindVertexArray(0);
 
-    // SFML loads top-left origin; flip vertically for GL
     sf::Image img;
     std::string texBytes = zappy::assetBytes(texPath);
     if (!texBytes.empty() && img.loadFromMemory(texBytes.data(), texBytes.size())) {

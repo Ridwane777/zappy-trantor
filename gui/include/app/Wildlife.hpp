@@ -17,13 +17,11 @@ struct WildlifeGroup {
     SkinnedMesh              mesh;
     std::vector<WildlifeEntity> entities;
     float                    scale     = 1.f;
-    float                    baseTilt  = 0.f; // degrees, pitch about local X applied to every entity
-    float                    baseRoll  = 0.f; // degrees, roll about local Z (stand flat wings upright)
-    bool                     alphaCutout = false; // texture alpha defines the silhouette (butterfly wings)
+    float                    baseTilt  = 0.f;
+    float                    baseRoll  = 0.f;
+    bool                     alphaCutout = false;
 };
 
-// Roam within a disk of `radius` around (cx, cz) — the island cluster — so the
-// wildlife stays over land instead of wandering the surrounding ocean.
 void updateWildlife(WildlifeGroup &g, float dt, float cx, float cz, float radius);
 
 void drawWildlife(WildlifeGroup &g, Shader &skin,

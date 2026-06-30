@@ -90,8 +90,8 @@ static std::vector<unsigned int> getIndices(const tinygltf::Model& m, int accIdx
     return out;
 }
 
-static const uint32_t CACHE_MAGIC   = 0x43424C47; // 'GLBC'
-static const uint32_t CACHE_VERSION = 4;
+static const uint32_t CACHE_MAGIC   = 0x43424C47;
+static const uint32_t CACHE_VERSION = 6;
 
 static std::string cachePath(const std::string& glbPath) {
     return glbPath + ".glbc";
@@ -115,6 +115,13 @@ template<class T>
 static bool crv(std::ifstream& f, std::vector<T>& v) {
     uint32_t n = 0;
     if (!cr(f, n)) return false;
+
+    std::streampos cur = f.tellg();
+    f.seekg(0, std::ios::end);
+    std::streampos end = f.tellg();
+    f.seekg(cur);
+    if (cur < 0 || end < 0) return false;
+    if ((uint64_t)n * sizeof(T) > (uint64_t)(end - cur)) return false;
     v.resize(n);
     if (n) f.read(reinterpret_cast<char*>(v.data()), n * sizeof(T));
     return f.good();
@@ -134,7 +141,7 @@ static void saveAnimsToCache(std::ofstream& f, const std::vector<Animation>& ani
         for (auto& bc : a.channels) {
             cw(f, bc.boneIndex);
             cwv(f, bc.timesT);
-            // transKeys as flat float3
+
             uint32_t nt = (uint32_t)bc.transKeys.size();
             cw(f, nt);
             for (auto& v : bc.transKeys) { cw(f,v.x); cw(f,v.y); cw(f,v.z); }
@@ -187,7 +194,7 @@ bool tryLoadCache(const std::string& glbPath, SkinnedMesh& sm,
     struct stat gs{}, cs{};
     if (stat(glbPath.c_str(), &gs) != 0) return false;
     if (stat(cp.c_str(), &cs) != 0) return false;
-    if (cs.st_mtime < gs.st_mtime) return false;   // GLB newer than cache
+    if (cs.st_mtime < gs.st_mtime) return false;
 
     std::ifstream f(cp, std::ios::binary);
     if (!f) return false;
@@ -214,35 +221,89 @@ bool tryLoadCache(const std::string& glbPath, SkinnedMesh& sm,
         name.resize(nl);
         if (nl) f.read(&name[0], nl);
     }
+
+    uint32_t nsm = 0; cr(f, nsm);
+    sm.subMeshes_.resize(nsm);
+    std::vector<int32_t> smImgSrc(nsm, -1);
+    for (uint32_t i = 0; i < nsm; ++i) {
+        cr(f, sm.subMeshes_[i].start);
+        cr(f, sm.subMeshes_[i].count);
+        cr(f, smImgSrc[i]);
+    }
+
+    uint32_t ni = 0; cr(f, ni);
+    std::map<int32_t, GLuint> srcTex;
+    for (uint32_t i = 0; i < ni; ++i) {
+        int32_t src = -1; cr(f, src);
+        uint32_t blen = 0; cr(f, blen);
+        std::string bytes;
+        if (blen) {
+            bytes.resize(blen);
+            f.read(&bytes[0], blen);
+        }
+        if (src >= 0 && blen > 0) {
+            GLuint t = makeTexFromImageBytes(bytes);
+            if (t) { srcTex[src] = t; sm.matTextures_.push_back(t); }
+        }
+    }
+    for (uint32_t i = 0; i < nsm; ++i) {
+        auto it = srcTex.find(smImgSrc[i]);
+        if (it != srcTex.end()) sm.subMeshes_[i].tex = it->second;
+    }
     return f.good();
 }
 
 void saveCache(const std::string& glbPath, const SkinnedMesh& sm,
                const std::vector<float>& verts,
-               const std::vector<unsigned int>& indices)
+               const std::vector<unsigned int>& indices,
+               const std::vector<SubMeshMeta>& smeta,
+               const std::map<int, std::string>& imgBytes)
 {
-    return;   // streaming mode: assets live in RAM, nothing written to disk
-    std::ofstream f(cachePath(glbPath), std::ios::binary);
-    if (!f) return;
-    cw(f, CACHE_MAGIC);
-    cw(f, CACHE_VERSION);
-    cw(f, sm.bmin_.x); cw(f, sm.bmin_.y); cw(f, sm.bmin_.z);
-    cw(f, sm.bmax_.x); cw(f, sm.bmax_.y); cw(f, sm.bmax_.z);
-    cwv(f, verts);
-    cwv(f, indices);
-    uint32_t nj = (uint32_t)sm.invBindMats_.size();
-    cw(f, nj);
-    for (auto& m : sm.invBindMats_)
-        f.write(reinterpret_cast<const char*>(glm::value_ptr(m)), 64);
-    cwv(f, sm.parentOf_);
-    saveAnimsToCache(f, sm.animations_);
-    uint32_t nb = (uint32_t)sm.boneNames_.size();
-    cw(f, nb);
-    for (auto& name : sm.boneNames_) {
-        uint32_t nl = (uint32_t)name.size();
-        cw(f, nl);
-        f.write(name.c_str(), nl);
+
+    const std::string finalPath = cachePath(glbPath);
+    const std::string tmpPath   = finalPath + ".tmp";
+    {
+        std::ofstream f(tmpPath, std::ios::binary | std::ios::trunc);
+        if (!f) return;
+        cw(f, CACHE_MAGIC);
+        cw(f, CACHE_VERSION);
+        cw(f, sm.bmin_.x); cw(f, sm.bmin_.y); cw(f, sm.bmin_.z);
+        cw(f, sm.bmax_.x); cw(f, sm.bmax_.y); cw(f, sm.bmax_.z);
+        cwv(f, verts);
+        cwv(f, indices);
+        uint32_t nj = (uint32_t)sm.invBindMats_.size();
+        cw(f, nj);
+        for (auto& m : sm.invBindMats_)
+            f.write(reinterpret_cast<const char*>(glm::value_ptr(m)), 64);
+        cwv(f, sm.parentOf_);
+        saveAnimsToCache(f, sm.animations_);
+        uint32_t nb = (uint32_t)sm.boneNames_.size();
+        cw(f, nb);
+        for (auto& name : sm.boneNames_) {
+            uint32_t nl = (uint32_t)name.size();
+            cw(f, nl);
+            f.write(name.c_str(), nl);
+        }
+
+        uint32_t nsm = (uint32_t)smeta.size();
+        cw(f, nsm);
+        for (auto& s : smeta) {
+            cw(f, s.start); cw(f, s.count); cw(f, s.imgSrc);
+        }
+
+        uint32_t ni = (uint32_t)imgBytes.size();
+        cw(f, ni);
+        for (auto& [src, bytes] : imgBytes) {
+            cw(f, (int32_t)src);
+            uint32_t blen = (uint32_t)bytes.size();
+            cw(f, blen);
+            if (blen) f.write(bytes.data(), blen);
+        }
+        f.flush();
+        if (!f.good()) { f.close(); std::remove(tmpPath.c_str()); return; }
     }
+    if (std::rename(tmpPath.c_str(), finalPath.c_str()) != 0)
+        std::remove(tmpPath.c_str());
 }
 
 static void saveAnimCache(const std::string& glbPath, const std::vector<Animation>& anims)
@@ -251,7 +312,7 @@ static void saveAnimCache(const std::string& glbPath, const std::vector<Animatio
     std::ofstream f(cp, std::ios::binary);
     if (!f) return;
     cw(f, CACHE_MAGIC);
-    uint32_t ver2 = CACHE_VERSION + 100;   // distinct tag from full cache
+    uint32_t ver2 = CACHE_VERSION + 100;
     cw(f, ver2);
     saveAnimsToCache(f, anims);
 }
@@ -271,8 +332,6 @@ static bool tryLoadAnimOnlyCache(const std::string& glbPath, std::vector<Animati
     return loadAnimsFromCache(f, out) && f.good();
 }
 
-// base dir of the glTF being parsed; tinygltf may pass relative URIs (e.g. "scene.bin")
-// thread_local so concurrent loads don't race
 static thread_local std::string g_gltfBaseDir;
 
 static void setCdnFs(tinygltf::TinyGLTF& loader)
@@ -283,7 +342,7 @@ static void setCdnFs(tinygltf::TinyGLTF& loader)
     fs.ReadWholeFile  = [](std::vector<unsigned char>* out, std::string* err,
                            const std::string& fp, void*) {
         std::string b = zappy::assetBytes(fp);
-        if (b.empty() && fp.rfind("assets/", 0) != 0)   // relative URI: prepend base dir
+        if (b.empty() && fp.rfind("assets/", 0) != 0)
             b = zappy::assetBytes(g_gltfBaseDir + fp);
         if (b.empty()) { if (err) *err = "cdn read failed: " + fp; return false; }
         out->assign(b.begin(), b.end());
@@ -314,8 +373,6 @@ static std::string base64(const std::string& in)
     return out;
 }
 
-// Inline external buffers/images as base64 data URIs so tinygltf needs no external file access.
-// (tinygltf's base_dir handling for streamed memory is unreliable.)
 static std::string embedGltfExternals(const std::string& gltf, const std::string& dir)
 {
     json j = json::parse(gltf, nullptr, false);
@@ -418,20 +475,14 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
             }
         }
 
-        // Compute the world transform of all SCENE nodes that are ancestors of
-        // the skin's root joint but are NOT themselves joints. Sketchfab exports
-        // often bury the skeleton under nodes with non-identity scales (e.g.
-        // scale=6.33 and scale=0.01). Without this, computeBones misses those
-        // transforms and the mesh deforms.
         {
-            // Build scene-graph parent map
+
             int numNodes = (int)model.nodes.size();
             std::vector<int> nodeParent(numNodes, -1);
             for (int ni = 0; ni < numNodes; ++ni)
                 for (int child : model.nodes[ni].children)
                     if (child < numNodes) nodeParent[child] = ni;
 
-            // Node local transform helper
             auto nodeMat = [&](int ni) -> glm::mat4 {
                 auto& n = model.nodes[ni];
                 if (!n.matrix.empty()) {
@@ -446,15 +497,12 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
                 return glm::translate(glm::mat4(1.f), t) * glm::toMat4(r) * glm::scale(glm::mat4(1.f), s);
             };
 
-            // Find root joint node
             int rootJointNode = skin.joints[0];
 
-            // Collect ancestor chain (from scene root down to parent of root joint)
             std::vector<int> chain;
             for (int cur = nodeParent[rootJointNode]; cur >= 0; cur = nodeParent[cur])
                 chain.push_back(cur);
 
-            // Multiply top-down (outermost ancestor first)
             glm::mat4 xform(1.f);
             for (int i = (int)chain.size()-1; i >= 0; --i)
                 xform = xform * nodeMat(chain[i]);
@@ -462,7 +510,6 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
         }
     }
 
-    // vertex layout: pos(3) normal(3) joints(4) weights(4) uv(2) → 16 floats
     std::vector<float>        verts;
     std::vector<unsigned int> indices;
 
@@ -502,7 +549,7 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
                 const float* wf = floatPtr(model, w0It->second);
                 for (size_t i = 0; i < nv*4; ++i) wvec[i] = wf[i];
             }
-            // non-skinned primitive: bind fully to bone 0 so GPU skinning is a no-op
+
             if (j0It == prim.attributes.end() && w0It == prim.attributes.end()) {
                 for (size_t i = 0; i < nv; ++i) wvec[i*4+0] = 1.f;
             }
@@ -537,12 +584,14 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
         }
     }
 
-    // Multi-material models (Charizard has body_a/body_b/eyes/fire) carry their
-    // base-color maps embedded in the GLB. Decode one GL texture per distinct
-    // image and tag each submesh. Single-texture models keep using loadTexture().
+    std::vector<SubMeshMeta> smeta;
+    std::map<int, std::string> imgSrcBytes;
     {
+        smeta.reserve(sm.subMeshes_.size());
+        for (auto& s : sm.subMeshes_) smeta.push_back({s.start, s.count, -1});
+
         int distinct = 0;
-        std::map<int, GLuint> imgTex;     // image index → gl texture
+        std::map<int, GLuint> imgTex;
         std::vector<int> seen;
         for (auto& s : sm.subMeshes_) {
             if (s.material < 0 || s.material >= (int)model.materials.size()) continue;
@@ -552,17 +601,17 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
             if (std::find(seen.begin(), seen.end(), src) == seen.end()) { seen.push_back(src); ++distinct; }
         }
         if (distinct > 1) {
-            for (auto& s : sm.subMeshes_) {
+            for (size_t si = 0; si < sm.subMeshes_.size(); ++si) {
+                auto& s = sm.subMeshes_[si];
                 if (s.material < 0 || s.material >= (int)model.materials.size()) continue;
                 int ti = model.materials[s.material].pbrMetallicRoughness.baseColorTexture.index;
                 if (ti < 0 || ti >= (int)model.textures.size()) continue;
                 int src = model.textures[ti].source;
                 if (src < 0 || src >= (int)model.images.size()) continue;
+                smeta[si].imgSrc = src;
                 auto found = imgTex.find(src);
                 if (found != imgTex.end()) { s.tex = found->second; continue; }
-                // Allow an external recolor_<image>.png next to the model to
-                // override the embedded base-color map (e.g. Charizard's grey
-                // skin repainted orange). Falls back to the embedded image.
+
                 std::string dir   = path.substr(0, path.find_last_of('/') + 1);
                 std::string bytes = zappy::assetBytes(dir + "recolor_" + std::to_string(src) + ".png");
                 if (bytes.empty()) {
@@ -573,6 +622,7 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
                         bytes.assign((const char*)buf.data.data() + bv.byteOffset, bv.byteLength);
                     }
                 }
+                imgSrcBytes[src] = bytes;
                 GLuint t = makeTexFromImageBytes(bytes);
                 imgTex[src] = t;
                 if (t) sm.matTextures_.push_back(t);
@@ -581,7 +631,6 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
             std::cout << "  + " << distinct << " embedded material textures\n";
         }
     }
-
 
     std::cout << "SkinnedMesh " << path
               << "  v=" << verts.size()/16
@@ -597,7 +646,7 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
 
             for (auto& ch : anim.channels) {
                 if (ch.target_node < 0) continue;
-                // map node → joint index
+
                 auto it = std::find(skin.joints.begin(), skin.joints.end(), ch.target_node);
                 if (it == skin.joints.end()) continue;
                 int ji = (int)(it - skin.joints.begin());
@@ -607,7 +656,6 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
                 size_t       nk    = model.accessors[samp.input].count;
                 const float* vals  = floatPtr(model, samp.output);
 
-                // find or create channel for this joint
                 BoneChannel* bc = nullptr;
                 for (auto& c : a.channels)
                     if (c.boneIndex == ji) { bc = &c; break; }
@@ -624,7 +672,7 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
                     bc->timesR.assign(times, times+nk);
                     bc->rotKeys.resize(nk);
                     for (size_t i = 0; i < nk; ++i)
-                        // glTF quat: x,y,z,w → glm: w,x,y,z
+
                         bc->rotKeys[i] = glm::quat(vals[i*4+3], vals[i*4], vals[i*4+1], vals[i*4+2]);
                 } else if (ch.target_path == "scale") {
                     bc->timesS.assign(times, times+nk);
@@ -638,7 +686,7 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
     }
 
     sm.upload(verts, indices);
-    saveCache(path, sm, verts, indices);
+    saveCache(path, sm, verts, indices, smeta, imgSrcBytes);
     return sm;
 }
 
@@ -726,7 +774,6 @@ void SkinnedMesh::computeBones(int animIdx, float t,
 
     if (n > MAX_BONES) n = MAX_BONES;
 
-    // seed every joint with its bind-pose local transform; animated channels override below
     std::vector<glm::mat4> local(n, glm::mat4(1.f));
     for (int i = 0; i < n && i < (int)bindLocal_.size(); ++i)
         local[i] = glm::translate(glm::mat4(1.f), bindLocal_[i].t)
@@ -742,12 +789,6 @@ void SkinnedMesh::computeBones(int animIdx, float t,
             if (reversed) t = dur - t;
         }
 
-        // Identify the locomotion (root-motion) joint: the highest joint in the
-        // hierarchy whose translation track actually *drifts* (start != end), i.e.
-        // baked forward travel that snaps back at the loop wrap. In this rig that
-        // is 'origin_109' for the walk/run loops. Pose/sway bones (e.g. waist_108)
-        // oscillate back to their start, so their net displacement is ~0 and they
-        // are excluded -- this keeps one-shot takeoff/landing clips untouched.
         int rootMoJoint = -1;
         if (stripRootMotion) {
             int bestDepth = 1 << 30;
@@ -767,8 +808,6 @@ void SkinnedMesh::computeBones(int animIdx, float t,
             int ji = ch.boneIndex;
             if (ji >= n) continue;
 
-            // default to the bind-pose TRS so bones with only a rotation track
-            // keep their rest offset (bone length) instead of collapsing to 0
             glm::vec3 T = (ji < (int)bindLocal_.size()) ? bindLocal_[ji].t : glm::vec3(0.f);
             glm::quat R = (ji < (int)bindLocal_.size()) ? bindLocal_[ji].r : glm::quat(1.f,0.f,0.f,0.f);
             glm::vec3 S = (ji < (int)bindLocal_.size()) ? bindLocal_[ji].s : glm::vec3(1.f);
@@ -787,14 +826,13 @@ void SkinnedMesh::computeBones(int animIdx, float t,
         }
     }
 
-    // joints stored in topological order (GLTF spec), so parents are always before children
     std::vector<glm::mat4> global(n);
     for (int i = 0; i < n; ++i) {
         int p = parentOf_[i];
         if (p >= 0 && p < n)
             global[i] = global[p] * local[i];
         else
-            global[i] = local[i]; // inverseBindMatrices are already skeleton-local
+            global[i] = local[i];
     }
 
     for (int i = 0; i < n; ++i)
@@ -836,7 +874,7 @@ void SkinnedMesh::upload(const std::vector<float>& verts,
 
 void SkinnedMesh::loadVertexColors(const std::string& colPath)
 {
-    std::string blob = zappy::assetBytes(colPath);   // local or streamed from CDN
+    std::string blob = zappy::assetBytes(colPath);
     if (blob.size() < 4) { std::cerr << "loadVertexColors: cannot open " << colPath << "\n"; return; }
 
     unsigned int n = 0;
@@ -856,8 +894,6 @@ void SkinnedMesh::loadVertexColors(const std::string& colPath)
     std::cout << "Loaded vertex colors: " << n << " verts from " << colPath << "\n";
 }
 
-// Decode encoded image bytes (PNG/JPG) into a fresh GL texture. Returns 0 on
-// failure. Used to build per-material textures from a multi-material GLB.
 static GLuint makeTexFromImageBytes(const std::string& bytes)
 {
     sf::Image img;
@@ -879,7 +915,7 @@ static GLuint makeTexFromImageBytes(const std::string& bytes)
 
 void SkinnedMesh::loadTexture(const std::string& pngPath)
 {
-    std::string png = zappy::assetBytes(pngPath);   // local or streamed from CDN
+    std::string png = zappy::assetBytes(pngPath);
     sf::Image img;
     if (png.empty() || !img.loadFromMemory(png.data(), png.size())) {
         std::cerr << "loadTexture: cannot open " << pngPath << "\n";
@@ -903,9 +939,6 @@ void SkinnedMesh::draw() const
     glBindVertexArray(vao_);
     glActiveTexture(GL_TEXTURE0);
 
-    // Per-material path: only when there are embedded textures and no external
-    // texture was set via loadTexture(). texId_ always wins so single-texture
-    // models (players, Mew) are unaffected.
     bool multi = !matTextures_.empty() && texId_ == 0;
     if (multi) {
         for (auto& s : subMeshes_) {
@@ -921,8 +954,6 @@ void SkinnedMesh::draw() const
     glBindVertexArray(0);
     glBindTexture(GL_TEXTURE_2D, 0);
 }
-
-// ── bone utilities ────────────────────────────────────────────────────────────
 
 int SkinnedMesh::boneIndexByName(const std::string& n) const
 {
@@ -942,9 +973,6 @@ void SkinnedMesh::overlayBoneChain(int rootBoneIdx, const glm::mat4& localRot,
     int n = (int)invBindMats_.size();
     if (rootBoneIdx < 0 || rootBoneIdx >= n) return;
 
-    // global[root] = boneMats[root] * inverse(invBind[root])
-    // W = global[root] * localRot * global[root]^-1  (world-space delta)
-    // newBoneMats[j] = W * boneMats[j]  for root and all descendants
     glm::mat4 bind_root = glm::inverse(invBindMats_[rootBoneIdx]);
     glm::mat4 global_root = boneMats[rootBoneIdx] * bind_root;
     glm::mat4 W = global_root * localRot * glm::inverse(global_root);
@@ -981,8 +1009,6 @@ std::vector<LocalTRS> SkinnedMesh::extractLocalTRS(int animIdx, float t) const
     }
     return out;
 }
-
-// ── move / destructor ─────────────────────────────────────────────────────────
 
 SkinnedMesh::~SkinnedMesh()
 {

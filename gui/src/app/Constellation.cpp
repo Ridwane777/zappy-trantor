@@ -1,6 +1,6 @@
 #include "app/Constellation.hpp"
 #include "render/Shader.hpp"
-#include "world/World.hpp"        // frnd(a, b)
+#include "world/World.hpp"
 
 #include <GL/glew.h>
 #include <glm/gtc/type_ptr.hpp>
@@ -9,16 +9,15 @@
 #include <cmath>
 #include <cstdlib>
 
-// links between the 7 Big Dipper stars (the bowl + the handle)
 static const int kDipperLink[7][2] = { {0,1},{1,2},{2,3},{3,0},{3,4},{4,5},{5,6} };
 
 Constellation::Constellation()
 {
-    // scattered background stars (little intro-style lights)
+
     auto rnd = [](float a, float b) { return a + (b - a) * (float)std::rand() / RAND_MAX; };
     for (int i = 0; i < 170; ++i) {
         float az = rnd(0.f, 6.2831853f);
-        float el = rnd(0.06f, 1.35f);               // elevation above horizon (rad)
+        float el = rnd(0.06f, 1.35f);
         float ce = std::cos(el), se = std::sin(el);
         SkyStar s;
         s.dir    = glm::normalize(glm::vec3(ce * std::cos(az), se, ce * std::sin(az)));
@@ -28,8 +27,7 @@ Constellation::Constellation()
         s.bright = rnd(0.35f, 0.9f);
         _stars.push_back(s);
     }
-    // Big Dipper, placed among the far stars at a tunable sky direction
-    // (azimuth/elevation in degrees) so it sits in the visible sky behind the tree.
+
     float constAz = std::getenv("ZAPPY_CONST_AZ") ? (float)std::atof(std::getenv("ZAPPY_CONST_AZ")) : 225.f;
     float constEl = std::getenv("ZAPPY_CONST_EL") ? (float)std::atof(std::getenv("ZAPPY_CONST_EL")) : 22.f;
     float constS  = std::getenv("ZAPPY_CONST_S")  ? (float)std::atof(std::getenv("ZAPPY_CONST_S"))  : 0.040f;
@@ -53,17 +51,17 @@ void Constellation::tick(bool spaceHeld, bool adminMode, float dt)
     if (adminMode) {
         if (spaceHeld && !_active) {
             _charge += dt;
-            if (_charge >= 5.f) {                  // trigger
+            if (_charge >= 5.f) {
                 _active = true; _waveT = 0.f; _litT = 0.f;
             }
         } else if (!_active) {
-            _charge = std::max(0.f, _charge - dt * 2.f);   // release -> fade
+            _charge = std::max(0.f, _charge - dt * 2.f);
         }
     }
-    if (_waveT >= 0.f) _waveT += dt;                       // run the wave
-    if (_active) {                                         // 5 s illumination
+    if (_waveT >= 0.f) _waveT += dt;
+    if (_active) {
         _litT += dt;
-        if (_litT >= 5.f) {                               // done -> reset
+        if (_litT >= 5.f) {
             _active = false; _litT = -1.f; _charge = 0.f;
         }
     }
@@ -72,10 +70,9 @@ void Constellation::tick(bool spaceHeld, bool adminMode, float dt)
 void Constellation::updateMewEnergy(bool adminMode, float dt, const glm::vec3& mewPos, float elapsed)
 {
     glm::vec3 mc(mewPos.x, mewPos.y + std::sin(elapsed * 2.5f) * 0.4f, mewPos.z);
-    glm::vec3 pa(0.78f, 0.58f, 1.0f);   // light purple
-    glm::vec3 pb(0.55f, 0.30f, 0.96f);  // deeper violet
+    glm::vec3 pa(0.78f, 0.58f, 1.0f);
+    glm::vec3 pb(0.55f, 0.30f, 0.96f);
 
-    // charging: motes gather and spiral up around Mew
     if (adminMode && _charge > 0.f && !_active) {
         float cf = glm::clamp(_charge / 5.f, 0.f, 1.f);
         int n = (int)(cf * cf * 6.f) + (frnd(0.f, 1.f) < cf ? 1 : 0);
@@ -92,13 +89,13 @@ void Constellation::updateMewEnergy(bool adminMode, float dt, const glm::vec3& m
             _motes.push_back(m);
         }
     }
-    // activation: a dense ring/dome of purple energy bursts outward from Mew
+
     if (_waveT >= 0.f && _wavePrev < 0.f) {
         const int n = 240;
         for (int i = 0; i < n; ++i) {
             Spark m;
             float ang = (i / (float)n) * 6.2832f + frnd(-0.04f, 0.04f);
-            float elev = frnd(-0.2f, 0.9f);                 // mostly outward, some upward (dome)
+            float elev = frnd(-0.2f, 0.9f);
             float ce = std::cos(elev), se = std::sin(elev);
             m.pos = mc + glm::vec3(std::cos(ang) * 0.4f, 0.3f, std::sin(ang) * 0.4f);
             float spd = frnd(10.f, 20.f);
@@ -127,7 +124,6 @@ void Constellation::renderNightSky(Shader& star, unsigned vao, const glm::mat4& 
     glBlendFunc(GL_ONE, GL_ONE);
     glBindVertexArray(vao);
 
-    // scattered background stars (little intro-style lights)
     for (auto& st : _stars) {
         glm::vec3 wp = camPos + st.dir * 1500.f;
         float tw = 0.6f + 0.4f * std::sin(elapsed * st.twFreq + st.phase);
@@ -139,7 +135,7 @@ void Constellation::renderNightSky(Shader& star, unsigned vao, const glm::mat4& 
     }
 
     float chargeF = glm::clamp(_charge / 5.f, 0.f, 1.f);
-    // 5 s illumination envelope: fade in (1s) -> hold -> fade out (1.5s)
+
     float lit = 0.f;
     if (_active)
         lit = glm::smoothstep(0.f, 1.0f, _litT)
@@ -150,9 +146,8 @@ void Constellation::renderNightSky(Shader& star, unsigned vao, const glm::mat4& 
     float pulse   = _active ? (0.82f + 0.18f * std::sin(elapsed * 3.f)) : 1.f;
     glm::vec3 cstColor(0.70f, 0.85f, 1.0f);
     glm::vec3 dws[7];
-    for (int i = 0; i < 7; ++i) dws[i] = camPos + _dipperDir[i] * 1500.f;  // among the stars
+    for (int i = 0; i < 7; ++i) dws[i] = camPos + _dipperDir[i] * 1500.f;
 
-    // links between stars — strong once active, faint while charging
     float linkF = _active ? lit * pulse : chargeF * 0.35f;
     if (linkF > 0.02f) {
         for (auto& L : kDipperLink) {
@@ -169,7 +164,6 @@ void Constellation::renderNightSky(Shader& star, unsigned vao, const glm::mat4& 
         }
     }
 
-    // the 7 Big Dipper stars — brighten with charge, flash on the wave
     for (int i = 0; i < 7; ++i) {
         float inten = (0.55f + 1.3f * glowF + 2.2f * waveF) * pulse * nightF;
         star.setVec3 ("uCenter", dws[i].x, dws[i].y, dws[i].z);
