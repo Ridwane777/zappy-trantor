@@ -99,7 +99,6 @@ void Server::_processGuiRequest(Client &client, const std::string &line)
         try {
             it->second(client, arg);
         } catch (const std::exception &) {
-            // malformed argument (e.g. "#abc"): ignore the request
         }
     }
 }
