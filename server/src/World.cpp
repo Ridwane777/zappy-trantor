@@ -219,8 +219,9 @@ bool World::queueCommand(int playerFd, const std::string &cmd)
 
     auto it = _handlers.find(name);
     if (it == _handlers.end()) {
-        if (onPlayerEvent) onPlayerEvent(playerFd, "suc\n");
-        return true; // Unknown command is still "queued" and processed instantly as suc
+        if (onPlayerEvent)
+            onPlayerEvent(playerFd, "suc\n");
+        return true;
     }
 
     Action action;
