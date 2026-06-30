@@ -492,7 +492,6 @@ static int broadcastDirection(int sx, int sy, int rx, int ry, int width, int hei
     }
 
     double rel = angle - orientAngle;
-    // Normalise dans [-π, π]
     while (rel >  M_PI)
         rel -= 2 * M_PI;
     while (rel < -M_PI)
@@ -566,7 +565,6 @@ std::string World::_cmdEject(Player &p)
             case WEST:  other.x = _map.wrapX(other.x - 1); break;
         }
 
-        // If the ejected player was in an incantation, unfreeze them
         if (other.isIncanting)
             other.isIncanting = false;
 
