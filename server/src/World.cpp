@@ -389,7 +389,6 @@ std::string World::_cmdLook(Player &p)
             const Tile &tile = _map.getTile(tx, ty);
             bool firstItem = true;
 
-            // Joueurs présents sur cette tile
             for (const auto &other : _players) {
                 if (other.x == tx && other.y == ty) {
                     if (!firstItem)
@@ -399,7 +398,6 @@ std::string World::_cmdLook(Player &p)
                 }
             }
 
-            // Ressources présentes sur cette tile
             for (int r = 0; r < RESOURCE_COUNT; r++) {
                 int qty = tile.get(static_cast<Resource>(r));
                 for (int q = 0; q < qty; q++) {
