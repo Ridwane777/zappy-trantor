@@ -26,7 +26,6 @@
 #include "app/Islands.hpp"
 #include "app/PlayerRender.hpp"
 #include "app/Wildlife.hpp"
-#include "app/BillMesh.hpp"
 #include "render/ObjLoader.hpp"
 #include "render/SkinnedMesh.hpp"
 #include "render/TexturedMesh.hpp"

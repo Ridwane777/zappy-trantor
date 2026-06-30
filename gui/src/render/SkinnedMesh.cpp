@@ -91,7 +91,7 @@ static std::vector<unsigned int> getIndices(const tinygltf::Model& m, int accIdx
 }
 
 static const uint32_t CACHE_MAGIC   = 0x43424C47;
-static const uint32_t CACHE_VERSION = 6;
+static const uint32_t CACHE_VERSION = 7;
 
 static std::string cachePath(const std::string& glbPath) {
     return glbPath + ".glbc";
@@ -212,6 +212,7 @@ bool tryLoadCache(const std::string& glbPath, SkinnedMesh& sm,
     for (auto& m : sm.invBindMats_)
         f.read(reinterpret_cast<char*>(glm::value_ptr(m)), 64);
     crv(f, sm.parentOf_);
+    f.read(reinterpret_cast<char*>(glm::value_ptr(sm.skinRootXform_)), 64);
 
     if (!loadAnimsFromCache(f, sm.animations_)) return false;
     uint32_t nb = 0; cr(f, nb);
@@ -276,6 +277,7 @@ void saveCache(const std::string& glbPath, const SkinnedMesh& sm,
         for (auto& m : sm.invBindMats_)
             f.write(reinterpret_cast<const char*>(glm::value_ptr(m)), 64);
         cwv(f, sm.parentOf_);
+        f.write(reinterpret_cast<const char*>(glm::value_ptr(sm.skinRootXform_)), 64);
         saveAnimsToCache(f, sm.animations_);
         uint32_t nb = (uint32_t)sm.boneNames_.size();
         cw(f, nb);
