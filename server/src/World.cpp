@@ -115,6 +115,12 @@ void World::update(int ticks)
         if (_spawnTimer >= 20) {
             _map.spawnResources();
             _spawnTimer = 0;
+            if (onGuiEvent) {
+                for (int y = 0; y < _map.getHeight(); y++)
+                    for (int x = 0; x < _map.getWidth(); x++)
+                        onGuiEvent(bctMsg(x, y, _map.getTile(x, y)));
+                onGuiEvent("sst 20\n");
+            }
         }
 
         for (auto it = _players.begin(); it != _players.end(); ) {
