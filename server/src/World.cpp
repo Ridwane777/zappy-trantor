@@ -132,7 +132,12 @@ void World::update(int ticks)
             }
 
             p.foodTimer--;
-            if (p.foodTimer <= 0) {
+            // On NE consomme PAS de food (et donc on ne peut pas mourir de faim)
+            // tant que le joueur est GELÉ dans une incantation. Sinon, comme une
+            // incantation dure jusqu'à 300 ticks pendant lesquels le joueur ne peut
+            // pas manger, tout un groupe pouvait mourir de faim PENDANT le rituel
+            // (typiquement au 7->8). Le défi de survie reste entier hors incantation.
+            if (p.foodTimer <= 0 && !p.isIncanting) {
                 if (p.inventory[FOOD] > 0) {
                     p.inventory[FOOD]--;
                     p.foodTimer = 126;

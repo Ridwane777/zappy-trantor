@@ -13,7 +13,7 @@ set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PORT="${1:-4343}"
-TEAMS=(team1 team2)
+TEAMS=(team1 team2 team3 team4)
 
 pids=()
 cleanup() {

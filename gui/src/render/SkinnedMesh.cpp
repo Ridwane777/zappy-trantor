@@ -16,9 +16,12 @@ using json = nlohmann::json;
 #include <stdexcept>
 #include <cstring>
 #include <algorithm>
+#include <map>
 #include <iostream>
 #include <fstream>
 #include <sys/stat.h>
+
+static GLuint makeTexFromImageBytes(const std::string& bytes);
 
 static int findInterval(const std::vector<float>& times, float t)
 {
@@ -525,7 +528,57 @@ SkinnedMesh SkinnedMesh::load(const std::string& path)
             }
 
             auto primIdx = getIndices(model, prim.indices);
+            SubMesh sub;
+            sub.start    = (GLsizei)indices.size();
+            sub.material = prim.material;
             for (auto idx : primIdx) indices.push_back(base + idx);
+            sub.count    = (GLsizei)indices.size() - sub.start;
+            sm.subMeshes_.push_back(sub);
+        }
+    }
+
+    // Multi-material models (Charizard has body_a/body_b/eyes/fire) carry their
+    // base-color maps embedded in the GLB. Decode one GL texture per distinct
+    // image and tag each submesh. Single-texture models keep using loadTexture().
+    {
+        int distinct = 0;
+        std::map<int, GLuint> imgTex;     // image index → gl texture
+        std::vector<int> seen;
+        for (auto& s : sm.subMeshes_) {
+            if (s.material < 0 || s.material >= (int)model.materials.size()) continue;
+            int ti = model.materials[s.material].pbrMetallicRoughness.baseColorTexture.index;
+            if (ti < 0 || ti >= (int)model.textures.size()) continue;
+            int src = model.textures[ti].source;
+            if (std::find(seen.begin(), seen.end(), src) == seen.end()) { seen.push_back(src); ++distinct; }
+        }
+        if (distinct > 1) {
+            for (auto& s : sm.subMeshes_) {
+                if (s.material < 0 || s.material >= (int)model.materials.size()) continue;
+                int ti = model.materials[s.material].pbrMetallicRoughness.baseColorTexture.index;
+                if (ti < 0 || ti >= (int)model.textures.size()) continue;
+                int src = model.textures[ti].source;
+                if (src < 0 || src >= (int)model.images.size()) continue;
+                auto found = imgTex.find(src);
+                if (found != imgTex.end()) { s.tex = found->second; continue; }
+                // Allow an external recolor_<image>.png next to the model to
+                // override the embedded base-color map (e.g. Charizard's grey
+                // skin repainted orange). Falls back to the embedded image.
+                std::string dir   = path.substr(0, path.find_last_of('/') + 1);
+                std::string bytes = zappy::assetBytes(dir + "recolor_" + std::to_string(src) + ".png");
+                if (bytes.empty()) {
+                    auto& im = model.images[src];
+                    if (im.bufferView >= 0 && im.bufferView < (int)model.bufferViews.size()) {
+                        auto& bv  = model.bufferViews[im.bufferView];
+                        auto& buf = model.buffers[bv.buffer];
+                        bytes.assign((const char*)buf.data.data() + bv.byteOffset, bv.byteLength);
+                    }
+                }
+                GLuint t = makeTexFromImageBytes(bytes);
+                imgTex[src] = t;
+                if (t) sm.matTextures_.push_back(t);
+                s.tex = t;
+            }
+            std::cout << "  + " << distinct << " embedded material textures\n";
         }
     }
 
@@ -662,7 +715,8 @@ void SkinnedMesh::loadAnimFrom(const std::string& path)
 
 void SkinnedMesh::computeBones(int animIdx, float t,
                                glm::mat4 boneMats[MAX_BONES],
-                               bool loop, bool reversed) const
+                               bool loop, bool reversed,
+                               bool stripRootMotion) const
 {
     int n = (int)invBindMats_.size();
     if (n == 0) {
@@ -688,6 +742,27 @@ void SkinnedMesh::computeBones(int animIdx, float t,
             if (reversed) t = dur - t;
         }
 
+        // Identify the locomotion (root-motion) joint: the highest joint in the
+        // hierarchy whose translation track actually *drifts* (start != end), i.e.
+        // baked forward travel that snaps back at the loop wrap. In this rig that
+        // is 'origin_109' for the walk/run loops. Pose/sway bones (e.g. waist_108)
+        // oscillate back to their start, so their net displacement is ~0 and they
+        // are excluded -- this keeps one-shot takeoff/landing clips untouched.
+        int rootMoJoint = -1;
+        if (stripRootMotion) {
+            int bestDepth = 1 << 30;
+            for (auto& ch : anim.channels) {
+                if (ch.transKeys.empty()) continue;
+                int ji = ch.boneIndex;
+                if (ji >= n) continue;
+                if (glm::length(ch.transKeys.back() - ch.transKeys.front()) < 0.05f)
+                    continue;
+                int d = 0, p = ji;
+                while (p >= 0 && p < (int)parentOf_.size()) { p = parentOf_[p]; ++d; }
+                if (d < bestDepth) { bestDepth = d; rootMoJoint = ji; }
+            }
+        }
+
         for (auto& ch : anim.channels) {
             int ji = ch.boneIndex;
             if (ji >= n) continue;
@@ -701,6 +776,9 @@ void SkinnedMesh::computeBones(int animIdx, float t,
             if (!ch.transKeys.empty())  T = sampleLinear(ch.timesT, ch.transKeys, t);
             if (!ch.rotKeys.empty())    R = sampleSlerp (ch.timesR, ch.rotKeys,   t);
             if (!ch.scaleKeys.empty())  S = sampleLinear(ch.timesS, ch.scaleKeys, t);
+
+            if (stripRootMotion && ji == rootMoJoint && !ch.transKeys.empty())
+                T = ch.transKeys.front();
 
             glm::mat4 m = glm::translate(glm::mat4(1.f), T)
                         * glm::toMat4(R)
@@ -778,6 +856,27 @@ void SkinnedMesh::loadVertexColors(const std::string& colPath)
     std::cout << "Loaded vertex colors: " << n << " verts from " << colPath << "\n";
 }
 
+// Decode encoded image bytes (PNG/JPG) into a fresh GL texture. Returns 0 on
+// failure. Used to build per-material textures from a multi-material GLB.
+static GLuint makeTexFromImageBytes(const std::string& bytes)
+{
+    sf::Image img;
+    if (bytes.empty() ||
+        !img.loadFromMemory(bytes.data(), bytes.size()))
+        return 0;
+    auto sz = img.getSize();
+    GLuint t = 0;
+    glGenTextures(1, &t);
+    glBindTexture(GL_TEXTURE_2D, t);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, sz.x, sz.y, 0,
+                 GL_RGBA, GL_UNSIGNED_BYTE, img.getPixelsPtr());
+    glGenerateMipmap(GL_TEXTURE_2D);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glBindTexture(GL_TEXTURE_2D, 0);
+    return t;
+}
+
 void SkinnedMesh::loadTexture(const std::string& pngPath)
 {
     std::string png = zappy::assetBytes(pngPath);   // local or streamed from CDN
@@ -801,14 +900,26 @@ void SkinnedMesh::loadTexture(const std::string& pngPath)
 
 void SkinnedMesh::draw() const
 {
-    if (texId_) {
-        glActiveTexture(GL_TEXTURE0);
-        glBindTexture(GL_TEXTURE_2D, texId_);
-    }
     glBindVertexArray(vao_);
-    glDrawElements(GL_TRIANGLES, indexCount_, GL_UNSIGNED_INT, nullptr);
+    glActiveTexture(GL_TEXTURE0);
+
+    // Per-material path: only when there are embedded textures and no external
+    // texture was set via loadTexture(). texId_ always wins so single-texture
+    // models (players, Mew) are unaffected.
+    bool multi = !matTextures_.empty() && texId_ == 0;
+    if (multi) {
+        for (auto& s : subMeshes_) {
+            glBindTexture(GL_TEXTURE_2D, s.tex);
+            glDrawElements(GL_TRIANGLES, s.count, GL_UNSIGNED_INT,
+                           (const void*)(intptr_t)(s.start * sizeof(unsigned int)));
+        }
+    } else {
+        if (texId_) glBindTexture(GL_TEXTURE_2D, texId_);
+        glDrawElements(GL_TRIANGLES, indexCount_, GL_UNSIGNED_INT, nullptr);
+    }
+
     glBindVertexArray(0);
-    if (texId_) glBindTexture(GL_TEXTURE_2D, 0);
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
 // ── bone utilities ────────────────────────────────────────────────────────────
@@ -878,6 +989,7 @@ SkinnedMesh::~SkinnedMesh()
     if (vao_)     { glDeleteVertexArrays(1, &vao_); glDeleteBuffers(1, &vbo_); glDeleteBuffers(1, &ebo_); }
     if (colorVbo_) glDeleteBuffers(1, &colorVbo_);
     if (texId_)    glDeleteTextures(1, &texId_);
+    for (GLuint t : matTextures_) glDeleteTextures(1, &t);
 }
 
 SkinnedMesh::SkinnedMesh(SkinnedMesh&& o) noexcept
@@ -889,8 +1001,10 @@ SkinnedMesh::SkinnedMesh(SkinnedMesh&& o) noexcept
       boneNames_(std::move(o.boneNames_)),
       skinRootXform_(o.skinRootXform_),
       animations_(std::move(o.animations_)),
+      subMeshes_(std::move(o.subMeshes_)),
+      matTextures_(std::move(o.matTextures_)),
       bmin_(o.bmin_), bmax_(o.bmax_)
-{ o.vao_ = o.vbo_ = o.ebo_ = o.colorVbo_ = o.texId_ = 0; }
+{ o.vao_ = o.vbo_ = o.ebo_ = o.colorVbo_ = o.texId_ = 0; o.matTextures_.clear(); }
 
 SkinnedMesh& SkinnedMesh::operator=(SkinnedMesh&& o) noexcept
 {

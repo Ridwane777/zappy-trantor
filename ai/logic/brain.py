@@ -118,7 +118,23 @@ class Brain:
             and not self.player.need_fuel
             and ELEVATION_REQ.get(self.player.level, {}).get("players", 1) > 1
         )
-        if best_dir and ready:
+
+        # --- Verrouillage au rendez-vous ---
+        # Dès qu'on est prêt ET au point de rendez-vous global, on se VERROUILLE
+        # (plus de déplacement, plus de départ pour manger) :
+        #   - is_anchor      -> on EST le rendez-vous (plus haut poids du niveau) ;
+        #   - best_dir == 0  -> l'ancre est sur NOTRE case (on l'a rejointe).
+        # À l'inverse, si on est prêt mais qu'une MEILLEURE ancre est entendue
+        # AILLEURS (best_dir != 0), on se déverrouille pour aller la rejoindre →
+        # tout le monde converge vers un seul point (le plus haut poids), pas de
+        # rendez-vous fragmentés.
+        if ready and (self.player.is_anchor or best_dir == 0):
+            self.player.locked = True
+        elif ready and best_dir:
+            self.player.locked = False
+
+        # On ne se déplace vers l'ancre que si on est prêt et PAS encore verrouillé.
+        if best_dir and ready and not self.player.locked:
             for move in DIRECTION_MOVES.get(best_dir, []):
                 self.client.send(move)
 
@@ -128,6 +144,7 @@ class Brain:
         # d'environnement ZAPPY_CHILD) est la REINE de l'équipe ; les process qu'il
         # crée sont les ouvriers. Voir fork.py pour le détail.
         team = TeamManager(self.client)
+        prev_level = self.player.level
 
         while True:
             team.tick()
@@ -161,9 +178,25 @@ class Brain:
             raw = self.client.send("Inventory")
             self.player.update_inventory(raw)
 
-            # 4) Objectif atteint : on a fini.
+            # 3bis) Un changement de niveau (incantation réussie) LÈVE le verrou : il
+            # faut maintenant re-collecter les pierres du nouveau niveau avant de se
+            # re-rallier. Sinon un joueur resterait figé à incanter dans le vide.
+            if self.player.level != prev_level:
+                self.player.locked = False
+                self.player.locked_ticks = 0
+                self.player.rally_seen = 0
+                prev_level = self.player.level
+
+            # 4) Niveau 8 atteint (max). On NE quitte PAS la partie : si le joueur se
+            # déconnectait, il "disparaîtrait" du jeu (le serveur envoie pdi à la
+            # fermeture de la socket) et ne compterait plus pour la victoire
+            # (seg = 6 joueurs niveau 8 de la MÊME équipe connectés en même temps).
+            # On reste donc connecté et on se contente de survivre, comme la reine :
+            # manger quand la food est basse, sinon rester immobile sur place.
             if self.player.level >= 8:
-                break
+                if self.player.inventory["food"] < QUEEN_FOOD_MIN:
+                    survive(self.client, self.player)
+                continue
 
             # --- Préparer la décision ---
             missing = self.player.missing_for_elevation()
@@ -189,13 +222,48 @@ class Brain:
             elif food >= self.player.FOOD_RALLY_TARGET:
                 self.player.need_fuel = False
 
+            # Déverrouillage de SÉCURITÉ à PATIENCE PROGRESSIVE. Tant qu'on est
+            # verrouillé :
+            #   - si le nombre de joueurs sur la case a AUGMENTÉ depuis le verrou
+            #     (le groupe grossit → le rendez-vous fonctionne), on remet la
+            #     patience à zéro : on continue d'attendre les derniers ;
+            #   - sinon on égrène la patience ; au-delà de LOCK_TIMEOUT tours SANS
+            #     nouvelle arrivée, on ABANDONNE ce rendez-vous (déverrouillage +
+            #     need_fuel=True → "non prêt", donc pas de re-verrouillage immédiat,
+            #     et on repart se ravitailler avant de retenter).
+            # Un timeout PLAT (sans ce reset sur progrès) coupait avant que 6 joueurs
+            # s'assemblent et annulait tout le bénéfice du verrou ; le reset sur
+            # progrès garde l'engagement long quand le groupe se complète vraiment.
+            if self.player.locked:
+                if self.player.here_count > self.player.rally_seen:
+                    self.player.rally_seen = self.player.here_count
+                    self.player.locked_ticks = 0
+                else:
+                    self.player.locked_ticks += 1
+                    if self.player.locked_ticks >= self.player.LOCK_TIMEOUT:
+                        self.player.locked = False
+                        self.player.locked_ticks = 0
+                        self.player.rally_seen = 0
+                        self.player.need_fuel = True
+            else:
+                self.player.locked_ticks = 0
+                self.player.rally_seen = 0
+
             # --- Choisir UNE action pour ce tour ---
-            if multi and self.player.is_anchor:
-                # ANCRE d'un niveau de groupe : c'est le point de rendez-vous figé.
-                # Elle ne collecte ni n'erre jamais ; elle reste sur place pour que
-                # les suiveurs convergent vers une cible immobile, et elle incante
-                # dès que le quorum est réuni. Elle ne se déplace QUE sous famine
-                # critique (puis reviendra se figer une fois rassasiée).
+            if multi and self.player.locked:
+                # VERROUILLÉ au rendez-vous : on ne bouge plus et on ne repart JAMAIS
+                # manger. On reste sur la case, on mange la food qui s'y trouve (dans
+                # elevate) et on incante dès que le quorum est réuni. La faim pendant
+                # l'incantation (300 ticks) est neutralisée côté serveur (gel sans
+                # consommation de food), donc le seul risque est la famine PENDANT
+                # l'attente — c'est précisément ce qu'on mesure avec cette expérience.
+                elevate(self.client, self.player)
+            elif multi and self.player.is_anchor:
+                # ANCRE pas encore verrouillée (cas transitoire) : c'est le point de
+                # rendez-vous figé. Elle ne collecte ni n'erre jamais ; elle reste
+                # sur place pour que les suiveurs convergent vers une cible immobile,
+                # et elle incante dès que le quorum est réuni. Elle ne se déplace QUE
+                # sous famine critique (puis reviendra se figer une fois rassasiée).
                 if food < self.player.CRITICAL_FOOD:
                     survive(self.client, self.player)
                 else:

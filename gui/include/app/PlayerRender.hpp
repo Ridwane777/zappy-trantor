@@ -36,6 +36,9 @@ struct PlayerAnim {
     float moveLerp = 1.f;
     bool  posInit = false;
     int   anim = 0;            // current animation index
+    int   prevAnim = 0;        // animation we're blending away from
+    float prevAnimTime = 0.f;
+    float blendT = 0.f;        // counts down from ANIM_BLEND_DUR to 0
 };
 
 // Shared state for the live/demo player pass, pulled out of GuiApp's run()
@@ -59,6 +62,14 @@ struct PlayerRenderCtx {
     SkinnedMesh& mewMesh;
     float mewAnimTime; bool mewMoving;
     glm::vec3 mewPos; float mewYaw; float mewScale;
+
+    bool haveCharz;
+    SkinnedMesh& charzMesh;
+    int   charzAnimIdx;
+    float charzAnimTime;
+    bool  charzStripRoot;   // strip baked locomotion drift (walk/run loops only)
+    float charzBobAmp;
+    glm::vec3 charzPos; float charzYaw; float charzScale;
 
     bool haveMoon;
     SkinnedMesh& moonMesh;

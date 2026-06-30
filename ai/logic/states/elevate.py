@@ -81,6 +81,12 @@ def elevate(client: Client, player: Player):
     # total présent (partenaires + nous).
     players_here = max(0, tiles[0].count("player") - 1) if tiles else 0
     here = players_here + 1
+    # On mémorise combien de joueurs sont présents sur la case : le brain s'en sert
+    # comme signal de PROGRÈS pour sa patience (tant que ce nombre grossit, le
+    # rendez-vous attire du monde → on continue d'attendre ; voir brain.py).
+    # (Look ne distingue pas le niveau : c'est le total des joueurs présents, donc
+    # une approximation, mais un bon indicateur que le point de ralliement "prend".)
+    player.here_count = here
 
     # Auto-alimentation sur place : un joueur qui attend (en particulier l'ancre,
     # immobile) mange la food présente sur sa case. Il se nourrit sans quitter le
