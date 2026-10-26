@@ -7,46 +7,46 @@ from network.broadcast import decode, encode
 from logic.fork import TeamManager
 from logic.player import ELEVATION_REQ
 
-"""Boucle de décision d'un joueur: à chaque tour, observer puis agir."""
+"""Decision loop of a player: every turn, observe then act."""
 DIRECTION_MOVES = {
-    0: [], # déjà sur la case de l'émetteur
-    1: ["Forward"], # devant
-    2: ["Right", "Forward"], # devant-droite
-    3: ["Right", "Forward"], # droite
-    4: ["Right", "Right", "Forward"], # derrière-droite
-    5: ["Right", "Right", "Forward"], # derrière
-    6: ["Left", "Left", "Forward"], # derrière-gauche
-    7: ["Left", "Forward"], # gauche
-    8: ["Left", "Forward"], # devant-gauche
+    0: [], # already on the sender's tile
+    1: ["Forward"], # front
+    2: ["Right", "Forward"], # front-right
+    3: ["Right", "Forward"], # right
+    4: ["Right", "Right", "Forward"], # back-right
+    5: ["Right", "Right", "Forward"], # back
+    6: ["Left", "Left", "Forward"], # back-left
+    7: ["Left", "Forward"], # left
+    8: ["Left", "Forward"], # front-left
 }
 
-"""Seuil de food pour la reine """
+"""Food threshold for the queen."""
 QUEEN_FOOD_MIN = 30
 
 
 class Brain:
-    """Boucle de décision d'un joueur : à chaque tour, observer puis agir.
-    Le déroulé d'un tour est toujours le même :
-    1. la reine (s'il s'agit du process recruteur) maintient l'effectif ;
-    2. on écoute les sons (broadcasts) pour décider du regroupement ;
-    3. on relit niveau + inventaire depuis le serveur ;
-    4. on choisit UNE action : manger, collecter, se regrouper, ou incanter."""
+    """Decision loop of a player: every turn, observe then act.
+    A turn always goes the same way:
+    1. the queen (if this is the recruiter process) maintains the headcount;
+    2. listen to sounds (broadcasts) to decide on regrouping;
+    3. re-read level + inventory from the server;
+    4. pick ONE action: eat, collect, regroup, or incant."""
     
     def __init__(self, client: Client):
         self.client = client
         self.player = Player()
 
     def _handle_broadcasts(self):
-        """Écoute les sons de l'équipe et décide du regroupement (ancre/suiveur).
-        Principe du regroupement par ANCRE ÉLUE et chaque joueur diffuse en continu "NEED:equipe:niveau:poids"
-        et en fonction du poids on sait vers qui se diriger. Comme le poids est un tirage aléatoire FIXE,
-        l'ancre d'un niveau est unique et stable : tout le monde converge vers le même joueur, sans osciller."""
+        """Listen to the team's sounds and decide on regrouping (anchor/follower).
+        Regrouping uses an ELECTED ANCHOR: every player continuously broadcasts "NEED:team:level:weight"
+        and the weight tells who to move towards. Since the weight is a FIXED random draw,
+        the anchor of a level is unique and stable: everyone converges on the same player without oscillating."""
 
-        # best_weight = le plus grand poids entendu jusqu'ici (on part du nôtre).
-        # best_dir = direction du joueur qui porte ce plus grand poids :
-        #   None -> personne de plus fort entendu (c'est donc NOUS l'ancre)
-        #   0    -> ce joueur est sur NOTRE case (on est déjà au rendez-vous)
-        #   1..8 -> direction vers laquelle se déplacer pour le rejoindre
+        # best_weight = the highest weight heard so far (starting from our own).
+        # best_dir = direction of the player carrying that highest weight:
+        #   None -> nobody stronger heard (so WE are the anchor)
+        #   0    -> that player is on OUR tile (we are already at the rally point)
+        #   1..8 -> direction to move in to join them
         best_dir = None
         best_weight = self.player.rally_weight
 
@@ -58,56 +58,56 @@ class Brain:
             if msg_type != "NEED":
                 continue
 
-            # data = "equipe:niveau:poids"
+            # data = "team:level:weight"
             parts = data.split(":")
             try:
                 sender_level = int(parts[1])
                 sender_weight = int(parts[2])
             except (ValueError, IndexError):
                 continue
-            # On n'écoute que les joueurs de NOTRE niveau: ce sont les seuls avecqui on peut incanter.
+            # Only listen to players of OUR level: they are the only ones we can incant with.
             if sender_level != self.player.level:
                 continue
 
-            # On retient le plus haut poids, MÊME s'il vient de notre propre case
-            # (direction 0). C'est essentiel : un suiveur déjà arrivé au rendez-vous
-            # entend l'ancre en direction 0 et doit RESTER là. Sans ça, il
-            # repartirait vers le 2e plus haut poids resté au loin.
+            # Keep the highest weight, EVEN if it comes from our own tile
+            # (direction 0). This is essential: a follower already at the rally point
+            # hears the anchor in direction 0 and must STAY there. Otherwise it
+            # would leave for the 2nd highest weight still far away.
             if sender_weight > best_weight:
                 best_weight = sender_weight
                 best_dir = direction
-        # Si aucun poids supérieur au nôtre n'a été entendu, c'est nous l'ancre.
+        # If no weight higher than ours was heard, we are the anchor.
         self.player.is_anchor = (best_dir is None)
 
-        """On ne se déplace vers l'ancre que si on est prêt (pierres + food) et PAS encore verrouillé."""
+        """Only move towards the anchor if ready (stones + food) and NOT yet locked."""
         ready = (
             not self.player.missing_for_elevation()
             and not self.player.need_fuel
             and ELEVATION_REQ.get(self.player.level, {}).get("players", 1) > 1
         )
 
-        """on verouille le joueur sur la case de l'ancre mais on déverouille si on attend une meilleur ancre"""
+        """Lock the player on the anchor's tile, but unlock if a better anchor is heard."""
         if ready and (self.player.is_anchor or best_dir == 0):
             self.player.locked = True
         elif ready and best_dir:
             self.player.locked = False
-        # On ne se déplace vers l'ancre que si on est prêt et PAS encore verrouillé.
+        # Only move towards the anchor if ready and NOT yet locked.
         if best_dir and ready and not self.player.locked:
             for move in DIRECTION_MOVES.get(best_dir, []):
                 self.client.send(move)
 
     def run(self):
-        """Boucle principale : un tour de jeu par itération, jusqu'au niveau 8."""
+        """Main loop: one game turn per iteration, up to level 8."""
 
-        """On crée un TeamManager pour gérer l'effectif de l'équipe (la reine) et on le tick à chaque tour."""
+        """Create a TeamManager to manage the team headcount (the queen) and tick it every turn."""
         team = TeamManager(self.client)
         prev_level = self.player.level
 
         while True:
             team.tick()
 
-            """la reine ne se déplace jamais, elle reste sur sa case et ne mange que si la réserve est basse
-            et elle ne collecte jamais de pierres (elle ne joue pas, elle supervise)."""
+            """The queen never moves: she stays on her tile, only eats when her reserve is low
+            and never collects stones (she does not play, she supervises)."""
             if team.is_recruiter:
                 raw = self.client.send("Inventory")
                 self.player.update_inventory(raw)
@@ -115,26 +115,26 @@ class Brain:
                     survive(self.client, self.player)
                 continue
 
-            #Écouter les sons et, le cas échéant, avancer vers l'ancre.
+            # Listen to sounds and, if needed, move towards the anchor.
             self._handle_broadcasts()
 
-            #verifier si le niveau a changé (incantation réussie) et mettre à jour le niveau du joueur
+            # Check whether the level changed (successful incantation) and update the player's level
             lvl = self.client.get_level_update()
             if lvl is not None:
                 self.player.level = lvl
 
-            # Relire l'inventaire (source de vérité pour food et pierres).
+            # Re-read the inventory (source of truth for food and stones).
             raw = self.client.send("Inventory")
             self.player.update_inventory(raw)
 
-            """lever le verrou si le niveau a changé et remettre à zéro le compteur de tours passés verrouillé"""
+            """Release the lock if the level changed and reset the locked-turns counter."""
             if self.player.level != prev_level:
                 self.player.locked = False
                 self.player.locked_ticks = 0
                 self.player.rally_seen = 0
                 prev_level = self.player.level
 
-            """On ne quitte pas la partie au niveau 8, on reste connecté pour compter pour la victoire."""
+            """Do not leave the game at level 8: stay connected to count towards victory."""
             if self.player.level >= 8:
                 if self.player.inventory["food"] < QUEEN_FOOD_MIN:
                     survive(self.client, self.player)
@@ -142,24 +142,24 @@ class Brain:
 
             missing = self.player.missing_for_elevation()
             req = ELEVATION_REQ.get(self.player.level, {})
-            multi = req.get("players", 1) > 1  # verifie si le niveau est un niveau de groupe ou solo
+            multi = req.get("players", 1) > 1  # whether this level is a group or solo level
             food = self.player.inventory["food"]
 
-            """le cri que chaque joueur envoie à chaque tour pour se faire trouver."""
+            """The call every player sends each turn so it can be found."""
             if multi:
                 self.client.send(
                     f"Broadcast {encode('NEED', f'{self.client.team}:{self.player.level}:{self.player.rally_weight}')}"
                 )
 
-            """On ne se déplace jamais vers l'ancre si on est en famine critique, 
-            même si on est l'ancre, on se déplace vers la food"""
+            """Never move towards the anchor when critically starving;
+            even the anchor goes for food."""
             if food < self.player.CRITICAL_FOOD:
                 self.player.need_fuel = True
             elif food >= self.player.FOOD_RALLY_TARGET:
                 self.player.need_fuel = False
 
-            """quand on est verrouillé, on regarde si le nbre de joueurs sur la case a augmenté depuis le verrouillage
-            si oui on remet le compteur de tours passés à zéro, sinon on incrémente"""
+            """When locked, check whether the number of players on the tile grew since locking:
+            if so reset the turn counter, otherwise increment it."""
             if self.player.locked:
                 if self.player.here_count > self.player.rally_seen:
                     self.player.rally_seen = self.player.here_count
@@ -176,24 +176,24 @@ class Brain:
                 self.player.rally_seen = 0
 
             if multi and self.player.locked:
-                """On est sur la case de l'ancre, on est prêt, on attend le quorum et on incante dès qu'il est atteint."""
+                """On the anchor's tile and ready: wait for the quorum and incant as soon as it is reached."""
                 elevate(self.client, self.player)
             elif multi and self.player.is_anchor:
-                """l'ancre une fois figée ne se déplace jamais sauf si elle est en famine critique,
-                dans ce cas elle va chercher de la food"""
+                """Once settled, the anchor never moves unless critically starving,
+                in which case it goes looking for food."""
                 if food < self.player.CRITICAL_FOOD:
                     survive(self.client, self.player)
                 else:
                     elevate(self.client, self.player)
             else:
-                # Suiveur, ou joueur d'un niveau "solo" (niveau 1).
+                # Follower, or player on a "solo" level (level 1).
                 if (not missing) and multi:
-                    # Pierres déjà réunies : on est en attente au rendez-vous. On ne
-                    # repart manger que si la réserve est vraiment basse (hystérésis)
-                    # pour ne pas casser le regroupement.
+                    # Stones already gathered: waiting at the rally point. Only
+                    # leave to eat if the reserve is really low (hysteresis)
+                    # so the regrouping is not broken.
                     must_eat = self.player.need_fuel
                 else:
-                    # En collecte (ou niveau solo) : on garde le coussin normal.
+                    # Collecting (or solo level): keep the normal food buffer.
                     must_eat = self.player.needs_food()
 
                 if must_eat:

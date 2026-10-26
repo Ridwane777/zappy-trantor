@@ -9,5 +9,5 @@ zappy_assets
 __pycache__/
 *.pyc
 
-# Assets GUI locaux (trop lourds pour git, servis par le CDN)
+# Local GUI assets (too heavy for git, served by the CDN)
 gui/assets/

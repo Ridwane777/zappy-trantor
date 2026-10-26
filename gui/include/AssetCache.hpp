@@ -68,7 +68,7 @@ inline std::string fetchRaw(const std::string &path)
     while ((n = fread(buf, 1, sizeof buf, p)) > 0)
         out.append(buf, n);
     if (pclose(p) != 0 || out.empty())
-        std::cerr << "[cdn] WARN: échec du chargement de " << rel << "\n";
+        std::cerr << "[cdn] WARN: failed to load " << rel << "\n";
     return out;
 }
 }

@@ -1,12 +1,12 @@
-# Makefile racine — délègue à chaque composant.
+# Root Makefile - delegates to each component.
 #
-# Règles disponibles :
-#   all         : compile server + gui
-#   server      : compile uniquement le serveur
-#   gui         : compile uniquement la GUI
-#   ai          : vérifie que zappy_ai est présent (script Python, rien à compiler)
-#   clean       : nettoie les objets de tous les composants
-#   fclean      : supprime les binaires de tous les composants
+# Available rules:
+#   all         : build server + gui
+#   server      : build the server only
+#   gui         : build the GUI only
+#   ai          : check that zappy_ai is present (Python script, nothing to build)
+#   clean       : remove object files of all components
+#   fclean      : remove binaries of all components
 #   re          : fclean + all
 
 NAME_SERVER = zappy_server

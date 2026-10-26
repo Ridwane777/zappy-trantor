@@ -1,39 +1,39 @@
 def encode(msg_type: str, data: str) -> str:
-    """Construit le texte d'un message de broadcast : "TYPE:donnees".
+    """Build the text of a broadcast message: "TYPE:data".
 
-    On préfixe nos messages par un TYPE (ex. "NEED") suivi de ":" et des données,
-    afin de pouvoir trier nos propres messages à la réception et ignorer le reste.
-    Exemple : encode("NEED", "team1:4:8123") -> "NEED:team1:4:8123".
+    Our messages are prefixed with a TYPE (e.g. "NEED") followed by ":" and the data,
+    so we can pick out our own messages on reception and ignore the rest.
+    Example: encode("NEED", "team1:4:8123") -> "NEED:team1:4:8123".
     """
     return f"{msg_type}:{data}"
 
 
 def decode(raw: str):
-    """Décode un son reçu du serveur en (direction, type, donnees).
+    """Decode a sound received from the server into (direction, type, data).
 
-    Le serveur transmet un son sous la forme :
-        "message K, TYPE:donnees"
-    où K est la direction d'où vient le son (0 = même case, 1..8 = case relative à
-    notre orientation, voir DIRECTION_MOVES dans brain.py).
+    The server delivers a sound as:
+        "message K, TYPE:data"
+    where K is the direction the sound comes from (0 = same tile, 1..8 = tile relative
+    to our orientation, see DIRECTION_MOVES in brain.py).
 
-    Renvoie :
-        - un triplet (direction:int, type:str, donnees:str) si le message est
-          valide ;
-        - None si ce n'est pas un message de son ou s'il est mal formé (on
-          l'ignore alors sans planter).
+    Returns:
+        - a tuple (direction:int, type:str, data:str) if the message is
+          valid;
+        - None if it is not a sound message or is malformed (it is then
+          ignored without crashing).
     """
     if not raw.startswith("message "):
         return None
 
     try:
-        # On enlève le préfixe "message ", puis on sépare la direction du contenu
-        # sur la PREMIÈRE virgule seulement (le contenu peut contenir des ":").
+        # Strip the "message " prefix, then split direction from content
+        # on the FIRST comma only (the content may contain ":").
         after = raw[len("message "):]
         k_part, content = after.split(",", 1)
         direction = int(k_part.strip())
 
-        # Le contenu est "TYPE:donnees". S'il n'y a pas de ":", il n'y a pas de
-        # données (message sans charge utile).
+        # The content is "TYPE:data". Without ":", there is no
+        # data (message without payload).
         content = content.strip()
         if ":" in content:
             msg_type, data = content.split(":", 1)

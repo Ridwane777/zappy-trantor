@@ -8,11 +8,11 @@ from logic.brain import Brain
 
 def parse_args():
     parser = argparse.ArgumentParser(prog="zappy_ai", add_help=False)
-    # port du serveur — obligatoire
+    # server port (required)
     parser.add_argument("-p", type=int, required=True, dest="port")
-    # nom de l'équipe — obligatoire
+    # team name (required)
     parser.add_argument("-n", type=str, required=True, dest="name")
-    # adresse du serveur — localhost par défaut
+    # server address (default: localhost)
     parser.add_argument("-h", type=str, default="localhost", dest="host")
     return parser.parse_args()
 
@@ -25,7 +25,7 @@ def main():
         brain = Brain(client)
         brain.run()
     except (ConnectionError, BrokenPipeError, KeyboardInterrupt):
-        # serveur fermé / partie terminée / interruption : on sort proprement
+        # server closed / game over / interrupted: exit cleanly
         pass
 
 

@@ -4,15 +4,15 @@ import time
 
 
 class Client:
-    # Le serveur applique DÉJÀ un coût en temps par action (Forward/Look=7 ticks,
-    # Inventory=1, Fork=42, Incantation=300), cadencé par la fréquence -f : l'IA est
-    # donc naturellement rythmée par le serveur (chaque send bloque jusqu'à la
-    # réponse, qui n'arrive qu'une fois l'action terminée). ZAPPY_AI_DELAY est un
-    # throttle CLIENT optionnel EN PLUS, uniquement pour ralentir la démo visuelle
-    # (durée d'un déplacement en s ; 0.5 -> ~2 tuiles/s). 0 (défaut) = pas de
-    # throttle client, on suit le rythme du serveur.
+    # The server ALREADY applies a time cost per action (Forward/Look=7 ticks,
+    # Inventory=1, Fork=42, Incantation=300), paced by the -f frequency: the AI is
+    # therefore naturally paced by the server (each send blocks until the
+    # answer, which only arrives once the action is done). ZAPPY_AI_DELAY is an
+    # optional EXTRA client-side throttle, only to slow down the visual demo
+    # (duration of one move in s; 0.5 -> ~2 tiles/s). 0 (default) = no
+    # client throttle, follow the server's pace.
     MOVE_INTERVAL = float(os.getenv("ZAPPY_AI_DELAY", "0") or 0)
-    # On ne cadence que l'avancée d'une tuile ; les rotations restent rapides.
+    # Only one-tile moves are throttled; rotations stay fast.
     _MOVE_CMDS = ("Forward",)
 
     def __init__(self, host: str, port: int, team: str):
@@ -24,7 +24,7 @@ class Client:
         self.map_y = 0
         self.free_slots = 0
         self._broadcasts = []
-        self._pending_level = None   # niveau reçu via "Current level" (incantation)
+        self._pending_level = None   # level received via "Current level" (incantation)
         self._next_move = 0.0
 
     def connect(self):
@@ -33,12 +33,12 @@ class Client:
 
         welcome = self._read_line()
         if not welcome.startswith("WELCOME"):
-            raise ConnectionError(f"Handshake raté : attendu WELCOME, reçu '{welcome}'")
+            raise ConnectionError(f"Handshake failed: expected WELCOME, got '{welcome}'")
 
         self._write(self.team)
-        # CLIENT-NUM = nombre de slots initiaux encore libres dans la team.
-        # 0 → on a pris le dernier slot (cas c=1 : on est seul, il faut forker).
-        # >0 → d'autres connexions sont encore possibles (cas c=N, test à N instances).
+        # CLIENT-NUM = number of initial slots still free in the team.
+        # 0 -> we took the last slot (c=1: we are alone, we must fork).
+        # >0 -> more connections are still possible (c=N, test with N instances).
         try:
             self.free_slots = int(self._read_line())
         except ValueError:
@@ -56,10 +56,10 @@ class Client:
         return self._read_response(is_incantation)
 
     def send_batch(self, commands: list) -> list:
-        # envoie les commandes par chunks de 10 (limite du serveur) sans attendre
-        # les réponses entre chaque, puis lit toutes les réponses dans l'ordre.
-        # On passe par _write, qui cadence quand même les Forward (ZAPPY_AI_DELAY) :
-        # la démo reste regardable, et à plein régime (delay=0) c'est rapide.
+        # Send commands in chunks of 10 (server limit) without waiting for
+        # answers in between, then read all answers in order.
+        # Goes through _write, which still throttles Forward (ZAPPY_AI_DELAY):
+        # the demo stays watchable, and at full speed (delay=0) it is fast.
         results = []
         for i in range(0, len(commands), 10):
             chunk = commands[i:i + 10]
@@ -75,16 +75,16 @@ class Client:
         return pending
 
     def get_level_update(self):
-        # renvoie le nouveau niveau reçu via "Current level" (ou None), puis l'efface
+        # return the new level received via "Current level" (or None), then clear it
         lvl = self._pending_level
         self._pending_level = None
         return lvl
 
     def connect_nbr(self) -> int:
-        # Nombre d'œufs (issus de Fork) de l'équipe encore en attente d'éclosion,
-        # tel que rapporté PAR LE SERVEUR. C'est notre seule source d'effectif
-        # légitime (le sujet interdit toute communication hors-jeu). Sert de
-        # sémaphore : si > 0, un œuf est déjà en vol → inutile d'en reforker un.
+        # Number of the team's eggs (from Fork) still waiting to hatch,
+        # as reported BY THE SERVER. This is our only legitimate headcount
+        # source (out-of-game communication is not allowed). Acts as a
+        # semaphore: if > 0, an egg is already pending, no need to fork another.
         raw = self.send("Connect_nbr")
         try:
             return int(raw)
@@ -98,9 +98,9 @@ class Client:
             print(f"[{direction}] {text}", flush=True)
 
     def _write(self, message: str):
-        # cadençage des déplacements uniquement : un Forward/Left/Right ne part
-        # qu'après MOVE_INTERVAL, ce qui borne la vitesse visible (2 tuiles/s à
-        # 0.5). Les autres commandes (Look, Inventory, Take...) restent rapides.
+        # Throttle moves only: a move command is only sent after
+        # MOVE_INTERVAL, which caps the visible speed (2 tiles/s at
+        # 0.5). Other commands (Look, Inventory, Take...) stay fast.
         if self.MOVE_INTERVAL > 0 and message.split(" ", 1)[0] in self._MOVE_CMDS:
             wait = self._next_move - time.monotonic()
             if wait > 0:
@@ -114,7 +114,7 @@ class Client:
         while not buf.endswith(b"\n"):
             chunk = self.sock.recv(1)
             if not chunk:
-                raise ConnectionError("Connexion fermée par le serveur")
+                raise ConnectionError("Connection closed by the server")
             buf += chunk
         line = buf.decode().strip()
         self._log("<<", line)
@@ -128,8 +128,8 @@ class Client:
             elif line.startswith("Current level"):
                 if is_incantation:
                     return line
-                # incantation result — peut arriver non sollicité (joueur participant
-                # qui n'a pas envoyé Incantation) : on le met de côté pour le brain
+                # incantation result: may arrive unsolicited (participating player
+                # that did not send Incantation), so keep it for the brain
                 try:
                     self._pending_level = int(line.split(":")[1].strip())
                 except (IndexError, ValueError):
@@ -141,6 +141,6 @@ class Client:
             elif line.startswith("eject:"):
                 pass  # Async message from being pushed, ignore as command response
             elif line == "dead":
-                raise ConnectionError("Mort de faim ou fin de partie")
+                raise ConnectionError("Starved to death or game over")
             else:
                 return line

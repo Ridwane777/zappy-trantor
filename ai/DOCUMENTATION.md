@@ -1,143 +1,143 @@
-# Documentation de l'IA Zappy (`zappy_ai`)
+# Zappy AI documentation (`zappy_ai`)
 
-Cette documentation explique **comment l'IA fonctionne** et **ce que fait chaque fonction**, fichier par fichier.
-
----
-
-## 1. Vue d'ensemble
-
-`zappy_ai` est le client autonome qui pilote **un seul joueur** (un « drone ») sur le serveur Zappy. Pour faire vivre une équipe entière, on lance **plusieurs process** `zappy_ai` (le premier en construit d'autres via la commande `Fork` du jeu).
-
-**Objectif du jeu :** faire monter les joueurs en niveau (1 → 8) via des **incantations**. Une incantation exige, sur **une même case**, un certain nombre de **joueurs du même niveau** + un certain nombre de **pierres** (voir la table `ELEVATION_REQ`).
-
-**Principe de fonctionnement d'un joueur** — une boucle infinie qui, à chaque tour :
-1. gère l'effectif de l'équipe (créer/remplacer des coéquipiers) ;
-2. écoute les messages (sons) et se dirige vers le point de ralliement ;
-3. décide quoi faire : **manger** (survie), **collecter** des pierres, ou **incanter**.
-
-**Contrainte du sujet respectée :** les clients **ne communiquent jamais hors du jeu**. Toute coordination passe par le **serveur** (broadcasts sonores + commande `Connect_nbr`). La seule information transmise à un sous-process est son rôle de lancement (variable d'env `ZAPPY_CHILD`), pas une donnée de jeu.
+This document explains **how the AI works** and **what each function does**, file by file.
 
 ---
 
-## 2. Arborescence
+## 1. Overview
+
+`zappy_ai` is the autonomous client that drives **a single player** (a "drone") on the Zappy server. To run a whole team, **several** `zappy_ai` **processes** are started (the first one builds the others through the game's `Fork` command).
+
+**Game goal:** level players up (1 → 8) through **incantations**. An incantation requires, on **the same tile**, a given number of **players of the same level** + a given number of **stones** (see the `ELEVATION_REQ` table).
+
+**How a player works**: an infinite loop that, every turn:
+1. manages the team headcount (create/replace teammates);
+2. listens to messages (sounds) and heads for the rally point;
+3. decides what to do: **eat** (survive), **collect** stones, or **incant**.
+
+**Rule respected:** clients **never communicate outside the game**. All coordination goes through the **server** (sound broadcasts + the `Connect_nbr` command). The only information passed to a child process is its launch role (env variable `ZAPPY_CHILD`), not game data.
+
+---
+
+## 2. Layout
 
 ```
 ai/
-├── zappy_ai                 # point d'entrée (exécutable Python)
+├── zappy_ai                 # entry point (Python executable)
 ├── network/
-│   ├── client.py            # connexion TCP + envoi/réception des commandes
-│   ├── parser.py            # parsing de la réponse "Look"
-│   └── broadcast.py         # encodage/décodage des messages broadcast
+│   ├── client.py            # TCP connection + sending/receiving commands
+│   ├── parser.py            # parsing of the "Look" answer
+│   └── broadcast.py         # encoding/decoding of broadcast messages
 └── logic/
-    ├── brain.py             # boucle principale + ralliement (homing)
-    ├── player.py            # état du joueur + table d'élévation
-    ├── fork.py              # gestion de l'effectif d'équipe (TeamManager)
-    ├── explore.py           # déplacement d'exploration
+    ├── brain.py             # main loop + rallying (homing)
+    ├── player.py            # player state + elevation table
+    ├── fork.py              # team headcount management (TeamManager)
+    ├── explore.py           # exploration moves
     └── states/
-        ├── survive.py       # aller manger (+ helper de déplacement)
-        ├── collect.py       # aller chercher les pierres manquantes
-        └── elevate.py       # rassemblement + incantation
+        ├── survive.py       # go eat (+ movement helper)
+        ├── collect.py       # fetch the missing stones
+        └── elevate.py       # gathering + incantation
 ```
 
 ---
 
-## 3. Le protocole serveur (rappel)
+## 3. Server protocol (reminder)
 
-**Connexion (handshake) :**
+**Connection (handshake):**
 ```
-serveur → WELCOME
-client  → <nom_equipe>
-serveur → <CLIENT-NUM>      (nb de slots encore libres pour l'équipe)
-serveur → <X> <Y>          (dimensions de la carte)
+server → WELCOME
+client → <team_name>
+server → <CLIENT-NUM>      (number of slots still free for the team)
+server → <X> <Y>           (map dimensions)
 ```
 
-**Commandes utilisées** (réponse entre parenthèses) :
-`Forward`, `Right`, `Left` (ok) · `Look` (`[tuile0, tuile1, ...]`) · `Inventory` (`[food n, linemate n, ...]`) · `Take <objet>` / `Set <objet>` (ok/ko) · `Broadcast <texte>` (ok) · `Fork` (ok) · `Connect_nbr` (un nombre) · `Incantation` (`Elevation underway` puis `Current level: K`, ou `ko`).
+**Commands used** (answer in parentheses):
+`Forward`, `Right`, `Left` (ok) · `Look` (`[tile0, tile1, ...]`) · `Inventory` (`[food n, linemate n, ...]`) · `Take <object>` / `Set <object>` (ok/ko) · `Broadcast <text>` (ok) · `Fork` (ok) · `Connect_nbr` (a number) · `Incantation` (`Elevation underway` then `Current level: K`, or `ko`).
 
-**Messages asynchrones** (peuvent arriver à tout moment) : `message K, <texte>` (broadcast reçu, `K` = direction du son), `eject: K`, `dead`.
+**Asynchronous messages** (may arrive at any time): `message K, <text>` (broadcast received, `K` = sound direction), `eject: K`, `dead`.
 
 ---
 
-## 4. La boucle principale (résumé)
+## 4. Main loop (summary)
 
-Dans `Brain.run()` (voir [logic/brain.py](logic/brain.py)), à chaque tour :
+In `Brain.run()` (see [logic/brain.py](logic/brain.py)), every turn:
 
 ```
-team.tick()                # 1. effectif : créer/remplacer les coéquipiers
-_handle_broadcasts()       # 2. lire les sons → se diriger vers l'ancre (homing)
-get_level_update()         # 3. récupérer un éventuel passage de niveau
-Inventory                  # 4. mettre à jour l'inventaire
-si niveau >= 8 : STOP
-                           # 5. décision :
-   doit manger ?  → survive()      (food trop basse)
-   sinon manque des pierres ? → collect()
-   sinon          → elevate()      (rassemblement + incantation)
+team.tick()                # 1. headcount: create/replace teammates
+_handle_broadcasts()       # 2. read sounds -> head for the anchor (homing)
+get_level_update()         # 3. pick up a possible level-up
+Inventory                  # 4. update the inventory
+if level >= 8: stay alive only
+                           # 5. decision:
+   must eat?  → survive()          (food too low)
+   else missing stones? → collect()
+   else       → elevate()          (gathering + incantation)
 ```
 
 ---
 
-## 5. Détail des fichiers et fonctions
+## 5. Files and functions
 
-### `zappy_ai` — point d'entrée
+### `zappy_ai`: entry point
 
-| Fonction | Rôle |
+| Function | Role |
 |---|---|
-| `parse_args()` | Lit les arguments **`-p` port (obligatoire)**, **`-n` nom d'équipe (obligatoire)**, **`-h` hôte (défaut `localhost`)**. Conforme à l'usage du sujet. |
-| `main()` | Crée le `Client`, se connecte, crée le `Brain` et lance `brain.run()`. Capture `ConnectionError`/`BrokenPipeError`/`KeyboardInterrupt` pour sortir proprement quand le serveur ferme, que le joueur meurt, ou sur Ctrl-C. |
+| `parse_args()` | Reads the arguments **`-p` port (required)**, **`-n` team name (required)**, **`-h` host (default `localhost`)**. |
+| `main()` | Creates the `Client`, connects, creates the `Brain` and runs `brain.run()`. Catches `ConnectionError`/`BrokenPipeError`/`KeyboardInterrupt` to exit cleanly when the server closes, the player dies, or on Ctrl-C. |
 
 ---
 
-### `network/client.py` — couche réseau (`class Client`)
+### `network/client.py`: network layer (`class Client`)
 
-Gère la socket TCP et l'envoi/réception des commandes. Bufferise les broadcasts et les passages de niveau reçus en asynchrone.
+Handles the TCP socket and command sending/receiving. Buffers broadcasts and level-ups received asynchronously.
 
-**Attributs clés :** `host`, `port`, `team`, `map_x/map_y` (taille carte), `free_slots` (slots libres au handshake), `_broadcasts` (file des sons reçus), `_pending_level` (niveau reçu en asynchrone).
+**Key attributes:** `host`, `port`, `team`, `map_x/map_y` (map size), `free_slots` (free slots at handshake), `_broadcasts` (queue of received sounds), `_pending_level` (level received asynchronously).
 
-**Variables d'environnement :**
-- `ZAPPY_AI_DELAY` : durée d'un déplacement en secondes (cadence la vitesse **visible** dans le GUI ; `0` = plein régime, `0.5` ≈ 2 cases/s).
-- `ZAPPY_DEBUG=1` : affiche tout le trafic (`>>` envoyé, `<<` reçu).
+**Environment variables:**
+- `ZAPPY_AI_DELAY`: duration of one move in seconds (paces the speed **visible** in the GUI; `0` = full speed, `0.5` ≈ 2 tiles/s).
+- `ZAPPY_DEBUG=1`: prints all traffic (`>>` sent, `<<` received).
 
-| Fonction | Rôle |
+| Function | Role |
 |---|---|
-| `connect()` | Ouvre la socket, fait le handshake (WELCOME → nom → CLIENT-NUM → dimensions). Remplit `free_slots`, `map_x`, `map_y`. |
-| `send(cmd, is_incantation=False)` | Envoie une commande **et** lit sa réponse (renvoie la réponse). |
-| `receive(is_incantation=False)` | Lit une réponse **sans** envoyer (utilisé pour la 2ᵉ phase de l'incantation). |
-| `send_batch(cmds)` | Envoie une liste de commandes par **paquets de 10** (limite du serveur : 10 requêtes sans réponse), puis lit toutes les réponses. Sert au déplacement « pipeline ». |
-| `get_broadcasts()` | Renvoie et **vide** la file des sons reçus (consommée par le brain). |
-| `get_level_update()` | Renvoie le niveau reçu en asynchrone (`Current level` non sollicité, ex. on est participant d'une incantation lancée par un autre), puis l'efface. |
-| `connect_nbr()` | Envoie `Connect_nbr` et renvoie le **nombre d'œufs** de l'équipe en attente d'éclosion. Sert de **sémaphore** au `TeamManager` (un seul œuf en vol à la fois). |
-| `_write(msg)` | Écrit sur la socket. **Cadence uniquement les `Forward`** selon `ZAPPY_AI_DELAY` (les `Look`/`Inventory`/`Take`… restent rapides). |
-| `_read_line()` | Lit une ligne (jusqu'au `\n`) ; lève `ConnectionError` si le serveur ferme. |
-| `_read_response(is_incantation)` | Lit la réponse d'une commande en **filtrant les messages asynchrones** : `message …` → mis dans `_broadcasts` ; `Current level`/`Elevation underway` → renvoyés si on attend une incantation, sinon stockés/ignorés ; `eject:` → ignoré ; `dead` → `ConnectionError`. |
+| `connect()` | Opens the socket and performs the handshake (WELCOME → name → CLIENT-NUM → dimensions). Fills `free_slots`, `map_x`, `map_y`. |
+| `send(cmd, is_incantation=False)` | Sends a command **and** reads its answer (returns the answer). |
+| `receive(is_incantation=False)` | Reads an answer **without** sending (used for the 2nd phase of the incantation). |
+| `send_batch(cmds)` | Sends a list of commands in **batches of 10** (server limit: 10 pending requests), then reads all answers. Used for pipelined movement. |
+| `get_broadcasts()` | Returns and **empties** the queue of received sounds (consumed by the brain). |
+| `get_level_update()` | Returns the level received asynchronously (unsolicited `Current level`, e.g. we took part in an incantation started by someone else), then clears it. |
+| `connect_nbr()` | Sends `Connect_nbr` and returns the **number of team eggs** waiting to hatch. Acts as a **semaphore** for `TeamManager` (one egg pending at a time). |
+| `_write(msg)` | Writes to the socket. **Only throttles `Forward`** according to `ZAPPY_AI_DELAY` (`Look`/`Inventory`/`Take`… stay fast). |
+| `_read_line()` | Reads one line (up to `\n`); raises `ConnectionError` if the server closes. |
+| `_read_response(is_incantation)` | Reads a command's answer while **filtering asynchronous messages**: `message …` → stored in `_broadcasts`; `Current level`/`Elevation underway` → returned when waiting for an incantation, otherwise stored/ignored; `eject:` → ignored; `dead` → `ConnectionError`. |
 
 ---
 
 ### `network/parser.py`
 
-| Fonction | Rôle |
+| Function | Role |
 |---|---|
-| `parse_look(raw)` | Transforme la réponse `Look` (`"[player food, , linemate, ...]"`) en **liste de tuiles**, chaque tuile étant une **liste d'objets** (ex. `[["player","food"], [], ["linemate"], ...]`). La tuile 0 = la case du joueur. |
+| `parse_look(raw)` | Turns the `Look` answer (`"[player food, , linemate, ...]"`) into a **list of tiles**, each tile being a **list of objects** (e.g. `[["player","food"], [], ["linemate"], ...]`). Tile 0 = the player's tile. |
 
 ---
 
 ### `network/broadcast.py`
 
-Nos messages d'équipe ont le format `TYPE:donnees` (ex. `NEED:team1:4:837421`).
+Our team messages use the format `TYPE:data` (e.g. `NEED:team1:4:837421`).
 
-| Fonction | Rôle |
+| Function | Role |
 |---|---|
-| `encode(msg_type, data)` | Construit `"TYPE:data"` à diffuser via `Broadcast`. |
-| `decode(raw)` | Parse un message reçu `"message K, TYPE:data"` → renvoie le triplet **`(direction K, TYPE, data)`** (ou `None` si ce n'est pas un broadcast). `K` est la direction du son (0 = même case, 1-8 autour). |
+| `encode(msg_type, data)` | Builds `"TYPE:data"` to send with `Broadcast`. |
+| `decode(raw)` | Parses a received `"message K, TYPE:data"` → returns the tuple **`(direction K, TYPE, data)`** (or `None` if it is not a broadcast). `K` is the sound direction (0 = same tile, 1-8 around). |
 
 ---
 
-### `logic/player.py` — état du joueur
+### `logic/player.py`: player state
 
-**`RESOURCES`** : la liste des 7 ressources (food + 6 pierres).
+**`RESOURCES`**: the list of the 7 resources (food + 6 stones).
 
-**`ELEVATION_REQ`** : la **table d'élévation** (du sujet) — pour chaque niveau courant, le nombre de **joueurs** requis et la quantité de chaque **pierre** :
+**`ELEVATION_REQ`**: the **elevation table**: for each current level, the number of **players** required and the quantity of each **stone**:
 
-| Niveau | joueurs | linemate | deraumere | sibur | mendiane | phiras | thystame |
+| Level | players | linemate | deraumere | sibur | mendiane | phiras | thystame |
 |---|---|---|---|---|---|---|---|
 | 1→2 | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
 | 2→3 | 2 | 1 | 1 | 1 | 0 | 0 | 0 |
@@ -147,140 +147,140 @@ Nos messages d'équipe ont le format `TYPE:donnees` (ex. `NEED:team1:4:837421`).
 | 6→7 | 6 | 1 | 2 | 3 | 0 | 1 | 0 |
 | 7→8 | 6 | 2 | 2 | 2 | 2 | 2 | 1 |
 
-**Constantes de food (`class Player`) :**
-- `FOOD_THRESHOLD = 18` : seuil normal en dessous duquel un joueur **en collecte** va manger.
-- `CRITICAL_FOOD = 12` : seuil critique (un joueur au rendez-vous ne repart manger qu'en dessous).
-- `FOOD_RALLY_TARGET = 25` : niveau de food jusqu'auquel on fait le **plein** (hystérésis) avant de se figer au rendez-vous.
-- `LOCK_TIMEOUT = 60` : patience max (en tours) d'un joueur verrouillé sans progrès avant d'abandonner le rendez-vous.
+**Food constants (`class Player`):**
+- `FOOD_THRESHOLD = 18`: normal threshold below which a **collecting** player goes to eat.
+- `CRITICAL_FOOD = 12`: critical threshold (a player at the rally point only leaves to eat below it).
+- `FOOD_RALLY_TARGET = 25`: food level to fill up to (hysteresis) before settling at the rally point.
+- `LOCK_TIMEOUT = 60`: max patience (in turns) of a locked player without progress before giving up the rally point.
 
-**Attributs clés :** `level`, `inventory`, `need_fuel` (hystérésis food), `is_anchor` (suis-je l'ancre de mon niveau ?), `rally_weight` (poids aléatoire fixe pour l'élection d'ancre), `explore_steps` (compteur pour l'exploration en zig-zag), `locked` (verrouillé au rendez-vous ?), `locked_ticks` (tours sans progrès depuis le verrou), `here_count` (joueurs sur ma case actuellement), `rally_seen` (max de joueurs vus depuis le verrou).
+**Key attributes:** `level`, `inventory`, `need_fuel` (food hysteresis), `is_anchor` (am I the anchor of my level?), `rally_weight` (fixed random weight for anchor election), `explore_steps` (counter for zigzag exploration), `locked` (locked at the rally point?), `locked_ticks` (turns without progress since locking), `here_count` (players currently on my tile), `rally_seen` (max players seen since locking).
 
-| Méthode | Rôle |
+| Method | Role |
 |---|---|
-| `update_inventory(raw)` | Parse la réponse `Inventory` et met à jour `self.inventory`. |
-| `missing_for_elevation()` | Renvoie les pierres manquantes pour le **niveau courant uniquement** (ignore la food). `{}` si niveau ≥ 8. C'est la seule cible de collecte : on collecte court, on monte, on recommence. |
-| `needs_food()` | `True` si `food < FOOD_THRESHOLD`. |
+| `update_inventory(raw)` | Parses the `Inventory` answer and updates `self.inventory`. |
+| `missing_for_elevation()` | Returns the stones missing for the **current level only** (ignores food). `{}` if level ≥ 8. This is the only collection target: collect briefly, level up, repeat. |
+| `needs_food()` | `True` if `food < FOOD_THRESHOLD`. |
 
 ---
 
-### `logic/brain.py` — cerveau (`class Brain`)
+### `logic/brain.py`: the brain (`class Brain`)
 
-**`DIRECTION_MOVES`** : table qui traduit la **direction d'un son** (numéro de tuile K, 1-8, renvoyé par le serveur) en **séquence de déplacements** pour se rapprocher de la source :
+**`DIRECTION_MOVES`**: table that turns a **sound direction** (tile number K, 1-8, sent by the server) into a **sequence of moves** towards the source:
 
-| K (direction du son) | mouvements |
+| K (sound direction) | moves |
 |---|---|
-| 0 (même case) | — |
-| 1 (devant) | `Forward` |
-| 2, 3 (droite) | `Right, Forward` |
-| 4, 5 (arrière) | `Right, Right, Forward` |
-| 6 (arrière-gauche) | `Left, Left, Forward` |
-| 7, 8 (gauche) | `Left, Forward` |
+| 0 (same tile) | none |
+| 1 (front) | `Forward` |
+| 2, 3 (right) | `Right, Forward` |
+| 4, 5 (back) | `Right, Right, Forward` |
+| 6 (back-left) | `Left, Left, Forward` |
+| 7, 8 (left) | `Left, Forward` |
 
-| Méthode | Rôle |
+| Method | Role |
 |---|---|
-| `__init__(client)` | Crée le `Player`. |
-| `_handle_broadcasts()` | **Ralliement (homing).** Lit tous les sons reçus. Pour les `NEED` **de notre niveau** (toutes équipes confondues, car une incantation réunit les joueurs de même niveau quelle que soit l'équipe), repère le **plus haut `weight`** entendu (élection d'ancre). Si quelqu'un a un poids supérieur au nôtre, on est un **suiveur** → on se dirige vers lui. Sinon **on est l'ancre** (`is_anchor = True`). On retient le plus haut poids **même en direction 0** (sur notre case) → un suiveur déjà arrivé **reste** au lieu d'être réaspiré ailleurs. On ne se déplace que si on est **`ready`** (plus rien à collecter pour le niveau courant, food OK, niveau ≥ 2 joueurs). Dès qu'on est prêt et au rendez-vous (ancre ou direction 0), on se **verrouille** (`locked = True`). |
-| `run()` | **Boucle principale** (voir §4). Crée le `TeamManager`. Si ce process est la **reine** (`is_recruiter`) : il se contente de survivre (manger sous `QUEEN_FOOD_MIN=30`) + `team.tick()`. Sinon (ouvrier), à chaque tour : `team.tick()` → `_handle_broadcasts()` → maj niveau → `Inventory` → arrêt si niveau 8 → diffusion du **beacon `NEED`** (si niveau de groupe) → maj hystérésis food → **patience progressive du verrou** → **décision** : verrouillé → `elevate` ; ancre → `elevate` (ou `survive` si famine critique) ; sinon `survive`/`collect`/`elevate`. |
+| `__init__(client)` | Creates the `Player`. |
+| `_handle_broadcasts()` | **Rallying (homing).** Reads every received sound. For `NEED` messages **of our level** (all teams included, since an incantation gathers same-level players whatever their team), finds the **highest `weight`** heard (anchor election). If someone has a higher weight than ours, we are a **follower** → we head for them. Otherwise **we are the anchor** (`is_anchor = True`). The highest weight is kept **even in direction 0** (our tile) → a follower that already arrived **stays** instead of being pulled elsewhere. We only move when **`ready`** (nothing left to collect for the current level, food OK, level needs ≥ 2 players). Once ready and at the rally point (anchor or direction 0), we **lock** (`locked = True`). |
+| `run()` | **Main loop** (see §4). Creates the `TeamManager`. If this process is the **queen** (`is_recruiter`): it only survives (eats below `QUEEN_FOOD_MIN=30`) + `team.tick()`. Otherwise (worker), every turn: `team.tick()` → `_handle_broadcasts()` → level update → `Inventory` → stay idle at level 8 → broadcast the **`NEED` beacon** (on group levels) → update food hysteresis → **progressive lock patience** → **decision**: locked → `elevate`; anchor → `elevate` (or `survive` when critically starving); otherwise `survive`/`collect`/`elevate`. |
 
-**Logique de décision (dans `run`)** :
-- **Verrouillé** au rendez-vous (`locked`) : on ne bouge plus et on n'part jamais manger → `elevate()` (incante dès quorum).
-- **Ancre** non verrouillée : se **fige** comme point de rendez-vous (`elevate`), et ne part manger (`survive`) que sous `CRITICAL_FOOD`.
-- `need_fuel` passe à `True` sous `CRITICAL_FOOD`, à `False` à `FOOD_RALLY_TARGET`, et **garde son état entre les deux** (hystérésis) → un suiveur engagé au rendez-vous n'en repart pas dès qu'il perd 1 food.
-- Suiveur **prêt** (pierres OK, niveau multi-joueurs) : `must_eat = need_fuel` ; sinon `must_eat = needs_food()` (seuil normal). Puis `survive` / `collect` / `elevate`.
+**Decision logic (in `run`)**:
+- **Locked** at the rally point (`locked`): no longer moves and never leaves to eat → `elevate()` (incants as soon as the quorum is reached).
+- **Anchor** not locked: **settles** as the rally point (`elevate`), and only leaves to eat (`survive`) below `CRITICAL_FOOD`.
+- `need_fuel` becomes `True` below `CRITICAL_FOOD`, `False` at `FOOD_RALLY_TARGET`, and **keeps its state in between** (hysteresis) → a follower committed to the rally point does not leave as soon as it loses 1 food.
+- **Ready** follower (stones OK, multi-player level): `must_eat = need_fuel`; otherwise `must_eat = needs_food()` (normal threshold). Then `survive` / `collect` / `elevate`.
 
-**Patience progressive du verrou** : tant que `locked`, si `here_count > rally_seen` (un joueur de plus vient d'arriver) → `locked_ticks = 0` (le groupe grossit, on attend). Sinon `locked_ticks += 1` ; au-delà de `LOCK_TIMEOUT (60)` tours sans progrès → abandon : `locked = False`, `need_fuel = True`, on repart se ravitailler et on retentera. Un changement de niveau lève automatiquement le verrou.
+**Progressive lock patience**: while `locked`, if `here_count > rally_seen` (one more player just arrived) → `locked_ticks = 0` (the group grows, keep waiting). Otherwise `locked_ticks += 1`; after `LOCK_TIMEOUT (60)` turns without progress → give up: `locked = False`, `need_fuel = True`, go refuel and retry later. A level change automatically releases the lock.
 
 ---
 
-### `logic/fork.py` — gestion de l'effectif (`class TeamManager`)
+### `logic/fork.py`: headcount management (`class TeamManager`)
 
-**`TEAM_CAP = 9`** : plafond **dur** de joueurs par équipe (jamais dépassé). **`REFORK_BELOW = 7`** : seuil de réapprovisionnement (hystérésis) — la reine ne reforke que lorsque l'effectif tombe **sous 7**, puis rebâtit jusqu'à 9 (7 = 1 reine + 6 ouvriers = quorum des niveaux 6-7). **`BUILD_FORK_COOLDOWN = 2.0`** : délai entre deux créations (le temps qu'un œuf éclose).
+**`TEAM_CAP = 9`**: **hard** cap of players per team (never exceeded). **`REFORK_BELOW = 7`**: replenishment threshold (hysteresis): the queen only re-forks when the headcount drops **below 7**, then rebuilds up to 9 (7 = 1 queen + 6 workers = quorum of levels 6-7). **`BUILD_FORK_COOLDOWN = 2.0`**: delay between two creations (time for an egg to hatch).
 
-| Élément | Rôle |
+| Item | Role |
 |---|---|
-| `_spawn(client)` | Lance un nouveau process `zappy_ai` (avec `-p/-n/-h`) et **renvoie son handle** (pour le surveiller). L'enfant reçoit `ZAPPY_CHILD=1` (un simple **rôle de lancement**, pas une donnée de jeu) → il ne recrute pas, il joue. À la connexion, le serveur lui donne un slot libre, sinon fait éclore un œuf. |
-| `TeamManager.__init__` | Détermine si ce process est le **recruteur** (`is_recruiter` = lancé à la main, sans `ZAPPY_CHILD`). Mémorise les `free_slots` initiaux. |
-| `TeamManager.tick()` | **Construit et maintient l'effectif (hystérésis 7→9).** Seul le **recruteur** (la reine) agit. Il : (1) **retire** de sa liste les enfants dont le **process est mort** (= joueur mort) ; (2) calcule l'effectif `1 (reine) + enfants vivants` ; (3) passe en mode **rebuild** quand l'effectif tombe sous `REFORK_BELOW` (7) et en sort à `TEAM_CAP` (9) ; (4) en mode rebuild et cooldown écoulé : crée un coéquipier — via un **slot initial** restant, sinon un **œuf** (`Fork`). **Point clé :** on ne lance l'enfant que **quand un slot/œuf existe** (slot dispo, ou `connect_nbr() > 0` = œuf prêt) ; sinon on `Fork` d'abord et l'enfant viendra au tour suivant. Ça évite que des enfants lancés trop tôt reçoivent « ko » et restent **bloqués** (fuite de process). |
+| `_spawn(client)` | Starts a new `zappy_ai` process (with `-p/-n/-h`) and **returns its handle** (to monitor it). The child gets `ZAPPY_CHILD=1` (just a **launch role**, not game data) → it does not recruit, it plays. On connection, the server gives it a free slot, or hatches an egg. |
+| `TeamManager.__init__` | Determines whether this process is the **recruiter** (`is_recruiter` = started by hand, without `ZAPPY_CHILD`). Stores the initial `free_slots`. |
+| `TeamManager.tick()` | **Builds and maintains the headcount (hysteresis 7→9).** Only the **recruiter** (the queen) acts. It: (1) **removes** children whose **process died** (= dead player); (2) computes the headcount `1 (queen) + living children`; (3) enters **rebuild** mode when the headcount drops below `REFORK_BELOW` (7) and leaves it at `TEAM_CAP` (9); (4) in rebuild mode, once the cooldown is over: creates a teammate, through a remaining **initial slot**, otherwise an **egg** (`Fork`). **Key point:** the child is only started **when a slot/egg exists** (free slot, or `connect_nbr() > 0` = egg ready); otherwise we `Fork` first and the child comes on a later turn. This keeps children started too early from getting "ko" and **hanging** (process leak). |
 
-> **Comment l'équipe est réapprovisionnée :** le recruteur surveille les **handles de process** de ses enfants. Quand un joueur meurt, son process se termine ; `tick()` le détecte (`poll()`) et le retire. Dès que l'effectif tombe **sous 7**, la reine rebâtit jusqu'à **9** (Fork + nouveaux process). Plafonné à 9 (jamais plus).
+> **How the team is replenished:** the recruiter monitors its children's **process handles**. When a player dies, its process ends; `tick()` detects it (`poll()`) and removes it. As soon as the headcount drops **below 7**, the queen rebuilds up to **9** (Fork + new processes). Capped at 9.
 
 ---
 
-### `logic/states/survive.py` — manger
+### `logic/states/survive.py`: eating
 
-| Fonction | Rôle |
+| Function | Role |
 |---|---|
-| `_go_to_tile(client, index)` | **Calcule et exécute le trajet** vers la tuile `index` de la vision (`Look`). Géométrie : la ligne `r = floor(√index)`, le décalage latéral `col = index − r(r+1)` (négatif = gauche). Envoie `Forward × r` + un virage + `Forward × |col|` en une salve (`send_batch`). Helper réutilisé par `collect` et `elevate`. |
-| `survive(client, player)` | `Look`, va sur la **case de food la plus proche** et ramasse **toute** la food présente. Si aucune food en vue → `explore()`. |
+| `_go_to_tile(client, index)` | **Computes and runs the path** to tile `index` of the field of view (`Look`). Geometry: row `r = floor(√index)`, lateral offset `col = index − r(r+1)` (negative = left). Sends `Forward × r` + one turn + `Forward × |col|` in one batch (`send_batch`). Helper reused by `collect`. |
+| `survive(client, player)` | `Look`, goes to the **closest food tile** and picks up **all** the food there. If no food is in sight → `explore()`. |
 
 ---
 
-### `logic/states/collect.py` — collecter les pierres
+### `logic/states/collect.py`: collecting stones
 
-| Fonction | Rôle |
+| Function | Role |
 |---|---|
-| `collect(client, player)` | Calcule les pierres manquantes du **niveau courant** (`missing_for_elevation`). `Look`, va sur la **première case** contenant une pierre manquante, la ramasse (+ la food présente au passage). Si rien en vue → `explore()`. |
+| `collect(client, player)` | Computes the missing stones for the **current level** (`missing_for_elevation`). `Look`, goes to the **first tile** holding a missing stone, picks it up (+ any food there). If nothing is in sight → `explore()`. |
 
 ---
 
-### `logic/states/elevate.py` — rassemblement + incantation
+### `logic/states/elevate.py`: gathering + incantation
 
-`STONES` : les 6 pierres (sans la food).
+`STONES`: the 6 stones (without food).
 
-| Fonction | Rôle |
+| Function | Role |
 |---|---|
-| `_topup_stones(client, player, first_tile)` | **Dépôt mutualisé.** Pose sur la case **seulement le déficit** pour atteindre les prérequis du niveau : on compte ce qui est **déjà** sur la case (déposé par les coéquipiers) et on n'ajoute que ce qui manque, dans la limite de ce qu'on porte. → chacun contribue, pas de gaspillage. |
-| `_do_incantation(client, player)` | `Look` + `_topup_stones` (s'assurer que la case a les pierres) + envoie `Incantation` (2 phases : `Elevation underway`, puis 300 ticks plus tard `Current level: K`). Si succès, met à jour `player.level`. |
-| `elevate(client, player)` | Si le niveau exige **1 joueur** → incante directement. Sinon : `Look`, compte les joueurs présents (`here`), **mange la food de la case** (auto-alimentation pendant l'attente). Si **quorum atteint** (`here ≥ needed`) → incante. Sinon → patiente sur place (le beacon `NEED` est désormais diffusé par `run()` à chaque tour, plus ici). |
+| `_topup_stones(client, player, first_tile)` | **Pooled drop.** Drops on the tile **only the deficit** needed to meet the level's requirements: counts what is **already** on the tile (dropped by teammates) and only adds what is missing, within what we carry. → everyone contributes, nothing is wasted. |
+| `_do_incantation(client, player)` | `Look` + `_topup_stones` (make sure the tile has the stones) + sends `Incantation` (2 phases: `Elevation underway`, then 300 ticks later `Current level: K`). On success, updates `player.level`. |
+| `elevate(client, player)` | If the level requires **1 player** → incants directly. Otherwise: `Look`, counts the players present (`here`), **eats the food on the tile** (self-feeding while waiting). If the **quorum is reached** (`here ≥ needed`) → incants. Otherwise → waits in place (the `NEED` beacon is broadcast by `run()` every turn). |
 
 ---
 
 ### `logic/explore.py`
 
-| Fonction | Rôle |
+| Function | Role |
 |---|---|
-| `explore(client, player)` | Déplacement d'exploration : avance, et **tourne aléatoirement toutes les 3 avancées** pour ne pas traverser la carte en ligne droite (et couvrir les côtés). |
+| `explore(client, player)` | Exploration move: moves forward and **turns randomly every 3 steps** so it does not cross the map in a straight line (and covers the sides). |
 
 ---
 
-## 6. Concepts clés (stratégies)
+## 6. Key concepts (strategies)
 
-- **Ralliement par élection d'ancre.** Chaque joueur a un `rally_weight` aléatoire fixe. Les joueurs prêts diffusent `NEED:team:level:weight`. Celui du **plus haut poids** reste immobile (ancre) ; les autres se dirigent vers lui grâce à la **direction du son** (`DIRECTION_MOVES`). Un seul attracteur stable → convergence sans oscillation.
+- **Rallying by anchor election.** Each player has a fixed random `rally_weight`. Players on group levels broadcast `NEED:team:level:weight`. The one with the **highest weight** stays still (anchor); the others head for it using the **sound direction** (`DIRECTION_MOVES`). A single stable attractor → convergence without oscillation.
 
-- **Verrouillage au rendez-vous (lock).** Dès qu'un joueur est prêt et sur la case de l'ancre, il se verrouille : il ne bouge plus et ne repart jamais manger. La patience est **progressive** : si le groupe grossit (`here_count` augmente), le compteur repart à zéro. Si personne n'arrive depuis `LOCK_TIMEOUT (60)` tours → abandon + ravitaillement + réessai. Évite l'orbite autour de l'ancre et les départs prématurés pour manger qui empêchaient le quorum de se former.
+- **Locking at the rally point.** As soon as a player is ready and on the anchor's tile, it locks: it no longer moves and never leaves to eat. Patience is **progressive**: if the group grows (`here_count` increases), the counter resets. If nobody arrives for `LOCK_TIMEOUT (60)` turns → give up + refuel + retry. This avoids orbiting around the anchor and the early departures to eat that kept the quorum from forming.
 
-- **Beacon continu.** Le `NEED` est diffusé **à chaque tour** : la direction d'un son (numéro de tuile) dépend de la position/orientation **courante** du récepteur ; une vieille direction est inutilisable. Émettre en continu donne au suiveur une direction fraîche à chaque pas.
+- **Continuous beacon.** `NEED` is broadcast **every turn**: a sound's direction (tile number) depends on the receiver's **current** position/orientation; an old direction is useless. Broadcasting continuously gives followers a fresh direction at every step.
 
-- **Collecte au niveau courant seulement.** On ne collecte que les pierres du niveau courant (`missing_for_elevation()`). La collecte reste courte → le joueur rejoint rapidement le rendez-vous, incante, puis recommence pour le niveau suivant.
+- **Collecting for the current level only.** Only the current level's stones are collected (`missing_for_elevation()`). Collection stays short → the player quickly joins the rally point, incants, then starts again for the next level.
 
-- **Hystérésis de food.** Deux seuils (`CRITICAL_FOOD=12`, `FOOD_RALLY_TARGET=25`) : on fait le plein, puis on **reste** au rendez-vous tant qu'on n'est pas retombé au seuil bas → évite l'oscillation « manger ↔ rallier ».
+- **Food hysteresis.** Two thresholds (`CRITICAL_FOOD=12`, `FOOD_RALLY_TARGET=25`): fill up, then **stay** at the rally point until dropping back to the low threshold → avoids the "eat ↔ rally" oscillation.
 
-- **Dépôt mutualisé des pierres.** À l'incantation, chaque joueur présent ne pose que le **déficit** → pas de gaspillage, ce ne sont pas les ressources d'un seul qui sont prises.
+- **Pooled stone drop.** At incantation time, each player present only drops the **deficit** → nothing is wasted, and the cost is not borne by a single player.
 
-- **Gestion d'effectif (TeamManager).** Un **recruteur** par équipe construit l'effectif à **9** et le **maintient** (remplace les morts en surveillant les process), plafonné à 9. Régulé par le serveur (`Connect_nbr` = sémaphore d'œuf).
+- **Headcount management (TeamManager).** One **recruiter** per team builds the headcount up to **9** and **maintains** it (replaces dead players by monitoring processes), capped at 9. Regulated by the server (`Connect_nbr` = egg semaphore).
 
-- **Conformité au sujet.** Aucune donnée de jeu n'est échangée hors du serveur. L'effectif est piloté par le serveur (slots du handshake + `Connect_nbr`). La seule info passée à un sous-process est `ZAPPY_CHILD` (un rôle de lancement, pas une donnée de jeu).
-
----
-
-## 7. Résultats et limites
-
-- **Niveau 8 atteint.** Le système de verrouillage au rendez-vous + patience progressive a permis d'atteindre le niveau 8 (9 joueurs ont atteint le niveau 8 lors d'un run live avec 4 équipes, carte 10×10, f=100).
-- **Correctif serveur.** La food n'est plus consommée pendant les 300 ticks de gel de l'incantation (`isIncanting` dans World.cpp) → évite les morts de faim pendant le rituel 7→8.
-- **Point dur résiduel.** Réunir 6 joueurs de même niveau sur une case exacte via le son (direction approximative à 1 parmi 8) reste aléatoire. Le succès dépend de la taille de la carte et de la variance des runs.
+- **No out-of-game communication.** No game data is exchanged outside the server. The headcount is driven by the server (handshake slots + `Connect_nbr`). The only info passed to a child process is `ZAPPY_CHILD` (a launch role, not game data).
 
 ---
 
-## 8. Lancer l'IA
+## 7. Results and limits
 
-**Un joueur :**
+- **Level 8 reached.** The rally-point lock + progressive patience made it possible to reach level 8 (9 players reached level 8 in a live run with 4 teams, 10×10 map, f=100).
+- **Server fix.** Food is no longer consumed during the 300-tick incantation freeze (`isIncanting` in World.cpp) → avoids starvation during the 7→8 ritual.
+- **Remaining hard part.** Gathering 6 same-level players on one exact tile using sound (direction accurate to 1 out of 8) remains random. Success depends on map size and run variance.
+
+---
+
+## 8. Running the AI
+
+**One player:**
 ```bash
 cd ai && python3 zappy_ai -p 4242 -n team1 -h localhost
 ```
-*(Le premier process lancé est le « recruteur » : il construit le reste de l'équipe via `Fork`.)*
+*(The first process started is the "recruiter": it builds the rest of the team through `Fork`.)*
 
-**Démos fournies** (depuis la racine du dépôt) :
+**Bundled demos** (from the repository root):
 ```bash
-./run_demo.sh        # serveur + plusieurs équipes + GUI
-./test_fork.sh       # test de la reproduction (Fork) : l'effectif grandit
+./run_demo.sh        # server + several teams + GUI
+./test_fork.sh       # reproduction (Fork) test: the headcount grows
 ```

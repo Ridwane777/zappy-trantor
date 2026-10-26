@@ -1,17 +1,17 @@
 #!/usr/bin/env bash
-# Lance la démo complète : serveur + 3 équipes + GUI.
-# On lance UNE seule IA par équipe : c'est la REINE de l'équipe. Elle ne fait que
-# survivre et forker pour maintenir l'effectif (rebâtit sous 7, plafond 9) ; ses
-# ouvriers évoluent et coopèrent entre équipes (incantations cross-team par
-# niveau). Quand tu appuies sur START après l'intro, la GUI rejoint la partie.
+# Runs the full demo: server + 2 teams + GUI.
+# Only ONE AI is started per team: it is the team's QUEEN. She only survives
+# and forks to maintain the headcount (rebuilds below 7, cap 9); her
+# workers level up and cooperate across teams (cross-team incantations per
+# level). Press START after the intro and the GUI joins the game.
 #
-# Usage : ./run_demo.sh [MOVE_SEC] [PORT]
-#   MOVE_SEC  durée d'un déplacement en secondes  (défaut 0.5 -> ~2 tuiles/s ;
-#             plus haut = plus lent)
-#   PORT      port du serveur                      (défaut 4242)
+# Usage: ./run_demo.sh [MOVE_SEC] [PORT]
+#   MOVE_SEC  duration of one move in seconds  (default 0.5 -> ~2 tiles/s;
+#             higher = slower)
+#   PORT      server port                       (default 4242)
 #
-# À lancer depuis ton propre terminal (pas via l'agent) pour que la fenêtre
-# reste ouverte tant que tu ne la fermes pas. Ctrl-C arrête tout proprement.
+# Run it from your own terminal so the window stays open
+# until you close it. Ctrl-C stops everything cleanly.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -25,19 +25,19 @@ TEAMS=(team1 team2)
 pids=()
 cleanup() {
     echo
-    echo "[run_demo] arrêt..."
+    echo "[run_demo] stopping..."
     for pid in "${pids[@]}"; do kill "$pid" 2>/dev/null || true; done
     wait 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
 
-echo "[run_demo] serveur port $PORT — ${#TEAMS[@]} équipes x $PLAYERS_PER_TEAM joueurs (carte ${WIDTH}x${HEIGHT})"
+echo "[run_demo] server port $PORT - ${#TEAMS[@]} teams x $PLAYERS_PER_TEAM players (map ${WIDTH}x${HEIGHT})"
 "$ROOT/server/zappy_server" -p "$PORT" -x "$WIDTH" -y "$HEIGHT" \
     -n "${TEAMS[@]}" -c "$PLAYERS_PER_TEAM" -f 100 &
 pids+=($!)
 sleep 1
 
-echo "[run_demo] IA : 1 client par équipe (la chaîne de remplissage peuple jusqu'à -c=$PLAYERS_PER_TEAM ; délai=${AI_DELAY}s/déplacement)"
+echo "[run_demo] AI: 1 client per team (the fill chain populates up to -c=$PLAYERS_PER_TEAM; delay=${AI_DELAY}s/move)"
 for team in "${TEAMS[@]}"; do
     ( cd "$ROOT/ai" && ZAPPY_AI_DELAY="$AI_DELAY" \
         python3 zappy_ai -p "$PORT" -n "$team" -h localhost ) &
@@ -45,7 +45,7 @@ for team in "${TEAMS[@]}"; do
 done
 sleep 1
 
-# Pas de ZAPPY_AUTOSTART : la GUI joue l'intro, puis START rejoint la partie.
-echo "[run_demo] GUI — intro puis START pour rejoindre 127.0.0.1:$PORT (ferme la fenêtre / Ctrl-C pour quitter)"
+# No ZAPPY_AUTOSTART: the GUI plays the intro, then START joins the game.
+echo "[run_demo] GUI - intro then START to join 127.0.0.1:$PORT (close the window / Ctrl-C to quit)"
 cd "$ROOT/gui"
 ./zappy_gui -p "$PORT" -h localhost

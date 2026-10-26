@@ -6,35 +6,35 @@ from logic.explore import explore
 
 
 def collect(client: Client, player: Player):
-    """Va chercher les pierres qui manquent pour l'élévation du niveau courant.
-    Stratégie simple et efficace :
-      1. on calcule les pierres manquantes (niveau courant uniquement) ;
-      2. on regarde autour de soi (Look) ;
-      3. on va sur la PREMIÈRE case en vue qui contient une pierre utile, on la
-         ramasse (et au passage la food qui s'y trouve) ;
-      4. si rien d'utile n'est visible, on explore pour découvrir d'autres cases.
-    On vise le niveau courant seulement (et non un gros stock d'avance) : la
-    collecte reste courte, ce qui permet de vite repartir au regroupement plutôt
-    que de passer tout son temps à amasser des pierres."""
+    """Fetch the stones missing for the current level's elevation.
+    Simple strategy:
+      1. compute the missing stones (current level only);
+      2. look around (Look);
+      3. go to the FIRST visible tile holding a useful stone and pick it
+         up (along with any food there);
+      4. if nothing useful is visible, explore to discover other tiles.
+    Only the current level is targeted (no large stock in advance): collection
+    stays short, so the player can quickly go back to regrouping instead
+    of spending all its time hoarding stones."""
     missing = player.missing_for_elevation()
 
-    # Champ de vision actuel : liste de cases (voir parse_look).
+    # Current field of view: list of tiles (see parse_look).
     raw = client.send("Look")
     tiles = parse_look(raw)
 
-    # On cherche la première case qui contient au moins une pierre manquante.
+    # Find the first tile holding at least one missing stone.
     for index, tile in enumerate(tiles):
         resources_here = [r for r in missing if r in tile]
         if resources_here:
-            # Un seul déplacement vers cette case.
+            # A single move to that tile.
             _go_to_tile(client, index)
-            # On ramasse toutes les pierres utiles présentes sur la case.
+            # Pick up every useful stone on the tile.
             for resource in resources_here:
                 client.send(f"Take {resource}")
-            # Bonus opportuniste : tant qu'on est là, on prend aussi la food.
-            # Sans ça la réserve de food ne dépasse jamais le strict seuil de survie.
+            # Opportunistic bonus: while here, also take the food.
+            # Without it the food reserve never goes above the bare survival threshold.
             for _ in range(tile.count("food")):
                 client.send("Take food")
             return
-    # Aucune pierre utile en vue : on explore pour couvrir d'autres zones.
+    # No useful stone in sight: explore other areas.
     explore(client, player)

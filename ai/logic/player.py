@@ -1,12 +1,12 @@
-"""ici c'est la mémoire du joueur."""
+"""The player's memory."""
 
 import random
 
-"""Les 7 ressources du jeu."""
+"""The 7 game resources."""
 RESOURCES = ["food", "linemate", "deraumere", "sibur", "mendiane", "phiras", "thystame"]
 
-"""Table des prérequis d'élévation  Pour passer du niveau N au niveau N+1, il faut réunir sur UNE MÊME case :
-joueurs du niveau N et les quantités de pierres indiquées."""
+"""Elevation requirements table. To go from level N to level N+1, the SAME tile must hold:
+the given number of level-N players and the given stone quantities."""
 ELEVATION_REQ = {
     1: {"players": 1, "linemate": 1, "deraumere": 0, "sibur": 0, "mendiane": 0, "phiras": 0, "thystame": 0},
     2: {"players": 2, "linemate": 1, "deraumere": 1, "sibur": 1, "mendiane": 0, "phiras": 0, "thystame": 0},
@@ -19,65 +19,65 @@ ELEVATION_REQ = {
 
 
 class Player:
-    """Représente l'état local d'UN joueur, tel que l'IA le connaît.
-    Cette classe ne stocke que ce dont l'IA a besoin pour décider quoi faire au tour
-    suivant : son niveau, son inventaire, et quelques drapeaux de coordination.
+    """Local state of ONE player, as known by the AI.
+    This class only stores what the AI needs to decide what to do next
+    turn: its level, its inventory, and a few coordination flags.
     """
 
-    """seuil normal: pour un joueur qui collecte des pierres.
-    En dessous, il part se ravitailler."""
+    """Normal threshold for a player collecting stones.
+    Below it, the player goes to find food."""
     FOOD_THRESHOLD = 18
-    """ seuil d'urgence: le joueur part se ravitailler immédiatement,
-    peut importe ce qu'il est en train de faire."""
+    """Emergency threshold: the player goes for food immediately,
+    whatever it is doing."""
     CRITICAL_FOOD = 12
-    """ seuil de ralliement: aumoin atteindre ce niveau avant
-    de se rassembler pour l'élévation."""
+    """Rally threshold: food level to reach before
+    gathering for an elevation."""
     FOOD_RALLY_TARGET = 25
-    """la patience max d'un joueur verrouillé au rendez-vous
-    avant d'abandonner et de repartir se ravitailler. """
+    """Max patience of a player locked at the rally point
+    before giving up and going back for food."""
     LOCK_TIMEOUT = 60
 
     def __init__(self):
-        # Niveau courant: démarre à 1.
+        # Current level: starts at 1.
         self.level = 1
-        # Inventaire local (toutes les ressources à 0 au départ).
+        # Local inventory (all resources at 0 at start).
         self.inventory = {resource: 0 for resource in RESOURCES}
 
-        # Compteur de pas effectués afin de faire changer de direction au joueur
+        # Step counter used to make the player change direction
         self.explore_steps = 0
 
-        """Booléen qui passe à True sous CRITICAL_FOOD=12,
-        repasse à False seulement quand on atteint FOOD_RALLY_TARGET=25.
-        Ça évite qu'un joueur parte manger dès qu'il perd 1 food."""
+        """Set to True below CRITICAL_FOOD=12,
+        back to False only once FOOD_RALLY_TARGET=25 is reached.
+        This keeps a player from leaving to eat every time it loses 1 food."""
         self.need_fuel = True
         
-        """Booléen qui indique si le joueur est l'ancre du niveau courant.
-        L'ancre est le joueur du niveau courant ayant le plus grand poids de ralliement"""
+        """Whether the player is the anchor of the current level.
+        The anchor is the player of the current level with the highest rally weight."""
         self.is_anchor = False
 
-        """Booléen qui indique si le joueur est verrouillé sur la case de l'ancre.
-        Le verrouillage est levé à chaque changement de niveau"""
+        """Whether the player is locked on the anchor's tile.
+        The lock is released on every level change."""
         self.locked = False
 
-        """compteur de tours passés verrouillé sans voir de nouveaux joueurs arriver.
-        Le compteur se remet à zéro dès qu'un joueur de plus arrive"""
+        """Turns spent locked without seeing new players arrive.
+        Reset to zero as soon as one more player arrives."""
         self.locked_ticks = 0
     
-        """Compte le nbre de joueurs vus sur la case au dernier Look"""
+        """Number of players seen on the tile at the last Look."""
         self.here_count = 0
 
-        """compte le nbre de joueurs vus sur la case au dernier Look
-        qui sont du même niveau que le joueur courant"""
+        """Number of players seen on the tile at the last Look
+        that have the same level as the current player."""
         self.rally_seen = 0
 
-        """Permet de tirer de manière aléatoire un joueur qui sera l'ancre du niveau courant."""
+        """Random draw used to elect the anchor of the current level."""
         self.rally_weight = random.randint(1, 1_000_000_000)
 
     def update_inventory(self, raw: str):
-        """Met à jour l'inventaire local depuis la réponse du serveur.
-        Le serveur renvoie [food 12, linemate 3, deraumere 0, ...]
-        On enlève les crochets, on découpe sur les virgules, puis chaque morceau
-        est un couple "nom-quantité" qu'on range dans self.inventory."""
+        """Update the local inventory from the server's answer.
+        The server returns [food 12, linemate 3, deraumere 0, ...]
+        Strip the brackets, split on commas; each piece is a
+        "name quantity" pair stored in self.inventory."""
         raw = raw.strip("[] \n")
         for item in raw.split(","):
             parts = item.strip().split()
@@ -87,8 +87,8 @@ class Player:
                     self.inventory[name] = int(qty)
 
     def missing_for_elevation(self) -> dict:
-        """compare l'inventaire aux prérequis du niveau courant (table ELEVATION_REQ).
-        Renvoie un dict vide si tout est prêt."""
+        """Compare the inventory with the current level's requirements (ELEVATION_REQ).
+        Returns an empty dict when everything is ready."""
         if self.level >= 8:
             return {}
         req = ELEVATION_REQ[self.level]
@@ -99,5 +99,5 @@ class Player:
         }
 
     def needs_food(self) -> bool:
-        """True si la réserve de food est passée sous le seuil de survie normal."""
+        """True if the food reserve is below the normal survival threshold."""
         return self.inventory["food"] < self.FOOD_THRESHOLD

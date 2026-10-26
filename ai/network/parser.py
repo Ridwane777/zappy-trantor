@@ -1,28 +1,27 @@
 def parse_look(raw: str) -> list:
-    """Transforme la réponse de la commande "Look" en liste de cases.
+    """Turn the answer of the "Look" command into a list of tiles.
 
-    Le serveur renvoie le champ de vision sous la forme d'une liste entre
-    crochets, les cases séparées par des virgules, et le contenu d'une case par
-    des espaces. Exemple :
+    The server returns the field of view as a bracketed list, tiles
+    separated by commas and a tile's content separated by spaces. Example:
 
         [ player, food, , linemate food, deraumere ]
-          ^case0  ^case1 ^case2 ^case3        ^case4
+          ^tile0  ^tile1 ^tile2 ^tile3        ^tile4
 
-    On veut en faire une liste de listes (une sous-liste par case, contenant les
-    noms des objets présents) :
+    We turn it into a list of lists (one sub-list per tile, holding the
+    names of the objects present):
 
         [["player"], ["food"], [], ["linemate", "food"], ["deraumere"]]
 
-    La case d'indice 0 est toujours celle où se trouve le joueur lui-même. Une
-    case vide donne une sous-liste vide.
+    Tile 0 is always the one the player stands on. An empty
+    tile gives an empty sub-list.
     """
-    # On retire les crochets et les espaces/retours autour de la chaîne.
+    # Strip the brackets and surrounding spaces/newlines.
     raw = raw.strip("[] \n")
 
     tiles = []
     for tile in raw.split(","):
         tile = tile.strip()
-        # tile.split() découpe sur les espaces ; si la case est vide on met [].
+        # tile.split() splits on spaces; an empty tile gives [].
         items = tile.split() if tile else []
         tiles.append(items)
     return tiles
