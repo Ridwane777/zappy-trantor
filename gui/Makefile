@@ -1,6 +1,6 @@
 CXX      = g++
 
-CXXFLAGS = -std=c++17 -O2 -Wall -Iinclude -I$(HOME)/.local/include -pthread
+CXXFLAGS = -std=c++17 -O2 -DGLM_ENABLE_EXPERIMENTAL -Wall -Iinclude -I$(HOME)/.local/include -pthread
 LDFLAGS  = -lGL -lGLEW -lsfml-graphics -lsfml-window -lsfml-system -lsfml-audio -lX11 -pthread
 
 NAME = zappy_gui
