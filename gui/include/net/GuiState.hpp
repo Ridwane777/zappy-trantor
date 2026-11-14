@@ -8,6 +8,12 @@
 
 inline constexpr int GUI_RES_COUNT = 7;
 
+// Resource names in protocol order (index i of bct/pin/pgt/pdr), the only copy in the GUI.
+inline constexpr std::array<const char *, GUI_RES_COUNT> GUI_RESOURCE_NAMES = {
+    "food", "linemate", "deraumere", "sibur", "mendiane", "phiras", "thystame"};
+inline constexpr std::array<const char *, GUI_RES_COUNT> GUI_RESOURCE_LABELS = {
+    "Food", "Linemate", "Deraumere", "Sibur", "Mendiane", "Phiras", "Thystame"};
+
 struct GuiTile {
     std::array<int, GUI_RES_COUNT> res{};
 };
@@ -63,7 +69,9 @@ struct GuiState {
     std::deque<GuiLogEntry> log;
     unsigned long logTotal = 0;
 
-    std::deque<std::string> rawFeed;
+    // Last protocol lines, without any prefix: received from and sent to the server.
+    std::deque<std::string> inboundFeed;
+    std::deque<std::string> outboundFeed;
 
     GuiTile &tileAt(int x, int y) { return tiles[y * width + x]; }
     const GuiTile &tileAt(int x, int y) const { return tiles[y * width + x]; }

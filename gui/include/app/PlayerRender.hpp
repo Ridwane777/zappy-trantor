@@ -5,7 +5,7 @@
 #include "render/SkinnedMesh.hpp"
 
 class Shader;
-class GuiClient;
+class INetworkClient;
 class HudOverlay;
 class Constellation;
 class AudioManager;
@@ -43,7 +43,7 @@ struct PlayerRenderCtx {
     bool testMode;
     bool netConnected;
     const std::vector<GuiPlayer>& testPlayers;
-    GuiClient& netClient;
+    const INetworkClient& netClient;
     const MapData& map;
     float evoDur;
     AudioManager& gameAudio;

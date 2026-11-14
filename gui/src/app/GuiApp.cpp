@@ -31,6 +31,7 @@
 #include "render/TexturedMesh.hpp"
 #include "menu/MenuScene.hpp"
 #include "net/GuiClient.hpp"
+#include <future>
 #include "audio/AudioManager.hpp"
 #include "hud/HudOverlay.hpp"
 #include "app/GuiApp.hpp"
@@ -184,9 +185,11 @@ int GuiApp::run(int argc, char** argv)
     GuiClient netClient;
     std::string netErr;
     bool netConnected = false;
-    std::thread netThread([&] {
-        netConnected = netClient.connect(menuCfg.host, menuCfg.port, netErr);
-    });
+    // Connects while the world loads; the future owns the result, read once below.
+    std::future<bool> connecting = std::async(std::launch::async,
+        [&netClient, &netErr, host = menuCfg.host, port = menuCfg.port] {
+            return netClient.connect(host, port, netErr);
+        });
 
     waitBar(gameDone, gameAssets.size(), "Chargement du monde...", 0.f, 0.10f);
     gamePrefetch.join();
@@ -387,7 +390,7 @@ int GuiApp::run(int argc, char** argv)
     for (std::size_t k = 0; k < map.tiles.size(); ++k)
         tileIndex[(long long)map.tiles[k].y * 100000 + map.tiles[k].x] = k;
 
-    netThread.join();
+    netConnected = connecting.get();
     if (netConnected)
         std::cout << "[net] connected to " << menuCfg.host << ":"
                   << menuCfg.port << "\n";
@@ -625,13 +628,12 @@ int GuiApp::run(int argc, char** argv)
 
         hud.update(dt);
 
-        if (netConnected && netClient.state().secondsToReset > 0.f)
-            netClient.state().secondsToReset =
-                std::max(0.f, netClient.state().secondsToReset - dt);
+        if (netConnected)
+            netClient.tick(dt);
 
         int pollId = hud.inventoryPollTarget(dt);
         if (pollId >= 0 && netConnected)
-            netClient.send("pin #" + std::to_string(pollId));
+            netClient.requestInventory(pollId);
 
         if (netConnected) {
             const GuiState& gs = netClient.state();
@@ -660,7 +662,7 @@ int GuiApp::run(int argc, char** argv)
                 camDist = ext * 2.42f;
                 camFramedForTeams = true;
             }
-            if (gs.sizeKnown && gs.resDirty) {
+            if (gs.sizeKnown && netClient.consumeResourcesDirty()) {
                 for (auto& t : map.tiles)
                     for (int i = 0; i < 7; ++i) t.res[i] = 0;
                 const int insetT = 7;
@@ -676,7 +678,6 @@ int GuiApp::run(int argc, char** argv)
                         for (int i = 0; i < 7; ++i)
                             map.tiles[it->second].res[i] += st.res[i];
                     }
-                netClient.state().resDirty = false;
             }
             if (!outro.active() && !gs.winner.empty())
                 outro.start(gs.winner);

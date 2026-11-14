@@ -11,6 +11,8 @@ SRCS = src/render/Shader.cpp \
        src/render/SkinnedMesh.cpp \
        src/render/Camera.cpp \
        src/render/TexturedMesh.cpp \
+       src/net/TcpConnection.cpp \
+       src/net/GuiProtocolParser.cpp \
        src/net/GuiClient.cpp \
        src/menu/MenuScene.cpp \
        src/audio/AudioManager.cpp \

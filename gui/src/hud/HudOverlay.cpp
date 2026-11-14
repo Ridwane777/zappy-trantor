@@ -180,18 +180,15 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
             win.draw(ev);
             y += 38.f;
 
-            auto drawFeed = [&](const char *label, const char *prefix,
+            auto drawFeed = [&](const char *label, const std::deque<std::string> &feed,
                                  sf::Color color, int maxLines) {
                 sf::Text lbl; lbl.setFont(font); lbl.setString(label);
                 lbl.setCharacterSize(13); lbl.setFillColor(sf::Color(150, 180, 215));
                 lbl.setPosition(x, y); win.draw(lbl); y += 18.f;
 
                 std::vector<const std::string *> matches;
-                for (int i = (int)state->rawFeed.size() - 1;
-                     i >= 0 && (int)matches.size() < maxLines; --i) {
-                    if (state->rawFeed[i].rfind(prefix, 0) == 0)
-                        matches.push_back(&state->rawFeed[i]);
-                }
+                for (int i = (int)feed.size() - 1; i >= 0 && (int)matches.size() < maxLines; --i)
+                    matches.push_back(&feed[i]);
                 const float lineH = 13.f;
                 int shown = (int)matches.size();
                 float h = shown * lineH + 8.f;
@@ -210,8 +207,8 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
                 }
                 y += h + 10.f;
             };
-            drawFeed("SERVER >>", "<< ", sf::Color(140, 235, 170, 230), 5);
-            drawFeed("CLIENT >>", ">> ", sf::Color(255, 200, 110, 230), 4);
+            drawFeed("SERVER >>", state->inboundFeed, sf::Color(140, 235, 170, 230), 5);
+            drawFeed("CLIENT >>", state->outboundFeed, sf::Color(255, 200, 110, 230), 4);
             y += 4.f;
         }
 
@@ -297,8 +294,6 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
             ht.setString("Player #" + std::to_string(sp.id) + "  inventory");
             ht.setCharacterSize(15); ht.setFillColor(sf::Color(210, 225, 255));
             ht.setPosition(x + 8.f, py + 6.f); win.draw(ht);
-            static const char *RNAME[7] = {"Food", "Linemate", "Deraumere",
-                "Sibur", "Mendiane", "Phiras", "Thystame"};
             static const sf::Color RCOL[7] = {
                 sf::Color(120, 220, 120), sf::Color(205, 205, 215),
                 sf::Color(120, 180, 255), sf::Color(110, 230, 210),
@@ -306,7 +301,7 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
                 sf::Color(255, 225, 120)};
             float ry = py + 32.f;
             for (int i = 0; i < 7; ++i) {
-                sf::Text nm; nm.setFont(font); nm.setString(RNAME[i]);
+                sf::Text nm; nm.setFont(font); nm.setString(GUI_RESOURCE_LABELS[i]);
                 nm.setCharacterSize(14); nm.setFillColor(RCOL[i]);
                 nm.setPosition(x + 12.f, ry); win.draw(nm);
                 sf::Text ct; ct.setFont(font);

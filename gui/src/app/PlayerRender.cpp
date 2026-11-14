@@ -4,7 +4,7 @@
 #include "render/Shader.hpp"
 #include "render/Mesh.hpp"
 #include "render/TexturedMesh.hpp"
-#include "net/GuiClient.hpp"
+#include "net/INetworkClient.hpp"
 #include "world/World.hpp"
 #include "hud/HudOverlay.hpp"
 #include "app/Constellation.hpp"

@@ -127,8 +127,6 @@ void drawTileGridGL(const glm::mat4& view, const glm::mat4& proj,
     glUseProgram(0);
 }
 
-static const char* RES_FULL[7]  = {"Food","Linemate","Deraumere","Sibur",
-                                    "Mendiane","Phiras","Thystame"};
 
 static bool mouseTile(const glm::mat4& view, const glm::mat4& proj,
                       unsigned winW, unsigned winH, int mx, int my,
@@ -190,7 +188,7 @@ void drawTileGridHUD(const glm::mat4& view, const glm::mat4& proj,
         const auto& tile = gs.tileAt(tx, ty);
         for (int i = 0; i < 7; ++i) {
             if (tile.res[i] > 0) {
-                lines.push_back(std::string(RES_FULL[i]) + ": " +
+                lines.push_back(std::string(GUI_RESOURCE_LABELS[i]) + ": " +
                                 std::to_string(tile.res[i]));
             }
         }
