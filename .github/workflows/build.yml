@@ -28,6 +28,15 @@ jobs:
       - name: Check zappy_server exists
         run: test -f server/zappy_server && echo "zappy_server OK"
 
+      - name: Server unit tests
+        run: make -C server tests_run
+
+      - name: Server network tests (fragmentation, flood, random bytes, slow reader, load)
+        run: python3 server/tests/network_tests.py
+
+      - name: AI wins a headless game
+        run: python3 tools/benchmark.py --teams red,blue --seconds 240 | tee bench.log && grep -q "WINNER=[a-z]" bench.log
+
       - name: Build GUI
         run: make gui
 
