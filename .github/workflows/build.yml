@@ -34,6 +34,9 @@ jobs:
       - name: Server network tests (fragmentation, flood, random bytes, slow reader, load)
         run: python3 server/tests/network_tests.py
 
+      - name: AI unit tests
+        run: cd ai && python3 -m unittest discover -s tests -t . -v
+
       - name: AI wins a headless game
         run: python3 tools/benchmark.py --teams red,blue --seconds 240 | tee bench.log && grep -q "WINNER=[a-z]" bench.log
 

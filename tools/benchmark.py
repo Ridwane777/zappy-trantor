@@ -6,10 +6,12 @@ distribution, and stops when a team wins (6 players at level 8) or time runs out
 
 Examples (from the repository root, after `make server`):
     python3 tools/benchmark.py --teams red,blue
-    python3 tools/benchmark.py --teams new:pack,old:legacy --seconds 300
+    python3 tools/benchmark.py --teams secure,plain:insecure --seconds 300
     python3 tools/benchmark.py --teams a,b,c,d --size 10 --port 4300
 
-A team is NAME or NAME:STRATEGY (pack = default, legacy = previous AI).
+A team is NAME followed by optional tags: NAME:insecure broadcasts in clear text (no
+encryption, no authentication), NAME:nojam does not jam the other teams. Both exist
+to measure the effect of encryption and jamming.
 """
 import argparse
 import collections
@@ -25,7 +27,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--teams", default="team1,team2", help="comma-separated NAME[:STRATEGY]")
+    ap.add_argument("--teams", default="team1,team2", help="comma-separated NAME[:insecure][:nojam]")
     ap.add_argument("--port", type=int, default=4300)
     ap.add_argument("--freq", type=int, default=100, help="server frequency (time units per second)")
     ap.add_argument("--size", type=int, default=20, help="map width and height")
@@ -43,7 +45,8 @@ def main():
     time.sleep(0.5)
     ais = [subprocess.Popen(
         [sys.executable, "zappy_ai", "-p", str(args.port), "-n", s[0]], cwd=os.path.join(ROOT, "ai"),
-        env=dict(os.environ, ZAPPY_STRATEGY=s[1] if len(s) > 1 else "pack"),
+        env=dict(os.environ, ZAPPY_INSECURE="1" if "insecure" in s[1:] else "0",
+                 ZAPPY_JAM="0" if "nojam" in s[1:] else "1"),
         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
         for s in specs]
 
