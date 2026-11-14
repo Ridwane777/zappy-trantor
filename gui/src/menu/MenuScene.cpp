@@ -288,8 +288,7 @@ bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,
                        frand(0.f, 6.28f), {0.34f, 0.56f, 0.26f}});
     }
 
-    auto envf = [](const char *n, float d) { const char *v = std::getenv(n); return v ? (float)std::atof(v) : d; };
-    const float phxYaw = envf("ZAPPY_PHX_YAW", 0.f);
+    const float phxYaw = out.phoenixYaw;
 
     Mesh sphere = buildSphere(1.f, 20, 16);
 

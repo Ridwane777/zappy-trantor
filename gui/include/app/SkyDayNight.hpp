@@ -12,4 +12,5 @@ struct DayNight {
     glm::vec3 skyHor;
 };
 
-DayNight computeDayNight(float elapsed, int nightOverride);
+DayNight computeDayNight(float elapsed, int nightOverride,
+                         float dayLength, float dayStart);

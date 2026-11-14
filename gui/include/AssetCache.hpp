@@ -14,14 +14,25 @@
 
 namespace zappy {
 
+// Where assets come from. Set once by configureAssetSource() at startup,
+// before any fetch thread runs, so it is read without locking afterwards.
+struct AssetSource {
+    std::string cdnUrl = "https://pub-6d9e00b90894418295af58a44ecfe1df.r2.dev";
+    bool        forceCdn = false;
+};
+
+namespace detail {
+inline AssetSource &assetSource() { static AssetSource s; return s; }
+}
+
+inline void configureAssetSource(const std::string &cdnUrl, bool forceCdn)
+{
+    detail::assetSource() = AssetSource{cdnUrl, forceCdn};
+}
+
 inline const std::string &cdnBase()
 {
-    static const std::string base = [] {
-        const char *env = std::getenv("ZAPPY_CDN_URL");
-        return std::string(env ? env
-            : "https://pub-6d9e00b90894418295af58a44ecfe1df.r2.dev");
-    }();
-    return base;
+    return detail::assetSource().cdnUrl;
 }
 
 namespace detail {
@@ -35,7 +46,7 @@ inline std::unordered_map<std::string, std::string> &store()
 inline bool localAssetsAvailable()
 {
     static const bool ok = [] {
-        if (const char *f = std::getenv("ZAPPY_FORCE_CDN"); f && *f && *f != '0')
+        if (assetSource().forceCdn)
             return false;
         std::ifstream probe("assets/fonts/GAMEDAY.ttf", std::ios::binary);
         return probe.good();

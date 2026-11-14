@@ -15,17 +15,22 @@ using json = nlohmann::json;
 #include <cstdlib>
 #include <sys/stat.h>
 
-static std::unordered_map<std::string, std::unique_ptr<Mesh>> g_meshes;
-
-Mesh &getMesh(const std::string &model)
+Mesh &MeshCache::get(const std::string &model)
 {
-    auto it = g_meshes.find(model);
-    if (it != g_meshes.end()) return *it->second;
+    auto it = _meshes.find(model);
+    if (it != _meshes.end()) return *it->second;
 
     std::string path = std::string(ASSET_DIR) + model + ".obj";
-    g_meshes[model] = std::make_unique<Mesh>(ObjLoader::load(path));
+    auto &slot = _meshes[model];
+    slot = std::make_unique<Mesh>(ObjLoader::load(path));
     std::cout << "Loaded " << model << "\n";
-    return *g_meshes[model];
+    return *slot;
+}
+
+void MeshCache::preload(const MapData &map)
+{
+    for (auto &t : map.tiles)
+        for (auto &p : t.props) get(p.model);
 }
 
 glm::vec3 colorFor(const std::string &n)

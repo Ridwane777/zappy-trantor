@@ -2,13 +2,10 @@
 #include <cstdlib>
 #include <cmath>
 
-DayNight computeDayNight(float elapsed, int nightOverride)
+DayNight computeDayNight(float elapsed, int nightOverride,
+                         float dayLength, float dayStart)
 {
-    const float DAY_LENGTH = std::getenv("ZAPPY_DAY_LENGTH")
-                           ? (float)std::atof(std::getenv("ZAPPY_DAY_LENGTH")) : 120.f;
-    const float DAY_START  = std::getenv("ZAPPY_DAY_START")
-                           ? (float)std::atof(std::getenv("ZAPPY_DAY_START")) : 0.05f;
-    float dayPhase = std::fmod(elapsed / DAY_LENGTH + DAY_START, 1.f);
+    float dayPhase = std::fmod(elapsed / dayLength + dayStart, 1.f);
 
     float nightF = glm::clamp(glm::smoothstep(0.45f, 0.55f, dayPhase)
                             - glm::smoothstep(0.95f, 1.00f, dayPhase), 0.f, 1.f);

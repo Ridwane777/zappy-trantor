@@ -7,7 +7,8 @@ class Shader;
 
 class Constellation {
 public:
-    Constellation();
+    // Big Dipper placement: azimuth/elevation in degrees, angular scale.
+    Constellation(float constAz, float constEl, float constS);
 
     void tick(bool spaceHeld, bool adminMode, float dt);
 

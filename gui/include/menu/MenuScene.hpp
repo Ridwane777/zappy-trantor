@@ -6,6 +6,7 @@
 struct MenuConfig {
     std::string host = "127.0.0.1";
     int         port = 4242;
+    float       phoenixYaw = 0.f;  // input: intro phoenix rotation, degrees
 };
 
 bool runMenu(sf::RenderWindow &window, sf::Font &font, sf::Font &uiFont,

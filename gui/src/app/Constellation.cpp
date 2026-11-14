@@ -11,7 +11,7 @@
 
 static const int kDipperLink[7][2] = { {0,1},{1,2},{2,3},{3,0},{3,4},{4,5},{5,6} };
 
-Constellation::Constellation()
+Constellation::Constellation(float constAz, float constEl, float constS)
 {
 
     auto rnd = [](float a, float b) { return a + (b - a) * (float)std::rand() / RAND_MAX; };
@@ -28,9 +28,6 @@ Constellation::Constellation()
         _stars.push_back(s);
     }
 
-    float constAz = std::getenv("ZAPPY_CONST_AZ") ? (float)std::atof(std::getenv("ZAPPY_CONST_AZ")) : 225.f;
-    float constEl = std::getenv("ZAPPY_CONST_EL") ? (float)std::atof(std::getenv("ZAPPY_CONST_EL")) : 22.f;
-    float constS  = std::getenv("ZAPPY_CONST_S")  ? (float)std::atof(std::getenv("ZAPPY_CONST_S"))  : 0.040f;
     float az = constAz * 3.14159265f / 180.f, el = constEl * 3.14159265f / 180.f;
     float ce = std::cos(el), se = std::sin(el);
     glm::vec3 cdir = glm::normalize(glm::vec3(ce * std::cos(az), se, ce * std::sin(az)));

@@ -2,7 +2,9 @@
 
 #include <glm/glm.hpp>
 #include <ctime>
+#include <memory>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "render/Mesh.hpp"
@@ -36,7 +38,22 @@ struct MapData {
     glm::vec3 fogColor {0.60f, 0.82f, 0.95f};
 };
 
-Mesh     &getMesh(const std::string &model);
+// OBJ meshes loaded on demand from ASSET_DIR and kept for reuse. It owns GL
+// buffers, so it must be created after the GL context and destroyed before it.
+class MeshCache {
+public:
+    MeshCache() = default;
+    MeshCache(const MeshCache &) = delete;
+    MeshCache &operator=(const MeshCache &) = delete;
+
+    Mesh &get(const std::string &model);
+    // Loads every prop model used by `map` so the first frame does not stall.
+    void preload(const MapData &map);
+
+private:
+    std::unordered_map<std::string, std::unique_ptr<Mesh>> _meshes;
+};
+
 glm::vec3 colorFor(const std::string &n);
 MapData   loadMap(const std::string &path);
 time_t    fileMtime(const std::string &p);
