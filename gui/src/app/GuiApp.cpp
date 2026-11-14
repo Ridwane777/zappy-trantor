@@ -61,7 +61,7 @@ int GuiApp::run(int argc, char** argv)
     ctx.antialiasingLevel = 4;
 
     sf::RenderWindow window(sf::VideoMode(1280, 720),
-        "Zappy Map — Sadida", sf::Style::Default, ctx);
+        "Zappy Map - Sadida", sf::Style::Default, ctx);
     window.setVerticalSyncEnabled(true);
 
     glewExperimental = GL_TRUE;
@@ -158,7 +158,7 @@ int GuiApp::run(int argc, char** argv)
 
     std::atomic<size_t> gameDone{0};
     std::thread gamePrefetch([&] { zappy::prefetch(gameAssets, &gameDone, 6); });
-    // Intro assets stream silently in the background — no separate loading
+    // Intro assets stream silently in the background - no separate loading
     // screen; they finish long before the player clicks START.
     std::thread introPrefetch([introAssets] { zappy::prefetch(introAssets, nullptr, 4); });
     introPrefetch.detach();
@@ -192,7 +192,7 @@ int GuiApp::run(int argc, char** argv)
     gamePrefetch.join();
     std::cout << "[menu] start -> server " << menuCfg.host << ":"
               << menuCfg.port << "\n";
-    window.setTitle("Zappy Map — Sadida");
+    window.setTitle("Zappy Map - Sadida");
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);

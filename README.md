@@ -1,4 +1,4 @@
-# Zappy — Trantor
+# Zappy - Trantor
 
 A multiplayer network game in which AI-driven players gather resources and perform
 elevation rituals on a toroidal map. The game server, the AI clients and the 3D GUI
@@ -97,7 +97,7 @@ Both protocols are documented in [`protocol/`](protocol/):
 
 Built by a team of six.
 
-**My contribution (Ridwane777):** the game server core — World/Map/Tile/Player model,
+**My contribution (Ridwane777):** the game server core - World/Map/Tile/Player model,
 command queue and game clock (time unit), resource consumption and player death,
 incantation (two-phase synchronization), sound broadcast direction, and GUI protocol
 event broadcasting.
@@ -109,3 +109,7 @@ Teammates:
 - Chabda Gbemetonou ([@chabda01](https://github.com/chabda01))
 - Huziane Tonawa
 - Peniel Amoussou
+
+## License
+
+[MIT](LICENSE)

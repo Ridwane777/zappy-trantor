@@ -1,4 +1,4 @@
-# GUI (GRAPHIC) protocol — server ⇄ graphic client
+# GUI (GRAPHIC) protocol - server ⇄ graphic client
 
 Reference for the messages exchanged with a **GRAPHIC** client (the GUI). This
 documents what the server in this repo **actually implements** (see
@@ -48,7 +48,7 @@ On `GRAPHIC` the server immediately sends the world bootstrap:
 | `edi` | `edi #egg` | egg removed |
 | `pex` | `pex #id` | player was ejected |
 | `pdi` | `pdi #id` | player died / disconnected |
-| `seg` | `seg team` | end of game — `team` won |
+| `seg` | `seg team` | end of game - `team` won |
 
 > Tile/inventory updates are authoritative: after any `pgt`/`pdr`/elevation the
 > server also re-sends the affected `bct`, so the GUI can rebuild tile contents

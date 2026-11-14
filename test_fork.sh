@@ -40,7 +40,7 @@ for team in "${TEAMS[@]}"; do
 done
 sleep 1
 
-echo "[test_fork] GUI — live observer on 127.0.0.1:$PORT"
+echo "[test_fork] GUI - live observer on 127.0.0.1:$PORT"
 echo "            Watch the HUD: players should grow from 2 -> 4 -> 8 ..."
 cd "$ROOT/gui"
 ./zappy_gui -p "$PORT" -h localhost

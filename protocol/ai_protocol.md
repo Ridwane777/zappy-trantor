@@ -1,4 +1,4 @@
-# AI protocol — server ⇄ AI client
+# AI protocol - server ⇄ AI client
 
 Reference for an **AI** client (a `zappy_ai` bot). Documents what this repo's
 server (`server/src/World.cpp`) and AI (`ai/`) actually implement.
@@ -17,12 +17,12 @@ If the team is full or unknown the server replies `ko\n` and closes the socket.
 ## Commands
 
 One command per line. Each gets exactly one reply line (except `Incantation`,
-which sends two — see below). Resources are: `food linemate deraumere sibur
+which sends two - see below). Resources are: `food linemate deraumere sibur
 mendiane phiras thystame`.
 
 | command | reply | effect |
 |---|---|---|
-| `Forward` | `ok` | move one tile forward (map wraps — torus) |
+| `Forward` | `ok` | move one tile forward (map wraps - torus) |
 | `Right` | `ok` | turn 90° right |
 | `Left` | `ok` | turn 90° left |
 | `Look` | `[t0,t1,t2,…]` | objects on each visible tile (vision grows with level) |
@@ -50,7 +50,7 @@ the tile) are in `server` / mirrored in `ai/logic/player.py` (`ELEVATION_REQ`).
 If unmet, the server replies `ko`.
 
 **Important behaviour:** `Current level: K` is sent to **every** participant on
-the tile — including ones that did **not** send `Incantation`. Those receive it
+the tile - including ones that did **not** send `Incantation`. Those receive it
 *unsolicited*, so the AI treats `Current level` as an **out-of-band** message
 (buffered like a broadcast in `ai/network/client.py`, applied in
 `ai/logic/brain.py`) instead of as the reply to its in-flight command. Reading it
@@ -66,6 +66,6 @@ buffers these between command replies (`Client._broadcasts`).
 
 In standard Zappy each action costs `time-units / f` seconds (Forward 7/f,
 Incantation 300/f, …) and `f` is the `-f` server flag. **This server does not
-implement per-action time costs** — commands execute immediately. Watchable
+implement per-action time costs** - commands execute immediately. Watchable
 pacing is instead done client-side via the `ZAPPY_AI_DELAY` env var (seconds
 between movement commands; `0.5` ≈ 2 tiles/s). See `ai/network/client.py`.
