@@ -282,7 +282,7 @@ void GuiClient::_processLine(const std::string &line)
             _state.eggs[e.id] = e;
         }
 
-    } else if (cmd == "edi") {
+    } else if (cmd == "edi" || cmd == "ebo") {   // egg destroyed, or hatched into a player
         std::string eggTok;
         if (iss >> eggTok)
             _state.eggs.erase(parseId(eggTok));
