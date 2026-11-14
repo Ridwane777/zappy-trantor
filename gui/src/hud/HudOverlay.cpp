@@ -113,7 +113,7 @@ void HudOverlay::draw(sf::RenderWindow &win, const GuiState *state,
     if (state) {
         status = "ONLINE " + host + ":" + std::to_string(port) +
                  "   grid " + std::to_string(state->width) + "x" + std::to_string(state->height) +
-                 "   t/u " + std::to_string(state->timeUnit) +
+                 "   t/u " + std::to_string(state->timeUnit) + " (+/-)" +
                  "   teams " + std::to_string(state->teams.size()) +
                  "   players " + std::to_string(state->players.size()) +
                  "   eggs " + std::to_string(state->eggs.size());

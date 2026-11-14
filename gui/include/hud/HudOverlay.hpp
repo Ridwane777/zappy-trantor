@@ -13,6 +13,7 @@ public:
     void init(const sf::Font &font) { _font = &font; }
 
     void toggle() { _open = !_open; }
+    void show() { _open = true; }
     void update(float dt) {
         _anim += ((_open ? 1.f : 0.f) - _anim) * std::min(1.f, dt * 10.f);
     }

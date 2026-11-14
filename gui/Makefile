@@ -31,6 +31,10 @@ SRCS = src/render/Shader.cpp \
        src/app/SettingsOverlay.cpp \
        src/app/OutroScene.cpp \
        src/app/Fullscreen.cpp \
+       src/app/GuiConfig.cpp \
+       src/app/AssetPrefetcher.cpp \
+       src/app/ScenePasses.cpp \
+       src/app/CharzController.cpp \
        src/app/GuiApp.cpp \
        src/main.cpp
 

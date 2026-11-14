@@ -35,35 +35,38 @@ struct PlayerAnim {
     float blendT = 0.f;
 };
 
+// Built once; the state that changes every frame (connection, mounts) is
+// held by const reference so the owner keeps updating it in place.
 struct PlayerRenderCtx {
     PlayerTier (&tiers)[4];
     std::unordered_map<int, PlayerAnim>& playerAnims;
     std::vector<Spark>& sparks;
 
     bool testMode;
-    bool netConnected;
+    const bool& netConnected;
     const std::vector<GuiPlayer>& testPlayers;
     const INetworkClient& netClient;
     const MapData& map;
     float evoDur;
+    float strideDist;
     AudioManager& gameAudio;
 
-    bool adminMode, haveMew;
+    const bool& adminMode; bool haveMew;
     SkinnedMesh& mewMesh;
-    float mewAnimTime; bool mewMoving;
-    glm::vec3 mewPos; float mewYaw; float mewScale;
+    const float& mewAnimTime; const bool& mewMoving;
+    const glm::vec3& mewPos; const float& mewYaw; float mewScale;
 
-    bool haveCharz;
+    const bool& haveCharz;  // charizard loaded and its mode active
     SkinnedMesh& charzMesh;
-    int   charzAnimIdx;
-    float charzAnimTime;
-    bool  charzStripRoot;
-    float charzBobAmp;
-    glm::vec3 charzPos; float charzYaw; float charzScale;
+    const int&   charzAnimIdx;
+    const float& charzAnimTime;
+    const bool&  charzStripRoot;
+    const float& charzBobAmp;
+    const glm::vec3& charzPos; const float& charzYaw; float charzScale;
 
     bool haveMoon;
     SkinnedMesh& moonMesh;
-    glm::vec3 moonDir;
+    glm::vec3 moonDir;  // refreshed each frame by the player pass
 
     TexturedMesh* eggMeshTex;
 

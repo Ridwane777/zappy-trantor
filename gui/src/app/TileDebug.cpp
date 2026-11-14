@@ -128,7 +128,7 @@ void drawTileGridGL(const glm::mat4& view, const glm::mat4& proj,
 }
 
 
-static bool mouseTile(const glm::mat4& view, const glm::mat4& proj,
+bool screenToTile(const glm::mat4& view, const glm::mat4& proj,
                       unsigned winW, unsigned winH, int mx, int my,
                       const MapData& map, const GuiState& gs, int& tx, int& ty)
 {
@@ -171,7 +171,7 @@ void drawTileGridHUD(const glm::mat4& view, const glm::mat4& proj,
     if (!gs.sizeKnown) return;
 
     int tx = -1, ty = -1;
-    if (!mouseTile(view, proj, winW, winH, mouseX, mouseY, map, gs, tx, ty))
+    if (!screenToTile(view, proj, winW, winH, mouseX, mouseY, map, gs, tx, ty))
         return;
 
     float wx = (tileWorldX(tx, map.w, gs.width) + tileWorldX(tx+1, map.w, gs.width)) * 0.5f;

@@ -68,8 +68,7 @@ static void updatePlayerStates(PlayerRenderCtx& ctx,
                                float dt) {
     const float MOVE_DUR = 0.50f;
 
-    static const float WALK_CYCLE_DIST = std::getenv("ZAPPY_STRIDE")
-        ? std::max(0.2f, (float)std::atof(std::getenv("ZAPPY_STRIDE"))) : TILE;
+    const float WALK_CYCLE_DIST = ctx.strideDist;
     for (const GuiPlayer* pp : drawList) {
         const GuiPlayer& p = *pp;
         PlayerAnim& pa = ctx.playerAnims[p.id];

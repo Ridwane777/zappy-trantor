@@ -61,7 +61,7 @@ void drawGround(Shader& toon, Shader& waterShader, unsigned int waterTex,
     glEnable(GL_CULL_FACE);
 }
 
-void drawProps(Shader& toon, Shader& outline, const MapData& map,
+void drawProps(Shader& toon, Shader& outline, MeshCache& meshes, const MapData& map,
                const glm::mat4& view, const glm::mat4& proj,
                float elapsed, float ambScale, float treeGlow,
                float cx, float cz, int teamCount)
@@ -83,7 +83,7 @@ void drawProps(Shader& toon, Shader& outline, const MapData& map,
         float wx = t.x * TILE + ioff.x;
         float wz = t.y * TILE + ioff.y;
         for (auto& p : t.props) {
-            Mesh& pm = getMesh(p.model);
+            Mesh& pm = meshes.get(p.model);
             float r  = pm.boundingRadius();
             float s  = (r > 1e-4f) ? p.scale / r : p.scale;
             if (p.model == "flower_1" || p.model == "flower_2")
@@ -249,9 +249,9 @@ void drawFood(Shader& egg, const std::unique_ptr<TexturedMesh>* foodMesh,
     glEnable(GL_CULL_FACE);
 }
 
-void drawClouds(Shader& toon, const MapData& map, float elapsed)
+void drawClouds(Shader& toon, MeshCache& meshes, const MapData& map, float elapsed)
 {
-    Mesh& cloudMesh = getMesh("cloud");
+    Mesh& cloudMesh = meshes.get("cloud");
     for (auto& c : map.clouds) {
         float x = c.x * TILE + elapsed * c.drift_x * TILE;
         float y = c.y;

@@ -109,6 +109,23 @@ cd gui && ./zappy_gui -p 4242 -h localhost
 The GUI plays an intro, then joins the game when you press START
 (`ZAPPY_AUTOSTART` skips this). 3D assets are loaded from `gui/assets/` if present,
 otherwise downloaded from a CDN (`ZAPPY_CDN_URL` overrides the address).
+Every `ZAPPY_*` variable the GUI reads is listed, with its default, in
+[`gui/include/app/GuiConfig.hpp`](gui/include/app/GuiConfig.hpp).
+
+GUI controls:
+
+| Input | Action |
+| --- | --- |
+| Left drag / mouse wheel | Orbit / zoom the camera |
+| Left click on a player's tile | Select it: side panel opens with its inventory (polled every 0.33 s); click again to cycle through a crowded tile |
+| SEE button (selected player) | Follow the player in third person |
+| `+` / `-` (keypad) or PageUp / PageDown | Double / halve the server time unit (`sst`, 1..10000), shown as `t/u` in the top bar |
+| Tab | Show / hide the teams panel |
+| G | Server tile grid and tile tooltip |
+| N | Cycle day/night: auto, night, day |
+| R | Reset the camera |
+| F11 | Fullscreen |
+| Esc | Leave POV, then deselect, then quit |
 
 **Demo**
 

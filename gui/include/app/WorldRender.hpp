@@ -4,6 +4,7 @@
 
 class Shader;
 class Mesh;
+class MeshCache;
 class TexturedMesh;
 struct MapData;
 
@@ -12,7 +13,7 @@ void drawGround(Shader& toon, Shader& waterShader, unsigned int waterTex,
                 const glm::vec2& sunXZ, Mesh& land, Mesh& ocean, Mesh& water,
                 const MapData& map, float cx, float cz, int teamCount);
 
-void drawProps(Shader& toon, Shader& outline, const MapData& map,
+void drawProps(Shader& toon, Shader& outline, MeshCache& meshes, const MapData& map,
                const glm::mat4& view, const glm::mat4& proj,
                float elapsed, float ambScale, float treeGlow,
                float cx, float cz, int teamCount);
@@ -29,4 +30,4 @@ void drawFood(Shader& egg, const std::unique_ptr<TexturedMesh>* foodMesh,
               const glm::mat4& view, const glm::mat4& proj, float elapsed,
               float cx, float cz, int teamCount);
 
-void drawClouds(Shader& toon, const MapData& map, float elapsed);
+void drawClouds(Shader& toon, MeshCache& meshes, const MapData& map, float elapsed);
