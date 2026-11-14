@@ -107,8 +107,9 @@ cd gui && ./zappy_gui -p 4242 -h localhost
 ```
 
 The GUI plays an intro, then joins the game when you press START
-(`ZAPPY_AUTOSTART` skips this). 3D assets are loaded from `gui/assets/` if present,
-otherwise downloaded from a CDN (`ZAPPY_CDN_URL` overrides the address).
+(`ZAPPY_AUTOSTART` skips this). The 3D assets (about 1.2 GB) are not in git: download them once with
+`./gui/scripts/fetch_assets.sh`, which fetches them from the `assets-v1` release and
+checks their SHA-256. Credits and licenses: [gui/ASSETS.md](gui/ASSETS.md).
 Every `ZAPPY_*` variable the GUI reads is listed, with its default, in
 [`gui/include/app/GuiConfig.hpp`](gui/include/app/GuiConfig.hpp).
 

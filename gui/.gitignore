@@ -15,18 +15,6 @@ tools/
 # library into the include path (~/.local/include) by `make` -> setup_libs.sh,
 # NOT bundled in the repo. Nothing to ignore here anymore.
 
-# Large asset bundles - not versioned (streamed from the CDN at runtime).
-assets/models/
-assets/characters/
-assets/models
-assets/characters
-
-# Large source art (decimated logo + raw background plates) - fetched separately
-assets/screen/zappy_logo.*
-assets/screen/Gemini_*
-*.o
-# Small UI essentials (fonts, gear icon, etc.) ARE tracked - everything under
-# assets/ not matched above is committed so the menu renders on a fresh clone.
-
-# symlink to local asset store - not committed (use fetch_assets.sh on a fresh clone)
+# Assets (models, textures, sounds, fonts, about 1.2 GB) are not versioned:
+# scripts/fetch_assets.sh downloads them from the GitHub release (see ASSETS.md).
 assets

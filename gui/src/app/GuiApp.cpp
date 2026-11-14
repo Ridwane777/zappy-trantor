@@ -89,11 +89,11 @@ std::vector<std::string> gameAssetList()
 {
     std::vector<std::string> gameAssets = {
         A("models/egg_tex.obj"), A("models/egg_tex.png"), A("models/cloud.obj"),
-        A("characters/female/Meshy_AI_Huntress_of_the_Wild_biped_Animation_Idle_15_withSkin.glb"),
-        A("characters/female/Meshy_AI_Huntress_of_the_Wild_biped_Animation_Walking_withSkin.glb"),
+        A("characters/female/idle.glb"),
+        A("characters/female/walk.glb"),
         A("characters/female/player_female.png"),
-        A("characters/male/Meshy_AI_Ironhorn_Wanderer_biped_Animation_Idle_11_withSkin.glb"),
-        A("characters/male/Meshy_AI_Ironhorn_Wanderer_biped_Animation_Walking_withSkin.glb"),
+        A("characters/male/idle.glb"),
+        A("characters/male/walk.glb"),
         A("characters/male/player_male.png"),
         A("characters/mew/scene.gltf"), A("characters/mew/scene.bin"),
         A("characters/mew/textures/blinn1_baseColor.jpeg"),
@@ -375,15 +375,15 @@ int GuiApp::run(int argc, char** argv)
     float incantCooldown = 25.f;
 
     const std::string CHAR_DIR   = "assets/characters/";
-    const std::string FEMALE_DIR = CHAR_DIR + "female/Meshy_AI_Huntress_of_the_Wild_biped_Animation_";
-    const std::string MALE_DIR   = CHAR_DIR + "male/Meshy_AI_Ironhorn_Wanderer_biped_Animation_";
+    const std::string FEMALE_DIR = CHAR_DIR + "female/";
+    const std::string MALE_DIR   = CHAR_DIR + "male/";
 
     advanceLoadingTo(window, hudFont, 0.10f, "Loading characters...");
 
     try {
         Character c;
-        c.mesh     = SkinnedMesh::load(FEMALE_DIR + "Idle_15_withSkin.glb");
-        c.mesh.loadAnimFrom(FEMALE_DIR + "Walking_withSkin.glb");
+        c.mesh     = SkinnedMesh::load(FEMALE_DIR + "idle.glb");
+        c.mesh.loadAnimFrom(FEMALE_DIR + "walk.glb");
         c.worldPos = {14*TILE+TILE*.5f, 0.f, 13*TILE+TILE*.5f};
         c.rotY     = 180.f;
         float meshH = c.mesh.boundsMax().y - c.mesh.boundsMin().y;
@@ -397,8 +397,8 @@ int GuiApp::run(int argc, char** argv)
 
     try {
         Character c;
-        c.mesh     = SkinnedMesh::load(MALE_DIR + "Idle_11_withSkin.glb");
-        c.mesh.loadAnimFrom(MALE_DIR + "Walking_withSkin.glb");
+        c.mesh     = SkinnedMesh::load(MALE_DIR + "idle.glb");
+        c.mesh.loadAnimFrom(MALE_DIR + "walk.glb");
         c.mesh.loadTexture(CHAR_DIR + "male/player_male.png");
         c.worldPos = {13*TILE+TILE*.5f, 0.f, 13*TILE+TILE*.5f};
         c.rotY     = 200.f;
