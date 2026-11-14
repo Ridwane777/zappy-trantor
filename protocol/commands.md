@@ -1,30 +1,35 @@
 # Protocol quick reference
 
-One-page cheat sheet for both protocols. Full details: `ai_protocol.md`,
-`gui_protocol.md`. Resource order everywhere: `0 food · 1 linemate · 2 deraumere
-· 3 sibur · 4 mendiane · 5 phiras · 6 thystame`.
+One-page cheat sheet for both protocols. Full details: [`ai_protocol.md`](ai_protocol.md),
+[`gui_protocol.md`](gui_protocol.md). Resource order everywhere: `0 food · 1 linemate ·
+2 deraumere · 3 sibur · 4 mendiane · 5 phiras · 6 thystame`.
 
 ## AI client → server
 
-| command | reply |
-|---|---|
-| `Forward` `Right` `Left` | `ok` |
-| `Look` | `[t0,t1,…]` |
-| `Inventory` | `[food n, linemate n, …]` |
-| `Take object` / `Set object` | `ok` / `ko` |
-| `Broadcast text` | `ok` |
-| `Fork` | `ok` |
-| `Eject` | `ok` / `ko` |
-| `Connect_nbr` | `N` |
-| `Incantation` | `Elevation underway` → `Current level: K` (or `ko`) |
+Handshake: `WELCOME` → send team name → `CLIENT-NUM` → `X Y` (or `ko`).
 
-Handshake: `WELCOME` → send team name → `CLIENT-NUM` → `X Y`.
+| command | cost | reply |
+|---|---|---|
+| `Forward` `Right` `Left` | 7 | `ok` |
+| `Look` | 7 | `[t0,t1,…]` |
+| `Inventory` | 1 | `[food n, linemate n, …]` |
+| `Broadcast text` | 7 | `ok` |
+| `Connect_nbr` | 0 | `N` |
+| `Fork` | 42 | `ok` |
+| `Eject` | 7 | `ok` / `ko` |
+| `Take object` / `Set object` | 7 | `ok` / `ko` |
+| `Incantation` | 300 | `Elevation underway` → `Current level: K` (or `ko`) |
+| anything else | 0 | `ko` |
+
+At most 10 pending commands per player. Asynchronous: `message K, text`,
+`eject: K`, `Current level: K`, `dead`.
 
 ## Server → GUI (GRAPHIC)
 
+Handshake: `WELCOME` → send `GRAPHIC` → bootstrap (`msz`, `tna…`, `bct…`, `pnw…`, `sgt`).
+
 | msg | format | | msg | format |
-|---|--Few or zero competing teams, long run, food-dense map (more food = more survivable waits).
--|---|---|---|
+|---|---|---|---|---|
 | `msz` | `msz X Y` | | `pgt` | `pgt #id i` (took) |
 | `sgt` | `sgt T` | | `pdr` | `pdr #id i` (dropped) |
 | `tna` | `tna N` | | `pic` | `pic X Y L #id…` |
@@ -32,25 +37,11 @@ Handshake: `WELCOME` → send team name → `CLIENT-NUM` → `X Y`.
 | `pnw` | `pnw #id X Y O L team` | | `pbc` | `pbc #id message` |
 | `ppo` | `ppo #id X Y O` | | `pfk` | `pfk #id` |
 | `plv` | `plv #id L` | | `enw` | `enw #egg #player X Y` |
-| `pin` | `pin #id X Y q0..q6` | | `edi` | `edi #egg` |
-| `pdi` | `pdi #id` | | `pex` | `pex #id` |
-| `seg` | `seg team` | | | |
+| `pin` | `pin #id X Y q0..q6` | | `ebo` | `ebo #egg` (hatched) |
+| `pdi` | `pdi #id` | | `edi` | `edi #egg` (destroyed) |
+| `pex` | `pex #id` | | `seg` | `seg team` |
+| `smg` | `smg message` | | `sst` | `sst T` |
+| `suc` | unknown request | | `sbp` | bad parameters |
 
-Handshake: `WELCOME` → send `GRAPHIC` → bootstrap (`msz`, `tna…`, `bct…`,
-`pnw…`, `sgt`, `sst`).
-
-GUI → server request: `pin #id` → server replies `pin #id X Y q0..q6`.
-
-## Custom extensions (this project)
-
-| msg | format | purpose |
-|---|---|---|
-| `sst` | `sst S` | seconds to next resource reset (countdown + tree pulse); GUI-only |
-
-## Notes
-
-- Map is a **torus** (Forward wraps at the edges).
-- `Current level: K` goes to **all** incantation participants; the AI buffers it
-  out-of-band to avoid desync.
-- This server executes commands **instantly** (no `T/f` time cost); pacing is
-  client-side via `ZAPPY_AI_DELAY`.
+GUI → server requests: `msz`, `bct X Y`, `mct`, `tna`, `ppo #id`, `plv #id`,
+`pin #id`, `sgt`, `sst T`.

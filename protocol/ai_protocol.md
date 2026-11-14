@@ -1,71 +1,78 @@
 # AI protocol - server ⇄ AI client
 
 Reference for an **AI** client (a `zappy_ai` bot). Documents what this repo's
-server (`server/src/World.cpp`) and AI (`ai/`) actually implement.
+server (`server/src/game/World.cpp`, `server/src/app/GameSession.cpp`) and AI
+(`ai/`) actually implement.
 
 ## Handshake
 
 ```
 server → WELCOME\n
 client → TEAM-NAME\n          (e.g. "team1")
-server → CLIENT-NUM\n         (remaining free slots for that team)
+server → CLIENT-NUM\n         (free slots left for that team: initial slots + eggs)
 server → X Y\n                (map width and height)
 ```
 
-If the team is full or unknown the server replies `ko\n` and closes the socket.
+If the team is full (no slot, no egg) or unknown, the server replies `ko\n` and
+closes the socket. A client that joins through an egg appears on the egg's tile.
 
 ## Commands
 
-One command per line. Each gets exactly one reply line (except `Incantation`,
-which sends two - see below). Resources are: `food linemate deraumere sibur
-mendiane phiras thystame`.
+One command per line, executed in order. A player can have at most **10**
+commands waiting: further lines are dropped without reply until one completes.
+Each command costs time units (`T`); with the server frequency `f` (`-f`), one
+time unit lasts `1/f` second.
 
-| command | reply | effect |
-|---|---|---|
-| `Forward` | `ok` | move one tile forward (map wraps - torus) |
-| `Right` | `ok` | turn 90° right |
-| `Left` | `ok` | turn 90° left |
-| `Look` | `[t0,t1,t2,…]` | objects on each visible tile (vision grows with level) |
-| `Inventory` | `[food n, linemate n, …]` | current inventory + remaining life |
-| `Take object` | `ok` / `ko` | pick `object` up from the current tile |
-| `Set object` | `ok` / `ko` | drop `object` on the current tile |
-| `Broadcast text` | `ok` | send `text` to every player (heard as `message K, text`) |
-| `Fork` | `ok` | lay an egg on the current tile (spawns a future slot) |
-| `Eject` | `ok` / `ko` | push players sharing this tile one tile back |
-| `Connect_nbr` | `N` | number of free team slots (eggs not yet hatched) |
-| `Incantation` | see below | start an elevation ritual |
+| command | cost | reply | effect |
+|---|---|---|---|
+| `Forward` | 7 | `ok` | move one tile forward (the map wraps: torus) |
+| `Right` | 7 | `ok` | turn 90° right |
+| `Left` | 7 | `ok` | turn 90° left |
+| `Look` | 7 | `[t0,t1,t2,…]` | objects on each visible tile (vision grows with level) |
+| `Inventory` | 1 | `[food n, linemate n, …]` | current inventory |
+| `Broadcast text` | 7 | `ok` | send `text` to every player (heard as `message K, text`) |
+| `Connect_nbr` | 0 | `N` | free team slots (initial slots left + eggs) |
+| `Fork` | 42 | `ok` | lay an egg on the current tile (one more slot) |
+| `Eject` | 7 | `ok` / `ko` | push players sharing this tile one tile away, destroy eggs here |
+| `Take object` | 7 | `ok` / `ko` | pick `object` up from the current tile |
+| `Set object` | 7 | `ok` / `ko` | drop `object` on the current tile |
+| `Incantation` | 300 | see below | start an elevation ritual |
 
-`Look` / `Inventory` formats match the AI parser in `ai/network/parser.py`.
+An unknown command, or an argument given to a command that takes none, is
+answered `ko` in its turn, so replies stay in order.
+
+Asynchronous messages, which can arrive between replies:
+
+| message | meaning |
+|---|---|
+| `message K, text` | a broadcast heard from direction `K` |
+| `eject: K` | this player was pushed by an `Eject` coming from direction `K` |
+| `Current level: L` | an incantation this player took part in succeeded |
+| `dead` | the player starved; the server closes the connection |
+
+Directions: `0` = same tile, `1` = front, then clockwise around the player up to `8`
+(front-right is `2`, right is `3`, back is `5`, left is `7`). The sound takes the
+shortest way on the torus.
+
+## Food
+
+A player starts with 10 food. One food unit lasts 126 time units; when the last one
+runs out, the player dies (`dead`). Food is not consumed while the player is frozen
+in an incantation.
 
 ## Incantation (elevation)
 
 ```
 client → Incantation\n
-server → Elevation underway\n          (immediately, if requirements are met)
-server → Current level: K\n            (when it completes)
+server → Elevation underway\n          (to every participant, if the requirements are met)
+server → Current level: K\n            (300 time units later, if they still are)
 ```
 
-Requirements (players of the right level on the same tile + the right stones on
-the tile) are in `server` / mirrored in `ai/logic/player.py` (`ELEVATION_REQ`).
-If unmet, the server replies `ko`.
+Participants are all players of the incantor's level on the tile; they are frozen
+during the ritual. Requirements are in `server/include/game/GameRules.hpp`
+(mirrored in `ai/logic/player.py`). If they are not met at the start or at the end,
+the server replies `ko`.
 
-**Important behaviour:** `Current level: K` is sent to **every** participant on
-the tile - including ones that did **not** send `Incantation`. Those receive it
-*unsolicited*, so the AI treats `Current level` as an **out-of-band** message
-(buffered like a broadcast in `ai/network/client.py`, applied in
-`ai/logic/brain.py`) instead of as the reply to its in-flight command. Reading it
-as a normal reply would shift every later reply by one line and desync the bot.
-
-## Broadcasts (received)
-
-A broadcast arrives at any time as `message K, text\n`, where `K` is the
-direction the sound came from (0 = same tile, 1‑8 around the player). The AI
-buffers these between command replies (`Client._broadcasts`).
-
-## Time / speed
-
-In standard Zappy each action costs `time-units / f` seconds (Forward 7/f,
-Incantation 300/f, …) and `f` is the `-f` server flag. **This server does not
-implement per-action time costs** - commands execute immediately. Watchable
-pacing is instead done client-side via the `ZAPPY_AI_DELAY` env var (seconds
-between movement commands; `0.5` ≈ 2 tiles/s). See `ai/network/client.py`.
+`Current level: K` is sent to **every** participant, including the ones that did
+not send `Incantation`: the AI treats it as an out-of-band message (buffered in
+`ai/network/client.py`) rather than as the reply to its own pending command.

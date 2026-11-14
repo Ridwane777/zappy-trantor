@@ -19,13 +19,39 @@ lasts 126 time units.
 
 | Component | Folder | Language | Role |
 |---|---|---|---|
-| Server | `server/` | C++17 | Owns the world: map, tiles, resources, players, eggs. Accepts AI and GUI clients on a single `poll()` loop, queues each player's commands (up to 10 pending), runs them on a game clock driven by the frequency `-f`, handles food consumption and death, incantations, broadcasts and forks, and pushes events to connected GUIs. |
+| Server | `server/` | C++17 | Owns the world: map, tiles, resources, players, eggs. Accepts AI and GUI clients on a single `poll()` loop with fixed-size circular buffers, queues each player's commands (up to 10 pending), runs them on a game clock driven by the frequency `-f`, handles food consumption and death, incantations, broadcasts and forks, and pushes events to connected GUIs. |
 | AI | `ai/` | Python 3 (standard library only) | Autonomous client that drives one player. The first process of a team acts as a "queen" that keeps the team populated with `Fork` and child processes, then settles on one tile; workers stock food, bring her the stones for the whole climb, and the team climbs from level 2 to level 8 together on her tile. See [ai/DOCUMENTATION.md](ai/DOCUMENTATION.md). |
 | GUI | `gui/` | C++17, SFML, OpenGL (GLEW, GLM) | 3D viewer: connects as a graphical client, receives the map and live events, and renders islands, players, resources and incantation effects, with a menu, HUD and day/night sky. |
 
-Server source layout: `World` (game rules and command handlers), `Map` / `Tile`
-(toroidal grid and resources), `Player`, `Client` (socket buffers), `Server`
-(network loop), `Args` (command line).
+### Server layers
+
+The server is split into three layers that only talk through abstract interfaces:
+
+```
+ net/   TcpServer, Socket, Poller, RingBuffer        sockets, poll(), buffers; no game code
+          │  IConnectionHandler (onConnect / onLine / onDisconnect)
+          ▼  IClientSink        (send / closeAfterFlush)
+ app/   GameSession, GuiProtocol, GameClock          handshake, roles, protocol text, time
+          │  World (join / queueCommand / update)
+          ▼  IWorldObserver     (onReply / onPlayerMoved / onIncantationStart / ...)
+ game/  World, Player, Map, Tile, GameRules           rules only; no socket, no GUI text
+```
+
+- `game/` identifies players by id: a `Player` holds no file descriptor, and its state
+  changes only through methods (`moveTo`, `removeItem`, `levelUp`, `tickFood`...).
+  Every rule number (food duration, command costs, elevation table, densities) is in
+  `GameRules.hpp`.
+- `net/` is the only code that calls the C socket API, through the RAII `Socket` class
+  (one owner per descriptor, closed exactly once) and `Poller` (around `poll()`). Each
+  client has a 4 KiB input and a 1 MiB output `RingBuffer`: they never grow, a line longer
+  than the input buffer or a client that never reads its replies is disconnected with a
+  message, and a flood cannot slow other clients down.
+- `app/GameSession` implements both interfaces: it maps connections to players or GUI
+  viewers, and `GuiProtocol` builds every GUI message in one place.
+
+Tests: `make -C server tests_run` (21 unit tests: buffers, parsing, options, game rules,
+session with a fake network) and `python3 server/tests/network_tests.py` (fragmented
+input, flood, random bytes, client that never reads, 300 simultaneous connections).
 
 ## Build
 
@@ -47,16 +73,22 @@ The AI needs no build step.
 **Server**
 
 ```bash
-./server/zappy_server -p port -x width -y height -n name1 name2 ... -c clientsNb -f freq
+./server/zappy_server [-p port] [-x width] [-y height] [-n name1 name2 ...] [-c clientsNb] [-f freq] [-s seed]
 ```
 
-| Flag | Meaning |
-|---|---|
-| `-p` | TCP port (1-65535) |
-| `-x`, `-y` | map width and height (clamped to 42) |
-| `-n` | team names |
-| `-c` | initial slots per team |
-| `-f` | frequency: time units per second (clamped to 500) |
+Every option has a default, so `./server/zappy_server` alone starts a game.
+
+| Flag | Meaning | Default |
+|---|---|---|
+| `-p` | TCP port (1-65535) | 4242 |
+| `-x`, `-y` | map width and height (clamped to 42) | 10, 10 |
+| `-n` | team names: unique, non-empty, no space, not `GRAPHIC` | Team1 Team2 Team3 Team4 |
+| `-c` | initial slots per team | 3 |
+| `-f` | frequency: time units per second (clamped to 10000) | 100 |
+| `-s` | random seed, to replay the same map and spawns | random |
+
+Invalid values (`-p abc`, `-n a a`, unknown option) stop the server with a message
+and the usage.
 
 **AI** (one player; the first process per team spawns its teammates)
 
