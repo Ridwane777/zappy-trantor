@@ -9,6 +9,16 @@ players of the same level must stand on one tile together with the right stones,
 then run an incantation. Players also need food to stay alive: each unit of food
 lasts 126 time units.
 
+![Two AI teams on the 3D GUI: gathering, incantations, level-ups](docs/media/gui-demo.gif)
+
+| | |
+| --- | --- |
+| ![Overview of the island](docs/media/gui-overview.jpg) | ![An incantation succeeds](docs/media/gui-incantation.jpg) |
+
+A full game in one minute (accelerated about 2.5x, both teams climbing to level 7):
+[docs/media/gui-demo.mp4](docs/media/gui-demo.mp4). Recorded with the demo camera
+(`ZAPPY_CAM_ZOOM=2.2 ZAPPY_CAM_ORBIT=5`).
+
 ## Architecture
 
 ```
