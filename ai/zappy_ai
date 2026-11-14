@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
+import os
 import sys
 import argparse
 from network.client import Client
 from logic.brain import Brain
+from logic.pack import PackBrain
 
 
 def parse_args():
@@ -22,7 +24,13 @@ def main():
     client = Client(args.host, args.port, args.name)
     try:
         client.connect()
-        brain = Brain(client)
+        # Default: the pack strategy (logic/pack.py), the whole team climbs together on
+        # one tile. ZAPPY_STRATEGY=legacy runs the previous per-level rally (logic/brain.py).
+        # Children inherit the variable, so a team always plays a single strategy.
+        if os.environ.get("ZAPPY_STRATEGY") == "legacy":
+            brain = Brain(client)
+        else:
+            brain = PackBrain(client)
         brain.run()
     except (ConnectionError, BrokenPipeError, KeyboardInterrupt):
         # server closed / game over / interrupted: exit cleanly
