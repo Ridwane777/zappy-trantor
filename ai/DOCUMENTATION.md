@@ -1,349 +1,157 @@
 # Zappy AI documentation (`zappy_ai`)
 
-This document explains **how the AI works** and **what each function does**, file by file.
-
----
+How the AI works, how its code is organized, and what was measured. Python 3,
+standard library only.
 
 ## 1. Overview
 
-> **Two strategies.** The default is the **pack strategy** (`logic/pack.py`, [section 6b](#6b-pack-strategy-default)):
-> the whole team climbs from level 2 to level 8 together, on one tile. The original per-level rally
-> (`logic/brain.py`, sections 4 to 7) is still available with `ZAPPY_STRATEGY=legacy`. Measured results:
-> [section 7](#7-results-and-limits).
+`zappy_ai` drives **one player**. A team is several processes: the first one started
+becomes the **queen**, which starts the others (the **workers**) through free slots and
+`Fork` eggs, and keeps the team at 9 players.
 
-`zappy_ai` is the autonomous client that drives **a single player** (a "drone") on the Zappy server. To run a whole team, **several** `zappy_ai` **processes** are started (the first one builds the others through the game's `Fork` command).
+**Goal:** 6 players of one team at level 8. Leveling up needs an incantation: on one
+tile, enough players of the same level and the right stones (`logic/rules.py`).
 
-**Game goal:** level players up (1 → 8) through **incantations**. An incantation requires, on **the same tile**, a given number of **players of the same level** + a given number of **stones** (see the `ELEVATION_REQ` table).
-
-**How a player works**: an infinite loop that, every turn:
-1. manages the team headcount (create/replace teammates);
-2. listens to messages (sounds) and heads for the rally point;
-3. decides what to do: **eat** (survive), **collect** stones, or **incant**.
-
-**Rule respected:** clients **never communicate outside the game**. All coordination goes through the **server** (sound broadcasts + the `Connect_nbr` command). The only information passed to a child process is its launch role (env variable `ZAPPY_CHILD`), not game data.
-
----
+**Rule respected:** clients never communicate outside the game. Everything goes
+through the server (broadcasts, `Connect_nbr`). A child process only gets its launch
+role (`ZAPPY_CHILD=1`), never game data.
 
 ## 2. Layout
 
 ```
 ai/
-├── zappy_ai                 # entry point (Python executable)
-├── network/
-│   ├── client.py            # TCP connection + sending/receiving commands
-│   ├── parser.py            # parsing of the "Look" answer
-│   └── broadcast.py         # encoding/decoding of broadcast messages
-└── logic/
-    ├── pack.py              # default strategy: the team climbs together on one tile
-    ├── brain.py             # legacy strategy: main loop + per-level rallying
-    ├── player.py            # player state + elevation table
-    ├── fork.py              # team headcount management (TeamManager)
-    ├── explore.py           # exploration moves
-    └── states/
-        ├── survive.py       # go eat (+ movement helper)
-        ├── collect.py       # fetch the missing stones
-        └── elevate.py       # gathering + incantation
+├── zappy_ai                 entry point: connects, picks queen or worker
+├── network/                 talking to the server
+│   ├── client.py            Client: TCP line transport, async events (broadcasts, level-ups, death)
+│   ├── game_api.py          GameApi: the only place that writes commands (look, take, incant...)
+│   └── protocol.py          pure parsing of replies (Look, Inventory, message, level)
+├── comm/                    talking to the team
+│   ├── secure.py            SecureChannel: encrypted, authenticated, replay-proof messages
+│   ├── messages.py          Home: the queen's message, typed
+│   └── jammer.py            Jammer: corrupts and re-broadcasts other teams' messages
+├── logic/                   playing
+│   ├── rules.py             resources, elevation table, climb_need()
+│   ├── navigation.py        sound direction -> moves, Look tile -> path, Explorer
+│   ├── player.py            Player: level and inventory, changed only through methods
+│   ├── team.py              ProcessSpawner (OS processes) and Recruiter (headcount policy)
+│   └── pack.py              PackAgent, PackQueen, PackWorker: the strategy
+└── tests/                   31 unit tests (python3 -m unittest discover -s tests -t .)
 ```
 
----
-
-## 3. Server protocol (reminder)
-
-**Connection (handshake):**
-```
-server → WELCOME
-client → <team_name>
-server → <CLIENT-NUM>      (number of slots still free for the team)
-server → <X> <Y>           (map dimensions)
-```
-
-**Commands used** (answer in parentheses):
-`Forward`, `Right`, `Left` (ok) · `Look` (`[tile0, tile1, ...]`) · `Inventory` (`[food n, linemate n, ...]`) · `Take <object>` / `Set <object>` (ok/ko) · `Broadcast <text>` (ok) · `Fork` (ok) · `Connect_nbr` (a number) · `Incantation` (`Elevation underway` then `Current level: K`, or `ko`).
-
-**Asynchronous messages** (may arrive at any time): `message K, <text>` (broadcast received, `K` = sound direction), `eject: K`, `dead`.
-
----
-
-## 4. Main loop (summary)
-
-In `Brain.run()` (see [logic/brain.py](logic/brain.py)), every turn:
-
-```
-team.tick()                # 1. headcount: create/replace teammates
-_handle_broadcasts()       # 2. read sounds -> head for the anchor (homing)
-get_level_update()         # 3. pick up a possible level-up
-Inventory                  # 4. update the inventory
-if level >= 8: stay alive only
-                           # 5. decision:
-   must eat?  → survive()          (food too low)
-   else missing stones? → collect()
-   else       → elevate()          (gathering + incantation)
-```
-
----
-
-## 5. Files and functions
-
-### `zappy_ai`: entry point
-
-| Function | Role |
-|---|---|
-| `parse_args()` | Reads the arguments **`-p` port (required)**, **`-n` team name (required)**, **`-h` host (default `localhost`)**. |
-| `main()` | Creates the `Client`, connects, creates the `Brain` and runs `brain.run()`. Catches `ConnectionError`/`BrokenPipeError`/`KeyboardInterrupt` to exit cleanly when the server closes, the player dies, or on Ctrl-C. |
-
----
-
-### `network/client.py`: network layer (`class Client`)
-
-Handles the TCP socket and command sending/receiving. Buffers broadcasts and level-ups received asynchronously.
-
-**Key attributes:** `host`, `port`, `team`, `map_x/map_y` (map size), `free_slots` (free slots at handshake), `_broadcasts` (queue of received sounds), `_pending_level` (level received asynchronously).
-
-**Environment variables:**
-- `ZAPPY_AI_DELAY`: duration of one move in seconds (paces the speed **visible** in the GUI; `0` = full speed, `0.5` ≈ 2 tiles/s).
-- `ZAPPY_DEBUG=1`: prints all traffic (`>>` sent, `<<` received).
-
-| Function | Role |
-|---|---|
-| `connect()` | Opens the socket and performs the handshake (WELCOME → name → CLIENT-NUM → dimensions). Fills `free_slots`, `map_x`, `map_y`. |
-| `send(cmd, is_incantation=False)` | Sends a command **and** reads its answer (returns the answer). |
-| `receive(is_incantation=False)` | Reads an answer **without** sending (used for the 2nd phase of the incantation). |
-| `send_batch(cmds)` | Sends a list of commands in **batches of 10** (server limit: 10 pending requests), then reads all answers. Used for pipelined movement. |
-| `get_broadcasts()` | Returns and **empties** the queue of received sounds (consumed by the brain). |
-| `get_level_update()` | Returns the level received asynchronously (unsolicited `Current level`, e.g. we took part in an incantation started by someone else), then clears it. |
-| `connect_nbr()` | Sends `Connect_nbr` and returns the **number of team eggs** waiting to hatch. Acts as a **semaphore** for `TeamManager` (one egg pending at a time). |
-| `_write(msg)` | Writes to the socket. **Only throttles `Forward`** according to `ZAPPY_AI_DELAY` (`Look`/`Inventory`/`Take`… stay fast). |
-| `_read_line()` | Reads one line (up to `\n`); raises `ConnectionError` if the server closes. |
-| `_read_response(is_incantation)` | Reads a command's answer while **filtering asynchronous messages**: `message …` → stored in `_broadcasts`; `Current level`/`Elevation underway` → returned when waiting for an incantation, otherwise stored/ignored; `eject:` → ignored; `dead` → `ConnectionError`. |
-
----
-
-### `network/parser.py`
-
-| Function | Role |
-|---|---|
-| `parse_look(raw)` | Turns the `Look` answer (`"[player food, , linemate, ...]"`) into a **list of tiles**, each tile being a **list of objects** (e.g. `[["player","food"], [], ["linemate"], ...]`). Tile 0 = the player's tile. |
-
----
-
-### `network/broadcast.py`
-
-Our team messages use the format `TYPE:data` (e.g. `NEED:team1:4:837421`).
-
-| Function | Role |
-|---|---|
-| `encode(msg_type, data)` | Builds `"TYPE:data"` to send with `Broadcast`. |
-| `decode(raw)` | Parses a received `"message K, TYPE:data"` → returns the tuple **`(direction K, TYPE, data)`** (or `None` if it is not a broadcast). `K` is the sound direction (0 = same tile, 1-8 around). |
-
----
-
-### `logic/player.py`: player state
-
-**`RESOURCES`**: the list of the 7 resources (food + 6 stones).
-
-**`ELEVATION_REQ`**: the **elevation table**: for each current level, the number of **players** required and the quantity of each **stone**:
-
-| Level | players | linemate | deraumere | sibur | mendiane | phiras | thystame |
-|---|---|---|---|---|---|---|---|
-| 1→2 | 1 | 1 | 0 | 0 | 0 | 0 | 0 |
-| 2→3 | 2 | 1 | 1 | 1 | 0 | 0 | 0 |
-| 3→4 | 2 | 2 | 0 | 1 | 0 | 2 | 0 |
-| 4→5 | 4 | 1 | 1 | 2 | 0 | 1 | 0 |
-| 5→6 | 4 | 1 | 2 | 1 | 3 | 0 | 0 |
-| 6→7 | 6 | 1 | 2 | 3 | 0 | 1 | 0 |
-| 7→8 | 6 | 2 | 2 | 2 | 2 | 2 | 1 |
-
-**Food constants (`class Player`):**
-- `FOOD_THRESHOLD = 18`: normal threshold below which a **collecting** player goes to eat.
-- `CRITICAL_FOOD = 12`: critical threshold (a player at the rally point only leaves to eat below it).
-- `FOOD_RALLY_TARGET = 25`: food level to fill up to (hysteresis) before settling at the rally point.
-- `LOCK_TIMEOUT = 60`: max patience (in turns) of a locked player without progress before giving up the rally point.
-
-**Key attributes:** `level`, `inventory`, `need_fuel` (food hysteresis), `is_anchor` (am I the anchor of my level?), `rally_weight` (fixed random weight for anchor election), `explore_steps` (counter for zigzag exploration), `locked` (locked at the rally point?), `locked_ticks` (turns without progress since locking), `here_count` (players currently on my tile), `rally_seen` (max players seen since locking).
-
-| Method | Role |
-|---|---|
-| `update_inventory(raw)` | Parses the `Inventory` answer and updates `self.inventory`. |
-| `missing_for_elevation()` | Returns the stones missing for the **current level only** (ignores food). `{}` if level ≥ 8. This is the only collection target: collect briefly, level up, repeat. |
-| `needs_food()` | `True` if `food < FOOD_THRESHOLD`. |
-
----
-
-### `logic/brain.py`: the brain (`class Brain`)
-
-**`DIRECTION_MOVES`**: table that turns a **sound direction** (tile number K, 1-8, sent by the server) into a **sequence of moves** towards the source:
-
-| K (sound direction) | moves |
-|---|---|
-| 0 (same tile) | none |
-| 1 (front) | `Forward` |
-| 2, 3 (right) | `Right, Forward` |
-| 4, 5 (back) | `Right, Right, Forward` |
-| 6 (back-left) | `Left, Left, Forward` |
-| 7, 8 (left) | `Left, Forward` |
-
-| Method | Role |
-|---|---|
-| `__init__(client)` | Creates the `Player`. |
-| `_handle_broadcasts()` | **Rallying (homing).** Reads every received sound. For `NEED` messages **of our level** (all teams included, since an incantation gathers same-level players whatever their team), finds the **highest `weight`** heard (anchor election). If someone has a higher weight than ours, we are a **follower** → we head for them. Otherwise **we are the anchor** (`is_anchor = True`). The highest weight is kept **even in direction 0** (our tile) → a follower that already arrived **stays** instead of being pulled elsewhere. We only move when **`ready`** (nothing left to collect for the current level, food OK, level needs ≥ 2 players). Once ready and at the rally point (anchor or direction 0), we **lock** (`locked = True`). |
-| `run()` | **Main loop** (see §4). Creates the `TeamManager`. If this process is the **queen** (`is_recruiter`): it only survives (eats below `QUEEN_FOOD_MIN=30`) + `team.tick()`. Otherwise (worker), every turn: `team.tick()` → `_handle_broadcasts()` → level update → `Inventory` → stay idle at level 8 → broadcast the **`NEED` beacon** (on group levels) → update food hysteresis → **progressive lock patience** → **decision**: locked → `elevate`; anchor → `elevate` (or `survive` when critically starving); otherwise `survive`/`collect`/`elevate`. |
-
-**Decision logic (in `run`)**:
-- **Locked** at the rally point (`locked`): no longer moves and never leaves to eat → `elevate()` (incants as soon as the quorum is reached).
-- **Anchor** not locked: **settles** as the rally point (`elevate`), and only leaves to eat (`survive`) below `CRITICAL_FOOD`.
-- `need_fuel` becomes `True` below `CRITICAL_FOOD`, `False` at `FOOD_RALLY_TARGET`, and **keeps its state in between** (hysteresis) → a follower committed to the rally point does not leave as soon as it loses 1 food.
-- **Ready** follower (stones OK, multi-player level): `must_eat = need_fuel`; otherwise `must_eat = needs_food()` (normal threshold). Then `survive` / `collect` / `elevate`.
-
-**Progressive lock patience**: while `locked`, if `here_count > rally_seen` (one more player just arrived) → `locked_ticks = 0` (the group grows, keep waiting). Otherwise `locked_ticks += 1`; after `LOCK_TIMEOUT (60)` turns without progress → give up: `locked = False`, `need_fuel = True`, go refuel and retry later. A level change automatically releases the lock.
-
----
-
-### `logic/fork.py`: headcount management (`class TeamManager`)
-
-**`TEAM_CAP = 9`**: **hard** cap of players per team (never exceeded). **`REFORK_BELOW = 7`**: replenishment threshold (hysteresis): the queen only re-forks when the headcount drops **below 7**, then rebuilds up to 9 (7 = 1 queen + 6 workers = quorum of levels 6-7). **`BUILD_FORK_COOLDOWN = 2.0`**: delay between two creations (time for an egg to hatch).
-
-| Item | Role |
-|---|---|
-| `_spawn(client)` | Starts a new `zappy_ai` process (with `-p/-n/-h`) and **returns its handle** (to monitor it). The child gets `ZAPPY_CHILD=1` (just a **launch role**, not game data) → it does not recruit, it plays. On connection, the server gives it a free slot, or hatches an egg. |
-| `TeamManager.__init__` | Determines whether this process is the **recruiter** (`is_recruiter` = started by hand, without `ZAPPY_CHILD`). Stores the initial `free_slots`. |
-| `TeamManager.tick()` | **Builds and maintains the headcount (hysteresis 7→9).** Only the **recruiter** (the queen) acts. It: (1) **removes** children whose **process died** (= dead player); (2) computes the headcount `1 (queen) + living children`; (3) enters **rebuild** mode when the headcount drops below `REFORK_BELOW` (7) and leaves it at `TEAM_CAP` (9); (4) in rebuild mode, once the cooldown is over: creates a teammate, through a remaining **initial slot**, otherwise an **egg** (`Fork`). **Key point:** the child is only started **when a slot/egg exists** (free slot, or `connect_nbr() > 0` = egg ready); otherwise we `Fork` first and the child comes on a later turn. This keeps children started too early from getting "ko" and **hanging** (process leak). |
-
-> **How the team is replenished:** the recruiter monitors its children's **process handles**. When a player dies, its process ends; `tick()` detects it (`poll()`) and removes it. As soon as the headcount drops **below 7**, the queen rebuilds up to **9** (Fork + new processes). Capped at 9.
-
----
-
-### `logic/states/survive.py`: eating
-
-| Function | Role |
-|---|---|
-| `_go_to_tile(client, index)` | **Computes and runs the path** to tile `index` of the field of view (`Look`). Geometry: row `r = floor(√index)`, lateral offset `col = index − r(r+1)` (negative = left). Sends `Forward × r` + one turn + `Forward × |col|` in one batch (`send_batch`). Helper reused by `collect`. |
-| `survive(client, player)` | `Look`, goes to the **closest food tile** and picks up **all** the food there. If no food is in sight → `explore()`. |
-
----
-
-### `logic/states/collect.py`: collecting stones
-
-| Function | Role |
-|---|---|
-| `collect(client, player)` | Computes the missing stones for the **current level** (`missing_for_elevation`). `Look`, goes to the **first tile** holding a missing stone, picks it up (+ any food there). If nothing is in sight → `explore()`. |
-
----
-
-### `logic/states/elevate.py`: gathering + incantation
-
-`STONES`: the 6 stones (without food).
-
-| Function | Role |
-|---|---|
-| `_topup_stones(client, player, first_tile)` | **Pooled drop.** Drops on the tile **only the deficit** needed to meet the level's requirements: counts what is **already** on the tile (dropped by teammates) and only adds what is missing, within what we carry. → everyone contributes, nothing is wasted. |
-| `_do_incantation(client, player)` | `Look` + `_topup_stones` (make sure the tile has the stones) + sends `Incantation` (2 phases: `Elevation underway`, then 300 ticks later `Current level: K`). On success, updates `player.level`. |
-| `elevate(client, player)` | If the level requires **1 player** → incants directly. Otherwise: `Look`, counts the players present (`here`), **eats the food on the tile** (self-feeding while waiting). If the **quorum is reached** (`here ≥ needed`) → incants. Otherwise → waits in place (the `NEED` beacon is broadcast by `run()` every turn). |
-
----
-
-### `logic/explore.py`
-
-| Function | Role |
-|---|---|
-| `explore(client, player)` | Exploration move: moves forward and **turns randomly every 3 steps** so it does not cross the map in a straight line (and covers the sides). |
-
----
-
-## 6. Key concepts (strategies)
-
-- **Rallying by anchor election.** Each player has a fixed random `rally_weight`. Players on group levels broadcast `NEED:team:level:weight`. The one with the **highest weight** stays still (anchor); the others head for it using the **sound direction** (`DIRECTION_MOVES`). A single stable attractor → convergence without oscillation.
-
-- **Locking at the rally point.** As soon as a player is ready and on the anchor's tile, it locks: it no longer moves and never leaves to eat. Patience is **progressive**: if the group grows (`here_count` increases), the counter resets. If nobody arrives for `LOCK_TIMEOUT (60)` turns → give up + refuel + retry. This avoids orbiting around the anchor and the early departures to eat that kept the quorum from forming.
-
-- **Continuous beacon.** `NEED` is broadcast **every turn**: a sound's direction (tile number) depends on the receiver's **current** position/orientation; an old direction is useless. Broadcasting continuously gives followers a fresh direction at every step.
-
-- **Collecting for the current level only.** Only the current level's stones are collected (`missing_for_elevation()`). Collection stays short → the player quickly joins the rally point, incants, then starts again for the next level.
-
-- **Food hysteresis.** Two thresholds (`CRITICAL_FOOD=12`, `FOOD_RALLY_TARGET=25`): fill up, then **stay** at the rally point until dropping back to the low threshold → avoids the "eat ↔ rally" oscillation.
-
-- **Pooled stone drop.** At incantation time, each player present only drops the **deficit** → nothing is wasted, and the cost is not borne by a single player.
-
-- **Headcount management (TeamManager).** One **recruiter** per team builds the headcount up to **9** and **maintains** it (replaces dead players by monitoring processes), capped at 9. Regulated by the server (`Connect_nbr` = egg semaphore).
-
-- **No out-of-game communication.** No game data is exchanged outside the server. The headcount is driven by the server (handshake slots + `Connect_nbr`). The only info passed to a child process is `ZAPPY_CHILD` (a launch role, not game data).
-
----
-
-## 6b. Pack strategy (default)
-
-**Why the legacy strategy could not win.** Measured with `tools/benchmark.py`: the legacy AI reaches level 6,
-then stops. Early levels need only 2 players, so the team climbs by pairs and ends up split into small groups
-of different levels, for example two players at level 4, two at 5 and two at 6. Level 5 needs 4 players of the
-same level and level 6 needs 6: none of these groups can ever climb again. Replacements start at level 1 and
-find nobody of their level, so they die and are replaced in a loop. Two smaller issues made gathering
-unreliable: followers moved toward the **oldest** buffered sound of the anchor (its direction is relative to a
-position and orientation the follower no longer has), and the anchor itself kept moving.
-
-**How the pack strategy works** (`logic/pack.py`, class `PackBrain`):
+Dependencies only go downward: `logic` uses `comm` and `network.game_api`; the strategy
+never builds a protocol string, never parses a reply, never touches a socket. The
+strategy classes receive their `GameApi`, channel, recruiter and jammer from the entry
+point, so tests replace them with fakes (`tests/test_pack.py`).
+
+## 3. Strategy: the pack climbs together
+
+**Why.** An incantation elevates every same-level player on its tile. The first AI of
+the project climbed by pairs (levels 2 to 4 need only 2 players) and the team split into
+groups of different levels, for example two players at level 4, two at 5 and two at 6.
+Level 5 needs 4 players of the same level, level 6 needs 6: none of these groups could
+climb again, and replacements started at level 1 with nobody of their level.
+
+**How** (`logic/pack.py`):
 
 1. Every player reaches level 2 alone: one linemate, solo incantation.
-2. The queen (first process of the team) stocks 40 food, reaches level 2, then settles on her tile, called
-   *home*, and never moves again. Every turn she broadcasts
-   `HOME:<team>:<level>:<food>:<deficit>`: her level, her food, and the stones still missing in her stock for
-   **all** the incantations from her level to level 8 (`climb_need()`).
-3. Workers stock 30 food, collect the stones of the deficit, and walk home. They only follow the **latest**
-   HOME sound, and they drop the sounds heard while walking. Since home never moves, every step brings them
-   one tile closer.
-4. At home, workers drop their stones (and food when the queen runs low). The queen picks everything up: the
-   stock stays in her inventory, where no other team can take it.
-5. When the stock covers the whole climb and 7 players stand at home (6 after a short wait), the queen alone
-   drops the stones of the current level and incants. The server elevates every same-level player on the
-   tile, so the group climbs **together**, level after level, and never splits. Workers never incant, so
-   incantations do not overlap.
+2. The queen stocks 40 food, reaches level 2, then settles on her tile (*home*) and never
+   moves again. Every turn she broadcasts an encrypted `Home` message: her level, her
+   food, and the stones still missing in her stock for **all** incantations up to level 8.
+3. Workers stock 30 food, collect the missing stones and walk home. They follow only the
+   **latest** Home sound and forget sounds heard while walking (a direction is relative to
+   the position and orientation at the time it was heard). Home never moves, so every
+   step brings them one tile closer.
+4. At home, workers drop their stones, and food when the queen runs low. The queen picks
+   everything up: the stock stays in her inventory, where no other team can take it.
+5. When the stock covers the whole climb and 7 players stand at home (6 after a short
+   wait), the queen alone drops the stones of the current level and incants. The server
+   elevates every same-level player on the tile, so the group climbs **together**, level
+   after level. Workers never incant, so incantations never overlap.
 
-The team is filtered in every message, so a player never follows another team's queen. Players that arrive
-too late to join the climb keep collecting stones and stay alive.
+Players arriving too late to join the climb keep collecting stones and stay alive.
 
----
+## 4. Communication: encryption and jamming
 
-## 7. Results and limits
+Every broadcast is heard by every player of every team, with its direction. A message
+in clear text tells the enemy where our home is, and anyone can forge one.
 
-**Measured** with `tools/benchmark.py` (server at `-f 100`, 9 slots per team, 300 s limit, 16 games run on one
-laptop, 2026-11-14). A game stops at the first win (6 players of a team at level 8).
+**Protection** (`comm/secure.py`). Each message is
+`base64(sender | counter | ciphertext | tag)`:
+
+| Part | How | Protects against |
+|---|---|---|
+| key | HMAC-SHA256(secret, team name) | other teams: they do not have our key |
+| ciphertext | plaintext XOR a SHA-256 keystream (key, sender, counter) | reading: the content is unreadable |
+| tag | HMAC-SHA256 of everything, 12 bytes | forging and modifying: the message is rejected |
+| counter | increases per sender; older or repeated counters are rejected | replaying a captured message |
+
+The secret defaults to a constant of this code and can be changed per game with
+`ZAPPY_TEAM_SECRET`. Limit: an opponent running this very code with the same team name
+and secret could derive the key.
+
+**Attack** (`comm/jammer.py`). The queen keeps the last messages she cannot
+authenticate (they come from other teams) and, every third turn, broadcasts a corrupted
+copy: same shape, digits replaced. A team that talks in clear text receives believable
+but false levels, quantities or weights, from the direction of **our** queen. Our own
+team rejects these decoys, since they fail authentication.
+
+## 5. Results
+
+Measured with `tools/benchmark.py` (server at `-f 100`, 9 slots per team, map 20×20
+unless stated, one laptop). A game stops at the first win (6 players of a team at level 8).
+
+**Strategy** (2026-11-14, 16 games):
 
 | Games | Runs | Result |
 | --- | --- | --- |
-| legacy vs legacy, 20×20 map | 5 | **0 wins** after 30,000 time units; max level 5 or 6; 4 to 15 deaths per team |
-| pack vs pack, 20×20 map | 5 | **5 wins**, after 6,800 to 8,060 time units; 0 or 1 death per team |
-| pack vs legacy, 20×20 map | 3 | **3 pack wins**, after 6,980 to 8,580; legacy was at level 4 or 5 |
+| first AI vs itself | 5 | **0 wins** after 30,000 time units; max level 5 or 6; 4 to 15 deaths per team |
+| pack vs pack | 5 | **5 wins**, after 6,800 to 8,060 time units; 0 or 1 death per team |
+| pack vs first AI | 3 | **3 pack wins**, after 6,980 to 8,580; the first AI was at level 4 or 5 |
 | 4 pack teams, 10×10 map | 3 | **3 wins**, after 6,730 to 7,260; 0 to 2 deaths per team |
 
-Every win had 7 or 8 players at level 8 together.
+Every win had 7 or 8 players at level 8 together. The first AI is kept in the git tag
+`legacy-ai`.
+
+**Communication** (2026-11-14):
+
+Opponent: the same AI with encryption turned off (`ZAPPY_INSECURE=1`), so its messages are
+in clear text and unauthenticated. 4 games per row, 20×20 map:
+
+| Games | Our wins | Opponent's max level when it lost |
+| --- | --- | --- |
+| encrypted, jammer on, vs clear text | 3 / 4 | 6, 4, 5 |
+| encrypted, jammer off (control), vs clear text | 3 / 4 | 5, 7, 7 |
+| encrypted vs encrypted (sanity check) | 3 / 3 games won by one side | 7, 6, 5 |
+
+What this shows, and what it does not:
+- **The first version of the jammer backfired.** A sound always comes from its sender, so
+  decoys lured enemy workers onto our home tile. The queen counted players with `Look`,
+  which cannot tell teams apart: she started the climb without all her workers and our
+  group split (2 games out of 4 stuck at level 5 or 6 after 30,000 time units). Fixed with
+  an authenticated roll call: workers waiting at home broadcast an encrypted `Here`
+  message with their id, and the queen counts only those. Since then, no game got stuck.
+- **The jammer's effect is not significant.** The opponent ends a little lower with the
+  jammer on, but 4 games per row cannot separate that from chance. The protection, on the
+  other hand, is verified by the unit tests: a foreign, modified or replayed message is
+  always rejected.
 
 **Limits.**
-- The games stop at the first winner, so whether every pack team would also win was not measured.
-- **Server rule.** This server does not consume food during the 300-unit incantation freeze (`isIncanting` in
-  `World.cpp`). With a server that does, the climb from level 2 to 8 costs about 15 food per player; workers
-  arrive home with 30, but this case was not measured.
-- 16 games show a clear trend, not a proof: map size, number of teams and deaths before the group forms
-  change the timing.
+- Games stop at the first winner: whether every pack team would also win was not measured.
+- This server does not consume food during the 300-unit incantation freeze. With a server
+  that does, the climb from level 2 to 8 costs about 15 food per player; workers arrive
+  home with 30, but this case was not measured.
+- These are a few dozen games: a clear trend, not a proof.
 
-Legacy strategy, for the record: the rally-point lock and progressive patience let some players reach level 8
-in one live run (4 teams, 10×10 map, f=100), but a team never had 6 players at level 8.
+## 6. Running and measuring
 
----
-
-## 8. Running the AI
-
-**Measure a strategy** (from the repository root, after `make server`):
 ```bash
-python3 tools/benchmark.py --teams red,blue                  # pack vs pack
-python3 tools/benchmark.py --teams new:pack,old:legacy       # pack vs legacy
+cd ai && python3 zappy_ai -p 4242 -n team1 -h localhost      # one queen; she starts the team
+cd ai && python3 -m unittest discover -s tests -t .          # unit tests
+python3 tools/benchmark.py --teams red,blue                  # headless game until a team wins
+python3 tools/benchmark.py --teams secure,plain:insecure     # vs a team talking in clear text
+python3 tools/benchmark.py --teams secure:nojam,plain:insecure   # same, jammer off (control)
 ```
 
-**One player:**
-```bash
-cd ai && python3 zappy_ai -p 4242 -n team1 -h localhost
-```
-*(The first process started is the "recruiter": it builds the rest of the team through `Fork`.)*
-
-**Bundled demos** (from the repository root):
-```bash
-./run_demo.sh        # server + several teams + GUI
-./test_fork.sh       # reproduction (Fork) test: the headcount grows
-```
+Environment variables: `ZAPPY_AI_DELAY` (seconds per move, to watch a game),
+`ZAPPY_DEBUG=1` (prints all traffic), `ZAPPY_TEAM_SECRET` (team key secret),
+`ZAPPY_INSECURE=1` and `ZAPPY_JAM=0` (experiments only: clear text, jammer off).
