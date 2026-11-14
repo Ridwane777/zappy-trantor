@@ -6,6 +6,11 @@ This document explains **how the AI works** and **what each function does**, fil
 
 ## 1. Overview
 
+> **Two strategies.** The default is the **pack strategy** (`logic/pack.py`, [section 6b](#6b-pack-strategy-default)):
+> the whole team climbs from level 2 to level 8 together, on one tile. The original per-level rally
+> (`logic/brain.py`, sections 4 to 7) is still available with `ZAPPY_STRATEGY=legacy`. Measured results:
+> [section 7](#7-results-and-limits).
+
 `zappy_ai` is the autonomous client that drives **a single player** (a "drone") on the Zappy server. To run a whole team, **several** `zappy_ai` **processes** are started (the first one builds the others through the game's `Fork` command).
 
 **Game goal:** level players up (1 → 8) through **incantations**. An incantation requires, on **the same tile**, a given number of **players of the same level** + a given number of **stones** (see the `ELEVATION_REQ` table).
@@ -29,7 +34,8 @@ ai/
 │   ├── parser.py            # parsing of the "Look" answer
 │   └── broadcast.py         # encoding/decoding of broadcast messages
 └── logic/
-    ├── brain.py             # main loop + rallying (homing)
+    ├── pack.py              # default strategy: the team climbs together on one tile
+    ├── brain.py             # legacy strategy: main loop + per-level rallying
     ├── player.py            # player state + elevation table
     ├── fork.py              # team headcount management (TeamManager)
     ├── explore.py           # exploration moves
@@ -263,15 +269,72 @@ Our team messages use the format `TYPE:data` (e.g. `NEED:team1:4:837421`).
 
 ---
 
+## 6b. Pack strategy (default)
+
+**Why the legacy strategy could not win.** Measured with `tools/benchmark.py`: the legacy AI reaches level 6,
+then stops. Early levels need only 2 players, so the team climbs by pairs and ends up split into small groups
+of different levels, for example two players at level 4, two at 5 and two at 6. Level 5 needs 4 players of the
+same level and level 6 needs 6: none of these groups can ever climb again. Replacements start at level 1 and
+find nobody of their level, so they die and are replaced in a loop. Two smaller issues made gathering
+unreliable: followers moved toward the **oldest** buffered sound of the anchor (its direction is relative to a
+position and orientation the follower no longer has), and the anchor itself kept moving.
+
+**How the pack strategy works** (`logic/pack.py`, class `PackBrain`):
+
+1. Every player reaches level 2 alone: one linemate, solo incantation.
+2. The queen (first process of the team) stocks 40 food, reaches level 2, then settles on her tile, called
+   *home*, and never moves again. Every turn she broadcasts
+   `HOME:<team>:<level>:<food>:<deficit>`: her level, her food, and the stones still missing in her stock for
+   **all** the incantations from her level to level 8 (`climb_need()`).
+3. Workers stock 30 food, collect the stones of the deficit, and walk home. They only follow the **latest**
+   HOME sound, and they drop the sounds heard while walking. Since home never moves, every step brings them
+   one tile closer.
+4. At home, workers drop their stones (and food when the queen runs low). The queen picks everything up: the
+   stock stays in her inventory, where no other team can take it.
+5. When the stock covers the whole climb and 7 players stand at home (6 after a short wait), the queen alone
+   drops the stones of the current level and incants. The server elevates every same-level player on the
+   tile, so the group climbs **together**, level after level, and never splits. Workers never incant, so
+   incantations do not overlap.
+
+The team is filtered in every message, so a player never follows another team's queen. Players that arrive
+too late to join the climb keep collecting stones and stay alive.
+
+---
+
 ## 7. Results and limits
 
-- **Level 8 reached.** The rally-point lock + progressive patience made it possible to reach level 8 (9 players reached level 8 in a live run with 4 teams, 10×10 map, f=100).
-- **Server fix.** Food is no longer consumed during the 300-tick incantation freeze (`isIncanting` in World.cpp) → avoids starvation during the 7→8 ritual.
-- **Remaining hard part.** Gathering 6 same-level players on one exact tile using sound (direction accurate to 1 out of 8) remains random. Success depends on map size and run variance.
+**Measured** with `tools/benchmark.py` (server at `-f 100`, 9 slots per team, 300 s limit, 16 games run on one
+laptop, 2026-11-14). A game stops at the first win (6 players of a team at level 8).
+
+| Games | Runs | Result |
+| --- | --- | --- |
+| legacy vs legacy, 20×20 map | 5 | **0 wins** after 30,000 time units; max level 5 or 6; 4 to 15 deaths per team |
+| pack vs pack, 20×20 map | 5 | **5 wins**, after 6,800 to 8,060 time units; 0 or 1 death per team |
+| pack vs legacy, 20×20 map | 3 | **3 pack wins**, after 6,980 to 8,580; legacy was at level 4 or 5 |
+| 4 pack teams, 10×10 map | 3 | **3 wins**, after 6,730 to 7,260; 0 to 2 deaths per team |
+
+Every win had 7 or 8 players at level 8 together.
+
+**Limits.**
+- The games stop at the first winner, so whether every pack team would also win was not measured.
+- **Server rule.** This server does not consume food during the 300-unit incantation freeze (`isIncanting` in
+  `World.cpp`). With a server that does, the climb from level 2 to 8 costs about 15 food per player; workers
+  arrive home with 30, but this case was not measured.
+- 16 games show a clear trend, not a proof: map size, number of teams and deaths before the group forms
+  change the timing.
+
+Legacy strategy, for the record: the rally-point lock and progressive patience let some players reach level 8
+in one live run (4 teams, 10×10 map, f=100), but a team never had 6 players at level 8.
 
 ---
 
 ## 8. Running the AI
+
+**Measure a strategy** (from the repository root, after `make server`):
+```bash
+python3 tools/benchmark.py --teams red,blue                  # pack vs pack
+python3 tools/benchmark.py --teams new:pack,old:legacy       # pack vs legacy
+```
 
 **One player:**
 ```bash

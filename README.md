@@ -20,7 +20,7 @@ lasts 126 time units.
 | Component | Folder | Language | Role |
 |---|---|---|---|
 | Server | `server/` | C++17 | Owns the world: map, tiles, resources, players, eggs. Accepts AI and GUI clients on a single `poll()` loop, queues each player's commands (up to 10 pending), runs them on a game clock driven by the frequency `-f`, handles food consumption and death, incantations, broadcasts and forks, and pushes events to connected GUIs. |
-| AI | `ai/` | Python 3 (standard library only) | Autonomous client that drives one player. The first process of a team acts as a "queen" that keeps the team populated with `Fork` and child processes; workers collect stones, rally through sound broadcasts and incant together. See [ai/DOCUMENTATION.md](ai/DOCUMENTATION.md). |
+| AI | `ai/` | Python 3 (standard library only) | Autonomous client that drives one player. The first process of a team acts as a "queen" that keeps the team populated with `Fork` and child processes, then settles on one tile; workers stock food, bring her the stones for the whole climb, and the team climbs from level 2 to level 8 together on her tile. See [ai/DOCUMENTATION.md](ai/DOCUMENTATION.md). |
 | GUI | `gui/` | C++17, SFML, OpenGL (GLEW, GLM) | 3D viewer: connects as a graphical client, receives the map and live events, and renders islands, players, resources and incantation effects, with a menu, HUD and day/night sky. |
 
 Server source layout: `World` (game rules and command handlers), `Map` / `Tile`
@@ -66,7 +66,7 @@ cd ai && python3 zappy_ai -p 4242 -n team1 -h localhost
 
 `-p` and `-n` are required, `-h` defaults to `localhost`. Optional environment
 variables: `ZAPPY_AI_DELAY` (seconds per move, slows the AI down for viewing) and
-`ZAPPY_DEBUG=1` (prints all traffic).
+`ZAPPY_DEBUG=1` (prints all traffic), `ZAPPY_STRATEGY=legacy` (previous AI).
 
 **GUI**
 
@@ -85,6 +85,27 @@ otherwise downloaded from a CDN (`ZAPPY_CDN_URL` overrides the address).
 ./test_fork.sh [PORT]             # 4 teams with one slot each, to watch Fork grow the teams
 ```
 
+## AI results
+
+The AI reliably wins: a team gets 6 players to level 8. Measured with
+[`tools/benchmark.py`](tools/benchmark.py) on 16 headless games (server at `-f 100`, 9 slots per team):
+
+| Games | Runs | Result |
+| --- | --- | --- |
+| previous AI vs itself, 20×20 | 5 | 0 wins after 30,000 time units, stuck at level 5 or 6 |
+| current AI vs itself, 20×20 | 5 | 5 wins, after 6,800 to 8,060 time units |
+| current AI vs previous AI, 20×20 | 3 | 3 wins for the current AI |
+| 4 teams of the current AI, 10×10 | 3 | 3 wins, after 6,730 to 7,260 time units |
+
+The previous AI climbed by pairs and the team split into groups of different levels that could never gather
+the 4 or 6 players of the higher levels. The current one keeps the team on one tile from level 2 to 8. Details
+and limits in [ai/DOCUMENTATION.md](ai/DOCUMENTATION.md#7-results-and-limits).
+
+```bash
+make server
+python3 tools/benchmark.py --teams red,blue    # headless game, prints levels until a team wins
+```
+
 ## Protocol
 
 Both protocols are documented in [`protocol/`](protocol/):
@@ -101,6 +122,9 @@ Built by a team of six.
 command queue and game clock (time unit), resource consumption and player death,
 incantation (two-phase synchronization), sound broadcast direction, and GUI protocol
 event broadcasting.
+
+**After the school project (Ridwane777):** the pack strategy of the AI (`ai/logic/pack.py`), which made it
+win, and the benchmark tool (`tools/benchmark.py`). The previous AI is kept as `ZAPPY_STRATEGY=legacy`.
 
 Teammates:
 
