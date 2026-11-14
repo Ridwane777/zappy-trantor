@@ -501,8 +501,8 @@ int GuiApp::run(int argc, char** argv)
 
     float cx = map.w * TILE * 0.5f;
     float cz = map.h * TILE * 0.5f;
-    float camYaw   = 45.f  * 3.14159f / 180.f;
-    float camPitch = 35.f  * 3.14159f / 180.f;
+    float camYaw   = cfg.camYaw   * 3.14159f / 180.f;
+    float camPitch = cfg.camPitch * 3.14159f / 180.f;
     int   nightOverride = 0;
     bool  fullscreen    = false;
     float camDist  = std::max(map.w, map.h) * TILE * 1.1f;
@@ -647,6 +647,10 @@ int GuiApp::run(int argc, char** argv)
         if (netConnected)
             netClient.tick(dt);
 
+        // Demo mode: slow orbit around the island (ZAPPY_CAM_ORBIT), overview camera only.
+        if (cfg.camOrbit != 0.f && !adminMode && !charzMode && !povMode)
+            camYaw += cfg.camOrbit * 3.14159f / 180.f * dt;
+
         int pollId = hud.inventoryPollTarget(dt);
         if (pollId >= 0 && netConnected)
             netClient.requestInventory(pollId);
@@ -675,7 +679,7 @@ int GuiApp::run(int argc, char** argv)
             const GuiState& gs = netClient.state();
             if (!camFramedForTeams && !gs.teams.empty()) {
                 float ext = worldExtentRadius(1, map.w * TILE * 0.455f);
-                camDist = ext * 2.42f;
+                camDist = ext * 2.42f / cfg.camZoom;
                 camFramedForTeams = true;
             }
             if (gs.sizeKnown && netClient.consumeResourcesDirty()) {
@@ -870,7 +874,7 @@ int GuiApp::run(int argc, char** argv)
                     camYaw = 45.f * 3.14159f / 180.f;
                     camPitch = 35.f * 3.14159f / 180.f;
                     float ext = worldExtentRadius(1, map.w * TILE * 0.455f);
-                    camDist = ext * 2.42f;
+                    camDist = ext * 2.42f / cfg.camZoom;
                 }
             }
             if (ev.type == sf::Event::KeyPressed && ev.key.code == sf::Keyboard::Tab)

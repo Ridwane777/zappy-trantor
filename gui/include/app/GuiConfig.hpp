@@ -21,6 +21,12 @@ struct GuiConfig {
     float playerScale = 0.05f / 6.f;  // ZAPPY_PSCALE
     float strideDist;                 // ZAPPY_STRIDE (min 0.2), default TILE
 
+    // Camera at start (defaults: the usual three-quarter view)
+    float camYaw   = 45.f;      // ZAPPY_CAM_YAW (degrees)
+    float camPitch = 35.f;      // ZAPPY_CAM_PITCH (degrees)
+    float camZoom  = 1.f;       // ZAPPY_CAM_ZOOM (above 1 = closer)
+    float camOrbit = 0.f;       // ZAPPY_CAM_ORBIT (degrees per second, 0 = still; demo mode)
+
     // Sky
     float dayLength = 120.f;    // ZAPPY_DAY_LENGTH
     float dayStart  = 0.05f;    // ZAPPY_DAY_START

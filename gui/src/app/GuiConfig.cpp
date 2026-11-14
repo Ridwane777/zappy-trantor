@@ -52,6 +52,10 @@ GuiConfig GuiConfig::fromEnvironment()
 
     c.dayLength = envFloat("ZAPPY_DAY_LENGTH", c.dayLength);
     c.dayStart  = envFloat("ZAPPY_DAY_START",  c.dayStart);
+    c.camYaw    = envFloat("ZAPPY_CAM_YAW",    c.camYaw);
+    c.camPitch  = envFloat("ZAPPY_CAM_PITCH",  c.camPitch);
+    c.camZoom   = std::max(0.1f, envFloat("ZAPPY_CAM_ZOOM", c.camZoom));
+    c.camOrbit  = envFloat("ZAPPY_CAM_ORBIT",  c.camOrbit);
     c.constAz   = envFloat("ZAPPY_CONST_AZ",   c.constAz);
     c.constEl   = envFloat("ZAPPY_CONST_EL",   c.constEl);
     c.constS    = envFloat("ZAPPY_CONST_S",    c.constS);
