@@ -15,7 +15,7 @@ if [ -f "$GUI_DIR/assets/ASSETS.md" ] && [ "${1:-}" != "--force" ]; then
     exit 0
 fi
 
-echo "downloading $ARCHIVE (about 750 MB)..."
+echo "downloading $ARCHIVE (about 880 MB)..."
 curl -fL --progress-bar -o "$TMP/$ARCHIVE" "$RELEASE_URL/$ARCHIVE"
 curl -fsSL -o "$TMP/$ARCHIVE.sha256" "$RELEASE_URL/$ARCHIVE.sha256"
 

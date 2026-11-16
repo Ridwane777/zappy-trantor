@@ -1,6 +1,6 @@
 # GUI assets
 
-The 3D models, textures, sounds and fonts used by the GUI (about 1.2 GB) are not stored
+The 3D models, textures, sounds and fonts used by the GUI (about 1.5 GB) are not stored
 in git. They are published as an archive attached to the GitHub release `assets-v1`:
 
 ```bash
